@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import data from "@/data.json";
 
 type RiskRow = {
@@ -30,6 +30,19 @@ type RiskRow = {
 
 const riskCalc: RiskRow[] = (data as any).riskCalc;
 
+type SortKey = "TID" | "Technique Name" | "Tactic" | "CIA Score" | "Impact Rate" | "Likelihood Rate" | "Risk Scores";
+
+const RATE_ORDER: Record<string, number> = {
+  "very high": 4,
+  "high": 3,
+  "medium": 2,
+  "low": 1,
+};
+
+function rateRank(v: string): number {
+  return RATE_ORDER[(v || "").toLowerCase().trim()] ?? 0;
+}
+
 function rateColor(rate: string) {
   if (!rate) return "text-muted-foreground";
   const r = String(rate).toLowerCase();
@@ -53,6 +66,8 @@ function rateStyle(rate: string) {
 export default function RiskCalculation() {
   const [search, setSearch] = useState("");
   const [tacticFilter, setTacticFilter] = useState("All");
+  const [sortKey, setSortKey] = useState<SortKey>("Risk Scores");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const tactics = ["All", ...Array.from(new Set(riskCalc.flatMap(r => r.Tactic?.split(", ") || []))).sort()];
 
@@ -62,6 +77,41 @@ export default function RiskCalculation() {
     const matchTactic = tacticFilter === "All" || (r.Tactic || "").includes(tacticFilter);
     return matchSearch && matchTactic;
   });
+
+  const sorted = useMemo(() => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      switch (sortKey) {
+        case "TID":
+        case "Technique Name":
+        case "Tactic":
+          return dir * (a[sortKey] ?? "").localeCompare(b[sortKey] ?? "");
+        case "Impact Rate":
+          return dir * (rateRank(a["Impact Rate"]) - rateRank(b["Impact Rate"]));
+        case "Likelihood Rate":
+          return dir * (rateRank(a["Likelihood Rate"]) - rateRank(b["Likelihood Rate"]));
+        case "CIA Score":
+        case "Risk Scores":
+          return dir * (Number(a[sortKey] ?? 0) - Number(b[sortKey] ?? 0));
+        default:
+          return 0;
+      }
+    });
+  }, [filtered, sortKey, sortDir]);
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir(d => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+  }
+
+  function SortIcon({ col }: { col: SortKey }) {
+    if (sortKey !== col) return <span className="ml-1 opacity-30">↕</span>;
+    return <span className="ml-1 text-primary">{sortDir === "asc" ? "↑" : "↓"}</span>;
+  }
 
   const avgRisk = riskCalc.reduce((s, r) => s + (r["Risk Scores"] || 0), 0) / riskCalc.length;
   const maxRisk = Math.max(...riskCalc.map(r => r["Risk Scores"] || 0));
@@ -117,18 +167,34 @@ export default function RiskCalculation() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/20">
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">TID</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Technique Name</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Tactic</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">CIA Score</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">Impact Rate</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">Likelihood</th>
+                {(
+                  [
+                    { col: "TID", label: "TID" },
+                    { col: "Technique Name", label: "Technique Name" },
+                    { col: "Tactic", label: "Tactic" },
+                    { col: "CIA Score", label: "CIA Score" },
+                    { col: "Impact Rate", label: "Impact Rate" },
+                    { col: "Likelihood Rate", label: "Likelihood" },
+                  ] as { col: SortKey; label: string }[]
+                ).map(({ col, label }) => (
+                  <th key={col} className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">
+                    <button onClick={() => handleSort(col)} className="flex items-center hover:text-foreground transition-colors">
+                      {label}
+                      <SortIcon col={col} />
+                    </button>
+                  </th>
+                ))}
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">Last Seen</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">Risk Score</th>
+                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">
+                  <button onClick={() => handleSort("Risk Scores")} className="flex items-center hover:text-foreground transition-colors">
+                    Risk Score
+                    <SortIcon col="Risk Scores" />
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
-              {filtered.slice(0, 100).map((row, i) => (
+              {sorted.slice(0, 100).map((row, i) => (
                 <tr key={i} className="border-b border-border/40 hover:bg-accent/20 transition-colors">
                   <td className="px-4 py-2.5">
                     <span className="font-mono text-xs text-primary bg-primary/10 px-2 py-0.5 rounded">{row.TID}</span>
@@ -168,9 +234,9 @@ export default function RiskCalculation() {
               ))}
             </tbody>
           </table>
-          {filtered.length > 100 && (
+          {sorted.length > 100 && (
             <div className="p-3 text-center text-xs text-muted-foreground border-t border-border">
-              Showing 100 of {filtered.length} results. Use search to filter further.
+              Showing 100 of {sorted.length} results. Use search to filter further.
             </div>
           )}
         </div>
