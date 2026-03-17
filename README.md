@@ -243,12 +243,7 @@ Common causes and fixes:
 |---------|-----|
 | You ran `sudo pnpm …` | Never use `sudo` with pnpm — it changes the home directory and breaks the pnpm store. Run without sudo. |
 | Node.js < 18 | This project requires Node.js 18 or later. Check with `node --version`. |
-| macOS / Windows | The `pnpm-workspace.yaml` strips non-Linux-x64 platform binaries (esbuild, rollup, Tailwind oxide). See below. |
 | Conda `(base)` environment | The conda Node.js may be outdated. Install Node.js via [nvm](https://github.com/nvm-sh/nvm) instead and run outside conda. |
-
-**Running on macOS or Windows**
-
-The `pnpm-workspace.yaml` has overrides that exclude non-Linux-x64 platform packages to keep Replit's install lean. On macOS or Windows you need to remove those exclusions. Open `pnpm-workspace.yaml` and delete the entire `overrides:` block (everything from `overrides:` to the end of the file), then re-run `pnpm install`.
 
 **Node.js version**
 
