@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import data from "@/data.json";
 
 type Actor = {
@@ -160,7 +161,11 @@ export default function ActorPrioritisation() {
                   filtered.map((actor, i) => (
                     <tr key={actor.name} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
                       <td className="px-4 py-2.5 text-muted-foreground font-mono text-xs">{i + 1}</td>
-                      <td className="px-4 py-2.5 font-medium text-foreground text-xs">{actor.name}</td>
+                      <td className="px-4 py-2.5 text-xs">
+                        <Link href={`/all-procedures?actor=${encodeURIComponent(actor.name)}`}>
+                          <span className="font-medium text-foreground hover:text-primary hover:underline cursor-pointer transition-colors" title="View procedures for this actor">{actor.name}</span>
+                        </Link>
+                      </td>
                       <td className="px-4 py-2.5 text-center">
                         <div className="flex gap-0.5">
                           {Array.from({ length: 7 }).map((_, j) => (
@@ -199,7 +204,9 @@ export default function ActorPrioritisation() {
               {(filteredRanking.length > 0 ? filteredRanking : actorRanking).slice(0, 15).map(a => (
                 <div key={a.name}>
                   <div className="flex justify-between mb-1">
-                    <span className="text-xs text-foreground">{a.name}</span>
+                    <Link href={`/all-procedures?actor=${encodeURIComponent(a.name)}`}>
+                      <span className="text-xs text-foreground hover:text-primary hover:underline cursor-pointer transition-colors" title="View procedures">{a.name}</span>
+                    </Link>
                   </div>
                   <BarChart value={a.riskSum} max={maxRisk} />
                 </div>
@@ -215,9 +222,11 @@ export default function ActorPrioritisation() {
             <div className="p-4">
               <div className="flex flex-wrap gap-2">
                 {monitoringList.filter(Boolean).map(actor => (
-                  <span key={actor} className="text-xs px-2.5 py-1 rounded-full bg-primary/10 border border-primary/30 text-primary font-medium">
-                    {actor}
-                  </span>
+                  <Link key={actor} href={`/all-procedures?actor=${encodeURIComponent(actor)}`}>
+                    <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 border border-primary/30 text-primary font-medium hover:bg-primary/20 cursor-pointer transition-colors" title="View procedures">
+                      {actor}
+                    </span>
+                  </Link>
                 ))}
               </div>
             </div>
@@ -244,7 +253,11 @@ export default function ActorPrioritisation() {
             <tbody>
               {topActors.map(actor => (
                 <tr key={actor.name} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
-                  <td className="px-4 py-3 font-semibold text-foreground">{actor.name}</td>
+                  <td className="px-4 py-3">
+                    <Link href={`/all-procedures?actor=${encodeURIComponent(actor.name)}`}>
+                      <span className="font-semibold text-foreground hover:text-primary hover:underline cursor-pointer transition-colors" title="View procedures for this actor">{actor.name}</span>
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 text-chart-2">{actor.intent}</td>
                   <td className="px-4 py-3 text-chart-3">{actor.capability}</td>
                   <td className="px-4 py-3 text-muted-foreground">{actor.ttpRisk.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>

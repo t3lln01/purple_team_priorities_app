@@ -16,6 +16,12 @@ const allProcedures: Procedure[] = (data as any).allProcedures;
 const uniqueActors = ["", ...Array.from(new Set(allProcedures.map(r => r.actor).filter(Boolean))).sort()];
 const uniqueMitreIds = ["", ...Array.from(new Set(allProcedures.map(r => r.mitreId).filter(Boolean))).sort()];
 
+function matchActor(name: string): string {
+  if (!name) return "";
+  const lower = name.toLowerCase();
+  return uniqueActors.find(a => a.toLowerCase() === lower) ?? "";
+}
+
 const PAGE_SIZE = 30;
 
 function formatDate(ms: number | null) {
@@ -32,7 +38,10 @@ function riskColor(r: number) {
 
 export default function AllProcedures() {
   const search = useSearch();
-  const [actorFilter, setActorFilter] = useState("");
+  const [actorFilter, setActorFilter] = useState(() => {
+    const params = new URLSearchParams(search);
+    return matchActor(params.get("actor") ?? "");
+  });
   const [mitreFilter, setMitreFilter] = useState(() => {
     const params = new URLSearchParams(search);
     return params.get("mitre") ?? "";
@@ -46,8 +55,8 @@ export default function AllProcedures() {
 
   useEffect(() => {
     const params = new URLSearchParams(search);
-    const mitre = params.get("mitre") ?? "";
-    setMitreFilter(mitre);
+    setMitreFilter(params.get("mitre") ?? "");
+    setActorFilter(matchActor(params.get("actor") ?? ""));
     setPage(1);
   }, [search]);
 
