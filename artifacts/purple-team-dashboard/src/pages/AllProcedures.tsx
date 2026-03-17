@@ -40,6 +40,8 @@ export default function AllProcedures() {
   const [procedureSearch, setProcedureSearch] = useState("");
   const [minRisk, setMinRisk] = useState("");
   const [maxRisk, setMaxRisk] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -52,14 +54,17 @@ export default function AllProcedures() {
   const filtered = useMemo(() => {
     const lo = minRisk !== "" ? Number(minRisk) : -Infinity;
     const hi = maxRisk !== "" ? Number(maxRisk) : Infinity;
+    const fromMs = dateFrom ? new Date(dateFrom).getTime() : -Infinity;
+    const toMs = dateTo ? new Date(dateTo).getTime() + 86400000 - 1 : Infinity;
     return allProcedures.filter(row => {
       if (actorFilter && row.actor !== actorFilter) return false;
       if (mitreFilter && row.mitreId !== mitreFilter) return false;
       if (procedureSearch && !row.procedure.toLowerCase().includes(procedureSearch.toLowerCase())) return false;
       if (row.risk < lo || row.risk > hi) return false;
+      if (row.date !== null && (row.date < fromMs || row.date > toMs)) return false;
       return true;
     });
-  }, [actorFilter, mitreFilter, procedureSearch, minRisk, maxRisk]);
+  }, [actorFilter, mitreFilter, procedureSearch, minRisk, maxRisk, dateFrom, dateTo]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -76,10 +81,12 @@ export default function AllProcedures() {
     setProcedureSearch("");
     setMinRisk("");
     setMaxRisk("");
+    setDateFrom("");
+    setDateTo("");
     setPage(1);
   }
 
-  const hasFilters = actorFilter || mitreFilter || procedureSearch || minRisk || maxRisk;
+  const hasFilters = actorFilter || mitreFilter || procedureSearch || minRisk || maxRisk || dateFrom || dateTo;
 
   return (
     <div className="p-6 space-y-5">
@@ -99,7 +106,7 @@ export default function AllProcedures() {
             </button>
           )}
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-xs text-muted-foreground font-medium">Actor / Group</label>
             <select
@@ -156,6 +163,26 @@ export default function AllProcedures() {
               value={maxRisk}
               onChange={e => handleFilterChange(() => setMaxRisk(e.target.value))}
               className="bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground font-medium">Date From</label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={e => handleFilterChange(() => setDateFrom(e.target.value))}
+              className="bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring [color-scheme:dark]"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground font-medium">Date To</label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={e => handleFilterChange(() => setDateTo(e.target.value))}
+              className="bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring [color-scheme:dark]"
             />
           </div>
         </div>
