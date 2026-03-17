@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useSearch } from "wouter";
 import data from "@/data.json";
 
@@ -13,13 +13,16 @@ type Procedure = {
 
 const allProcedures: Procedure[] = (data as any).allProcedures;
 
-const uniqueActors = ["", ...Array.from(new Set(allProcedures.map(r => r.actor).filter(Boolean))).sort()];
+const procedureActors: string[] = Array.from(
+  new Set(allProcedures.map(r => r.actor).filter(Boolean))
+).sort();
+
 const uniqueMitreIds = ["", ...Array.from(new Set(allProcedures.map(r => r.mitreId).filter(Boolean))).sort()];
 
 function matchActor(name: string): string {
   if (!name) return "";
   const lower = name.toLowerCase();
-  return uniqueActors.find(a => a.toLowerCase() === lower) ?? "";
+  return procedureActors.find(a => a.toLowerCase() === lower) ?? "";
 }
 
 const PAGE_SIZE = 30;
@@ -44,11 +47,155 @@ function riskColor(r: number) {
   return "text-green-400 bg-green-400/10 border border-green-400/30";
 }
 
+function ActorMultiSelect({
+  selected,
+  onChange,
+}: {
+  selected: Set<string>;
+  onChange: (next: Set<string>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [chipSearch, setChipSearch] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  function toggle(actor: string) {
+    const next = new Set(selected);
+    next.has(actor) ? next.delete(actor) : next.add(actor);
+    onChange(next);
+  }
+
+  function clearAll() {
+    onChange(new Set());
+  }
+
+  const visible = chipSearch
+    ? procedureActors.filter(a => a.toLowerCase().includes(chipSearch.toLowerCase()))
+    : procedureActors;
+
+  const label =
+    selected.size === 0
+      ? "All actors"
+      : selected.size === 1
+      ? [...selected][0]
+      : `${selected.size} actors`;
+
+  return (
+    <div className="flex flex-col gap-1 relative" ref={ref}>
+      <label className="text-xs text-muted-foreground font-medium">Actor / Group</label>
+
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className={`flex items-center justify-between gap-2 bg-input border rounded-lg px-2.5 py-1.5 text-xs text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${
+          open ? "border-ring" : "border-border"
+        } ${selected.size > 0 ? "text-primary" : "text-foreground"}`}
+      >
+        <span className="truncate">{label}</span>
+        <span className="text-muted-foreground flex-shrink-0">{open ? "▲" : "▼"}</span>
+      </button>
+
+      {selected.size > 0 && (
+        <div className="flex flex-wrap gap-1 mt-0.5">
+          {[...selected].map(a => (
+            <span
+              key={a}
+              className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary"
+            >
+              {a}
+              <button
+                onClick={() => toggle(a)}
+                className="hover:text-red-400 transition-colors leading-none"
+                title="Remove"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          <button
+            onClick={clearAll}
+            className="text-[10px] text-muted-foreground hover:text-foreground underline transition-colors"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
+      {open && (
+        <div className="absolute top-full left-0 z-50 mt-1 w-64 bg-card border border-border rounded-xl shadow-xl overflow-hidden">
+          <div className="p-2 border-b border-border">
+            <input
+              type="search"
+              autoFocus
+              placeholder="Search actors…"
+              value={chipSearch}
+              onChange={e => setChipSearch(e.target.value)}
+              className="w-full bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto p-2 flex flex-col gap-0.5">
+            {visible.length === 0 ? (
+              <span className="text-xs text-muted-foreground px-2 py-1">No actors found.</span>
+            ) : (
+              visible.map(actor => {
+                const active = selected.has(actor);
+                return (
+                  <button
+                    key={actor}
+                    onClick={() => toggle(actor)}
+                    className={`flex items-center gap-2 w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                      active
+                        ? "bg-primary/15 text-primary"
+                        : "text-foreground hover:bg-accent"
+                    }`}
+                  >
+                    <span
+                      className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center text-[9px] transition-colors ${
+                        active
+                          ? "bg-primary border-primary text-primary-foreground"
+                          : "border-border"
+                      }`}
+                    >
+                      {active ? "✓" : ""}
+                    </span>
+                    <span className="truncate">{actor}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+          {selected.size > 0 && (
+            <div className="border-t border-border p-2">
+              <button
+                onClick={clearAll}
+                className="w-full text-xs text-muted-foreground hover:text-foreground text-center underline transition-colors"
+              >
+                Clear all ({selected.size})
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AllProcedures() {
   const search = useSearch();
-  const [actorFilter, setActorFilter] = useState(() => {
+
+  const [selectedActors, setSelectedActors] = useState<Set<string>>(() => {
     const params = new URLSearchParams(search);
-    return matchActor(params.get("actor") ?? "");
+    const actor = matchActor(params.get("actor") ?? "");
+    return actor ? new Set([actor]) : new Set();
   });
   const [mitreFilter, setMitreFilter] = useState(() => {
     const params = new URLSearchParams(search);
@@ -64,7 +211,8 @@ export default function AllProcedures() {
   useEffect(() => {
     const params = new URLSearchParams(search);
     setMitreFilter(params.get("mitre") ?? "");
-    setActorFilter(matchActor(params.get("actor") ?? ""));
+    const actor = matchActor(params.get("actor") ?? "");
+    setSelectedActors(actor ? new Set([actor]) : new Set());
     setPage(1);
   }, [search]);
 
@@ -74,14 +222,14 @@ export default function AllProcedures() {
     const fromMs = dateFrom ? new Date(dateFrom).getTime() : -Infinity;
     const toMs = dateTo ? new Date(dateTo).getTime() + 86400000 - 1 : Infinity;
     return allProcedures.filter(row => {
-      if (actorFilter && row.actor !== actorFilter) return false;
+      if (selectedActors.size > 0 && !selectedActors.has(row.actor)) return false;
       if (mitreFilter && row.mitreId !== mitreFilter) return false;
       if (procedureSearch && !row.procedure.toLowerCase().includes(procedureSearch.toLowerCase())) return false;
       if (row.risk < lo || row.risk > hi) return false;
       if (row.date !== null && (row.date < fromMs || row.date > toMs)) return false;
       return true;
     });
-  }, [actorFilter, mitreFilter, procedureSearch, minRisk, maxRisk, dateFrom, dateTo]);
+  }, [selectedActors, mitreFilter, procedureSearch, minRisk, maxRisk, dateFrom, dateTo]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -93,7 +241,7 @@ export default function AllProcedures() {
   }
 
   function clearAll() {
-    setActorFilter("");
+    setSelectedActors(new Set());
     setMitreFilter("");
     setProcedureSearch("");
     setMinRisk("");
@@ -103,7 +251,7 @@ export default function AllProcedures() {
     setPage(1);
   }
 
-  const hasFilters = actorFilter || mitreFilter || procedureSearch || minRisk || maxRisk || dateFrom || dateTo;
+  const hasFilters = selectedActors.size > 0 || mitreFilter || procedureSearch || minRisk || maxRisk || dateFrom || dateTo;
 
   return (
     <div className="p-6 space-y-5">
@@ -123,19 +271,12 @@ export default function AllProcedures() {
             </button>
           )}
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted-foreground font-medium">Actor / Group</label>
-            <select
-              value={actorFilter}
-              onChange={e => handleFilterChange(() => setActorFilter(e.target.value))}
-              className="bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              {uniqueActors.map(a => (
-                <option key={a} value={a}>{a || "All actors"}</option>
-              ))}
-            </select>
-          </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-start">
+          <ActorMultiSelect
+            selected={selectedActors}
+            onChange={next => { setSelectedActors(next); setPage(1); }}
+          />
 
           <div className="flex flex-col gap-1">
             <label className="text-xs text-muted-foreground font-medium">MITRE ID</label>
@@ -150,7 +291,7 @@ export default function AllProcedures() {
             </select>
           </div>
 
-          <div className="flex flex-col gap-1 lg:col-span-1">
+          <div className="flex flex-col gap-1">
             <label className="text-xs text-muted-foreground font-medium">Procedure Search</label>
             <input
               type="search"
@@ -173,17 +314,6 @@ export default function AllProcedures() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted-foreground font-medium">Risk Max</label>
-            <input
-              type="number"
-              placeholder="e.g. 1800"
-              value={maxRisk}
-              onChange={e => handleFilterChange(() => setMaxRisk(e.target.value))}
-              className="bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
             <label className="text-xs text-muted-foreground font-medium">Date From</label>
             <input
               type="date"
@@ -200,6 +330,19 @@ export default function AllProcedures() {
               value={dateTo}
               onChange={e => handleFilterChange(() => setDateTo(e.target.value))}
               className="bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring [color-scheme:dark]"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-start">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground font-medium">Risk Max</label>
+            <input
+              type="number"
+              placeholder="e.g. 1800"
+              value={maxRisk}
+              onChange={e => handleFilterChange(() => setMaxRisk(e.target.value))}
+              className="bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
         </div>
