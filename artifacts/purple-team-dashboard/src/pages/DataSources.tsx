@@ -57,7 +57,74 @@ function parseMitre(json: any): MitreStats {
   return { total: techs.length, tactics, sample: techs.slice(0, 50), loadedAt: new Date().toISOString() };
 }
 
-// Normalise last_updated / created_date to ms timestamp — handles unix-seconds, unix-ms, and ISO strings
+// Parse DD/MM/YYYY → ms timestamp (matches Python's CSV_DATE_FMT = '%d/%m/%Y')
+function parseDDMMYYYY(s: string): number {
+  if (!s) return 0;
+  const parts = s.split("/");
+  if (parts.length !== 3) return 0;
+  const [d, m, y] = parts.map(Number);
+  if (!d || !m || !y) return 0;
+  return new Date(y, m - 1, d).getTime();
+}
+
+// Minimal RFC-4180-compatible CSV line splitter (handles quoted fields)
+function splitCsvLine(line: string): string[] {
+  const result: string[] = [];
+  let cur = "";
+  let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if (c === "," && !inQ) { result.push(cur); cur = ""; }
+    else cur += c;
+  }
+  result.push(cur);
+  return result;
+}
+
+function parseCsvRows(text: string): Record<string, string>[] {
+  const lines = text.split(/\r?\n/);
+  const nonEmpty = lines.filter(l => l.trim());
+  if (nonEmpty.length < 2) return [];
+  // Strip BOM if present
+  const headerLine = nonEmpty[0].replace(/^\uFEFF/, "");
+  const headers = splitCsvLine(headerLine).map(h => h.trim());
+  return nonEmpty.slice(1).map(line => {
+    const vals = splitCsvLine(line);
+    const row: Record<string, string> = {};
+    headers.forEach((h, i) => { row[h] = (vals[i] ?? "").trim(); });
+    return row;
+  }).filter(row => Object.values(row).some(v => v));
+}
+
+// Parse a CrowdStrike reports CSV (columns: id, name, url, date DD/MM/YYYY)
+function parseReportsCsv(text: string): { stats: ReportsStats; lookup: ReportsLookup } {
+  const rows = parseCsvRows(text);
+  const lookup: ReportsLookup = {};
+  const mapped = rows.map(row => {
+    const id   = (row["id"]   ?? row["Report id"]   ?? "").trim().toUpperCase();
+    const name = (row["name"] ?? row["Report name"] ?? "").trim();
+    const url  = (row["url"]  ?? row["Report url"]  ?? "").trim();
+    const dateStr = (row["date"] ?? "").trim(); // DD/MM/YYYY
+    const dateMs  = parseDDMMYYYY(dateStr);
+    if (id) lookup[id] = { reportId: id, name, url, last_updated: dateMs };
+    return { id, name, url, date: dateStr, dateTs: dateMs, type: "Report" };
+  }).filter(r => r.id);
+
+  const sorted = [...mapped].sort((a, b) => b.dateTs - a.dateTs);
+  const stats: ReportsStats = {
+    total: mapped.length,
+    dateRange: { from: sorted.at(-1)?.date ?? "—", to: sorted[0]?.date ?? "—" },
+    types: [{ name: "Report", count: mapped.length }],
+    sample: sorted.slice(0, 50).map(r => ({ id: 0, name: r.name, url: r.url, date: r.date, type: r.type })),
+    loadedAt: new Date().toISOString(),
+  };
+  return { stats, lookup };
+}
+
+// Fallback: parse from JSON (api_object.resources format)
 function toMs(val: any): number {
   if (!val) return 0;
   if (typeof val === "number") return val < 10_000_000_000 ? val * 1000 : val;
@@ -70,29 +137,14 @@ function fmtDate(ms: number): string {
   return new Date(ms).toLocaleDateString("en-GB", { year: "numeric", month: "short", day: "2-digit" });
 }
 
-function parseReports(json: any): { stats: ReportsStats; lookup: ReportsLookup } {
+function parseReportsJson(json: any): { stats: ReportsStats; lookup: ReportsLookup } {
   const resources = json?.api_object?.resources ?? json?.resources ?? (Array.isArray(json) ? json : []);
   const lookup: ReportsLookup = {};
   const mapped = resources.map((r: any) => {
-    const slug = (r.slug ?? "").toLowerCase();
-    // Prefer last_modified_date; fall back to created_date
+    const id = (r.slug ?? r.id ?? "").toString().toUpperCase();
     const dateMs = toMs(r.last_modified_date) || toMs(r.created_date);
-    if (slug) {
-      lookup[slug] = {
-        reportId: slug.toUpperCase(),
-        name: r.name ?? "",
-        url: r.url ?? "",
-        last_updated: dateMs,
-      };
-    }
-    return {
-      id: r.id,
-      name: r.name ?? "",
-      url: r.url ?? "",
-      date: fmtDate(dateMs),
-      dateTs: dateMs,
-      type: r.type?.name ?? "Unknown",
-    };
+    if (id) lookup[id] = { reportId: id, name: r.name ?? "", url: r.url ?? "", last_updated: dateMs };
+    return { id, name: r.name ?? "", url: r.url ?? "", date: fmtDate(dateMs), dateTs: dateMs, type: r.type?.name ?? "Unknown" };
   });
   const sorted = [...mapped].sort((a: any, b: any) => b.dateTs - a.dateTs);
   const typeCounts: Record<string, number> = {};
@@ -132,6 +184,15 @@ function readJson(file: File): Promise<any> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = e => { try { resolve(JSON.parse(e.target?.result as string)); } catch { reject(new Error("Invalid JSON")); } };
+    reader.onerror = () => reject(new Error("Read error"));
+    reader.readAsText(file);
+  });
+}
+
+function readText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target?.result as string ?? "");
     reader.onerror = () => reject(new Error("Read error"));
     reader.readAsText(file);
   });
@@ -236,10 +297,17 @@ export default function DataSources() {
     const file = e.target.files?.[0]; if (!file) return;
     setReportsStatus("loading"); setReportsError("");
     try {
-      const json = await readJson(file);
-      const { stats, lookup } = parseReports(json);
-      setReportsStats(stats); lsSet("ds_reports_stats", stats);
-      saveReportsLookup(lookup); setReportsStatus("done");
+      const isCsv = file.name.toLowerCase().endsWith(".csv");
+      let result: { stats: ReportsStats; lookup: ReportsLookup };
+      if (isCsv) {
+        const text = await readText(file);
+        result = parseReportsCsv(text);
+      } else {
+        const json = await readJson(file);
+        result = parseReportsJson(json);
+      }
+      setReportsStats(result.stats); lsSet("ds_reports_stats", result.stats);
+      saveReportsLookup(result.lookup); setReportsStatus("done");
     } catch (err: any) { setReportsError(err.message); setReportsStatus("error"); }
     e.target.value = "";
   }
@@ -446,23 +514,24 @@ export default function DataSources() {
                   <span className="text-xs font-bold uppercase tracking-widest text-chart-2">Reports</span>
                   <StatusBadge status={reportsStatus} />
                 </div>
-                <p className="text-xs text-muted-foreground">Intelligence reports — dates, URLs, types, linked actors</p>
+                <p className="text-xs text-muted-foreground">Intelligence reports — CSV preferred (id, name, url, date)</p>
               </div>
               {reportsStats && <button onClick={clearReports} title="Clear" className="text-muted-foreground hover:text-red-400 transition-colors flex-shrink-0"><Trash2 className="w-4 h-4" /></button>}
             </div>
           </div>
           <div className="p-5 space-y-3 flex-1">
-            <SH>Expected Format</SH>
+            <SH>Expected Format (CSV — preferred)</SH>
             <div className="bg-muted/20 border border-border rounded-lg px-3 py-2 text-[10px] font-mono text-muted-foreground leading-relaxed">
-              {`{ "api_object": { "resources": [...] } }`}<br />
-              {`// each: id, name, slug, url, created_date (unix)`}
+              id, name, url, date<br />
+              CSA-240217, "Report Title", https://..., 17/02/2024<br />
+              <span className="opacity-60">// date column = DD/MM/YYYY</span>
             </div>
             <SH>Load via File</SH>
             <button onClick={() => reportsFileRef.current?.click()}
               className="w-full flex items-center justify-center gap-2 px-3 py-2.5 border-2 border-dashed border-border rounded-lg text-xs text-muted-foreground hover:border-chart-2/50 hover:text-foreground transition-colors">
-              <Upload className="w-3.5 h-3.5" />Upload reports.json
+              <Upload className="w-3.5 h-3.5" />Upload reports.csv or reports.json
             </button>
-            <input ref={reportsFileRef} type="file" accept=".json" className="hidden" onChange={onReportsFile} />
+            <input ref={reportsFileRef} type="file" accept=".csv,.json" className="hidden" onChange={onReportsFile} />
             {reportsError && <p className="text-xs text-red-400">{reportsError}</p>}
             {reportsStats && (
               <div className="space-y-3 pt-1">

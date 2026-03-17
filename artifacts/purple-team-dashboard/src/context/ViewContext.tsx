@@ -129,43 +129,48 @@ export function generateView(
       const reports = entry.reports ?? [];
       const observables = entry.observables ?? [];
 
-      // Resolve report slugs → lookup entries
-      const resolvedReports = reports
-        .map(slug => ({ slug, data: reportsLookup[slug.toLowerCase()] ?? reportsLookup[slug.toUpperCase()] ?? reportsLookup[slug] }))
-        .filter(r => r.data);
+      // Match slugs → lookup (keys are uppercase, match Python: rep_id.strip().upper())
+      let bestReport: ReportsLookup[string] | null = null;
+      let bestDate = 0;
 
-      // Pick the single newest report by last_updated
-      const sortedByDate = [...resolvedReports].sort(
-        (a, b) => (b.data?.last_updated ?? 0) - (a.data?.last_updated ?? 0)
-      );
-      const latestReport = sortedByDate[0];
+      for (const slug of reports) {
+        const key = slug.trim().toUpperCase();
+        const rep = reportsLookup[key];
+        if (!rep) continue;
+        if (rep.last_updated > bestDate) {
+          bestDate = rep.last_updated;
+          bestReport = rep;
+        }
+      }
 
-      // Date from newest report's last_updated
-      const latestDate = latestReport ? latestReport.data.last_updated : null;
+      // Python script: skip entry entirely if no matching report found
+      if (!bestReport) continue;
 
-      // Report Ref = "SLUG — Title - URL" so ViewDetail can split URL out
-      const externalRef = latestReport
-        ? `${latestReport.data.reportId} — ${latestReport.data.name} - ${latestReport.data.url}`
-        : reports.length > 0 ? reports.map(s => s.toUpperCase()).join(", ") : "";
+      // Date from the best (newest) report
+      const latestDate = bestDate > 0 ? bestDate : null;
+
+      // External ref mirrors Python: f'{threat_actor.upper()} {best_report["name"]} - {best_report["url"]}'
+      const externalRef = `${actorName.toUpperCase()} ${bestReport.name} - ${bestReport.url}`;
 
       const risk = Math.round(reports.length * 100 + observables.length * 50);
 
-      // One procedure per observable (or one generic if none)
-      const procedureTexts = observables.length > 0 ? observables : [`[${actorName}] - ${entry.technique_name}`];
+      // Python: one row per TTP entry; description = '[Actor] - {all observables joined by space}'
+      const observablesText = observables.join(" ").trim();
+      const procedure = observablesText
+        ? `[${actorName}] - ${observablesText}`
+        : `[${actorName}] -`;
 
-      for (const proc of procedureTexts) {
-        procedures.push({
-          actor: actorName,
-          mitreId,
-          tacticName: entry.tactic_name,
-          techniqueName: entry.technique_name,
-          procedure: proc,
-          date: latestDate,
-          externalRef,
-          risk,
-          reportRefs: reports,
-        });
-      }
+      procedures.push({
+        actor: actorName,
+        mitreId,
+        tacticName: entry.tactic_name,
+        techniqueName: entry.technique_name,
+        procedure,
+        date: latestDate,
+        externalRef,
+        risk,
+        reportRefs: reports,
+      });
     }
   }
 
