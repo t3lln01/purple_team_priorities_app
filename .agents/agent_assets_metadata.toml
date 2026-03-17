@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "YY4WyxTFpXdYHupZ-zfXj"
+uri = "file://README.md"
+type = "text"
+title = "README.md — Purple Team Dashboard"
