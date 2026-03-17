@@ -1,3 +1,4 @@
+import { useState } from "react";
 import data from "@/data.json";
 
 type Actor = {
@@ -47,9 +48,26 @@ function BarChart({ value, max }: { value: number; max: number }) {
   );
 }
 
+const RISK_LEVELS = ["All", "Critical", "High", "Medium", "Low"] as const;
+type RiskLevel = typeof RISK_LEVELS[number];
+
 export default function ActorPrioritisation() {
+  const [search, setSearch] = useState("");
+  const [riskFilter, setRiskFilter] = useState<RiskLevel>("All");
+
   const maxRisk = Math.max(...actorRanking.map(a => a.riskSum));
-  const topActors = actors.slice(0, 10);
+
+  const filtered = actors.filter(actor => {
+    const matchSearch = !search || actor.name.toLowerCase().includes(search.toLowerCase());
+    const matchRisk = riskFilter === "All" || riskLabel(actor.riskPct) === riskFilter;
+    return matchSearch && matchRisk;
+  });
+
+  const filteredRanking = actorRanking.filter(a =>
+    filtered.some(f => f.name.toLowerCase() === a.name.toLowerCase())
+  );
+
+  const topActors = filtered.slice(0, 10);
 
   return (
     <div className="p-6 space-y-6">
@@ -60,17 +78,59 @@ export default function ActorPrioritisation() {
 
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-card border border-card-border rounded-xl p-4">
-          <div className="text-2xl font-bold text-primary">{actors.length}</div>
-          <div className="text-sm text-muted-foreground mt-1">Total Tracked Actors</div>
+          <div className="text-2xl font-bold text-primary">{filtered.length}<span className="text-base text-muted-foreground font-normal"> / {actors.length}</span></div>
+          <div className="text-sm text-muted-foreground mt-1">Tracked Actors</div>
         </div>
         <div className="bg-card border border-card-border rounded-xl p-4">
-          <div className="text-2xl font-bold text-red-400">{actors.filter(a => a.riskPct >= 0.5).length}</div>
+          <div className="text-2xl font-bold text-red-400">{filtered.filter(a => a.riskPct >= 0.5).length}</div>
           <div className="text-sm text-muted-foreground mt-1">High/Critical Priority</div>
         </div>
         <div className="bg-card border border-card-border rounded-xl p-4">
           <div className="text-2xl font-bold text-chart-2">{monitoringList.filter(Boolean).length}</div>
           <div className="text-sm text-muted-foreground mt-1">Under Active Monitoring</div>
         </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <input
+          type="search"
+          placeholder="Search actors..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="flex-1 max-w-xs bg-input border border-border rounded-lg px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+        <div className="flex gap-1.5">
+          {RISK_LEVELS.map(level => (
+            <button
+              key={level}
+              onClick={() => setRiskFilter(level)}
+              className={`px-3 py-1.5 text-xs rounded-lg border transition-colors font-medium ${
+                riskFilter === level
+                  ? level === "All"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : level === "Critical"
+                    ? "bg-red-500/20 text-red-400 border-red-500/50"
+                    : level === "High"
+                    ? "bg-orange-500/20 text-orange-400 border-orange-500/50"
+                    : level === "Medium"
+                    ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/50"
+                    : "bg-green-500/20 text-green-400 border-green-500/50"
+                  : "border-border text-muted-foreground hover:bg-accent"
+              }`}
+            >
+              {level}
+            </button>
+          ))}
+        </div>
+        {(search || riskFilter !== "All") && (
+          <button
+            onClick={() => { setSearch(""); setRiskFilter("All"); }}
+            className="text-xs text-muted-foreground hover:text-foreground underline transition-colors"
+          >
+            Clear
+          </button>
+        )}
+        <span className="text-xs text-muted-foreground">{filtered.length} result{filtered.length !== 1 ? "s" : ""}</span>
       </div>
 
       <div className="grid grid-cols-2 gap-6">
@@ -92,32 +152,38 @@ export default function ActorPrioritisation() {
                 </tr>
               </thead>
               <tbody>
-                {actors.map((actor, i) => (
-                  <tr key={actor.name} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
-                    <td className="px-4 py-2.5 text-muted-foreground font-mono text-xs">{i + 1}</td>
-                    <td className="px-4 py-2.5 font-medium text-foreground text-xs">{actor.name}</td>
-                    <td className="px-4 py-2.5 text-center">
-                      <div className="flex gap-0.5">
-                        {Array.from({ length: 7 }).map((_, j) => (
-                          <div key={j} className={`w-2 h-2 rounded-sm ${j < actor.intent ? "bg-primary" : "bg-muted"}`} />
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-center">
-                      <div className="flex gap-0.5">
-                        {Array.from({ length: 7 }).map((_, j) => (
-                          <div key={j} className={`w-2 h-2 rounded-sm ${j < actor.capability ? "bg-chart-2" : "bg-muted"}`} />
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">{(actor.riskPct * 100).toFixed(1)}%</td>
-                    <td className="px-4 py-2.5">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${riskColor(actor.riskPct)}`}>
-                        {riskLabel(actor.riskPct)}
-                      </span>
-                    </td>
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">No actors match the current filter.</td>
                   </tr>
-                ))}
+                ) : (
+                  filtered.map((actor, i) => (
+                    <tr key={actor.name} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
+                      <td className="px-4 py-2.5 text-muted-foreground font-mono text-xs">{i + 1}</td>
+                      <td className="px-4 py-2.5 font-medium text-foreground text-xs">{actor.name}</td>
+                      <td className="px-4 py-2.5 text-center">
+                        <div className="flex gap-0.5">
+                          {Array.from({ length: 7 }).map((_, j) => (
+                            <div key={j} className={`w-2 h-2 rounded-sm ${j < actor.intent ? "bg-primary" : "bg-muted"}`} />
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-center">
+                        <div className="flex gap-0.5">
+                          {Array.from({ length: 7 }).map((_, j) => (
+                            <div key={j} className={`w-2 h-2 rounded-sm ${j < actor.capability ? "bg-chart-2" : "bg-muted"}`} />
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-muted-foreground">{(actor.riskPct * 100).toFixed(1)}%</td>
+                      <td className="px-4 py-2.5">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${riskColor(actor.riskPct)}`}>
+                          {riskLabel(actor.riskPct)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -130,7 +196,7 @@ export default function ActorPrioritisation() {
               <p className="text-xs text-muted-foreground mt-0.5">Sum of evaluated TTP risks</p>
             </div>
             <div className="p-4 space-y-3">
-              {actorRanking.slice(0, 15).map(a => (
+              {(filteredRanking.length > 0 ? filteredRanking : actorRanking).slice(0, 15).map(a => (
                 <div key={a.name}>
                   <div className="flex justify-between mb-1">
                     <span className="text-xs text-foreground">{a.name}</span>
