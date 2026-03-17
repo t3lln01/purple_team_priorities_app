@@ -75,8 +75,8 @@ function parseReports(json: any): { stats: ReportsStats; lookup: ReportsLookup }
   const lookup: ReportsLookup = {};
   const mapped = resources.map((r: any) => {
     const slug = (r.slug ?? "").toLowerCase();
-    // Prefer last_updated; fall back to created_date
-    const dateMs = toMs(r.last_updated) || toMs(r.created_date);
+    // Prefer last_modified_date; fall back to created_date
+    const dateMs = toMs(r.last_modified_date) || toMs(r.created_date);
     if (slug) {
       lookup[slug] = {
         reportId: slug.toUpperCase(),

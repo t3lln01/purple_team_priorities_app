@@ -112,7 +112,7 @@ export type ReportsLookup = Record<string, {
   reportId: string;   // slug uppercased (e.g. "CSA-240217")
   name: string;
   url: string;
-  last_updated: number; // ms timestamp
+  last_updated: number; // ms timestamp — normalised from last_modified_date
 }>;
 
 export function generateView(
