@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Purple Team Adversary Prioritization"
+version = "1.0.0"
+id = "artifacts/purple-team-dashboard"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+localPort = 19199
+name = "web"
+paths = ["/"]
+
+[services.development]
+run = "pnpm --filter @workspace/purple-team-dashboard run dev"
+
+[services.env]
+PORT = "19199"
+BASE_PATH = "/"
+
+[services.production]
+build = ["pnpm", "--filter", "@workspace/purple-team-dashboard", "run", "build"]
+publicDir = "artifacts/purple-team-dashboard/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
