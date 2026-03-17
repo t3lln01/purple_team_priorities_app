@@ -1,0 +1,1950 @@
+[
+  {
+    "id": "ta0001_t1078",
+    "tactic_id": "ta0001",
+    "tactic_name": "Initial Access",
+    "technique_id": "t1078",
+    "technique_name": "Valid Accounts",
+    "reports": [
+      "CSA-240217",
+      "CSA-240518",
+      "CSA-240810",
+      "CSECR-24108",
+      "CSECR-24128",
+      "CSECR-24155",
+      "CSECR-25016",
+      "CSECR-25035",
+      "CSECR-25086",
+      "CSECR-25087",
+      "CSECR-25122"
+    ],
+    "observables": [
+      "SCATTERED SPIDER logs into Okta accounts across multiple victim companies almost certainly using the same device",
+      "SCATTERED SPIDER primarily focused on capturing credentials and using these credentials to authenticate to VPN, Citrix or Okta portals. "
+    ]
+  },
+  {
+    "id": "ta0001_t1133",
+    "tactic_id": "ta0001",
+    "tactic_name": "Initial Access",
+    "technique_id": "t1133",
+    "technique_name": "External Remote Services",
+    "reports": [
+      "CSECR-24093",
+      "CSECR-24155",
+      "CSECR-25016"
+    ]
+  },
+  {
+    "id": "ta0001_t1190",
+    "tactic_id": "ta0001",
+    "tactic_name": "Initial Access",
+    "technique_id": "t1190",
+    "technique_name": "Exploit Public-Facing Application",
+    "reports": [
+      "CSA-240531",
+      "CSA-250012",
+      "CSA-250971",
+      "CSA-251334",
+      "CSECR-24093",
+      "CSECR-25035"
+    ],
+    "observables": [
+      "Likely exploitation of OpenAM vulnerability CVE-2021-35464"
+    ]
+  },
+  {
+    "id": "ta0001_t1199",
+    "tactic_id": "ta0001",
+    "tactic_name": "Initial Access",
+    "technique_id": "t1199",
+    "technique_name": "Trusted Relationship",
+    "reports": [
+      "CSECR-24108",
+      "CSECR-25016"
+    ],
+    "observables": [
+      "In multiple cases, the adversary attempted to leverage access from initial victims to access cellular providers."
+    ]
+  },
+  {
+    "id": "ta0001_t1566",
+    "tactic_id": "ta0001",
+    "tactic_name": "Initial Access",
+    "technique_id": "t1566",
+    "technique_name": "Phishing",
+    "reports": [
+      "CSA-240146",
+      "CSA-240720",
+      "CSA-240837",
+      "CSA-241030",
+      "CSECR-23028",
+      "CSECR-24082",
+      "CSECR-24089",
+      "CSECR-24108",
+      "CSECR-24128",
+      "CSECR-24137",
+      "CSECR-24156",
+      "CSECR-25016",
+      "CSECR-25086"
+    ],
+    "observables": [
+      "Called the helpdesk to reset the victim\u2019s authentication factor",
+      "Employed voice phishing against the victim\u2019s helpdesk to obtain access to an Entra ID identity"
+    ]
+  },
+  {
+    "id": "ta0001_t1566.001",
+    "tactic_id": "ta0001",
+    "tactic_name": "Initial Access",
+    "technique_id": "t1566.001",
+    "technique_name": "Spearphishing Attachment",
+    "reports": [
+      "CSECR-24093",
+      "CSECR-25093"
+    ]
+  },
+  {
+    "id": "ta0001_t1566.002",
+    "tactic_id": "ta0001",
+    "tactic_name": "Initial Access",
+    "technique_id": "t1566.002",
+    "technique_name": "Spearphishing Link",
+    "reports": [
+      "CSA-240217",
+      "CSECR-24027",
+      "CSECR-24093",
+      "CSECR-25093"
+    ],
+    "observables": [
+      "Phishing emails and SMS messages directed users to credential harvesting pages",
+      "SCATTERED SPIDER setup SSO phishing pages"
+    ]
+  },
+  {
+    "id": "ta0002_t1047",
+    "tactic_id": "ta0002",
+    "tactic_name": "Execution",
+    "technique_id": "t1047",
+    "technique_name": "Windows Management Instrumentation",
+    "reports": [
+      "CSECR-24093",
+      "CSECR-25092"
+    ],
+    "observables": [
+      "Limited use of Impacket\u2019s WMIExec.py tool to move laterally"
+    ]
+  },
+  {
+    "id": "ta0002_t1053",
+    "tactic_id": "ta0002",
+    "tactic_name": "Execution",
+    "technique_id": "t1053",
+    "technique_name": "Scheduled Task/Job"
+  },
+  {
+    "id": "ta0002_t1053.005",
+    "tactic_id": "ta0002",
+    "tactic_name": "Execution",
+    "technique_id": "t1053.005",
+    "technique_name": "Scheduled Task",
+    "observables": [
+      "Used schtasks.exe utility to run UAC-bypass binary"
+    ]
+  },
+  {
+    "id": "ta0002_t1059",
+    "tactic_id": "ta0002",
+    "tactic_name": "Execution",
+    "technique_id": "t1059",
+    "technique_name": "Command and Scripting Interpreter",
+    "reports": [
+      "CSA-230051",
+      "CSA-240217",
+      "CSECR-24003",
+      "CSECR-24019",
+      "CSECR-24082",
+      "CSECR-24085",
+      "CSECR-24116",
+      "CSECR-24128",
+      "CSECR-24137"
+    ]
+  },
+  {
+    "id": "ta0002_t1059.001",
+    "tactic_id": "ta0002",
+    "tactic_name": "Execution",
+    "technique_id": "t1059.001",
+    "technique_name": "PowerShell",
+    "reports": [
+      "CSA-231696",
+      "CSA-241262",
+      "CSECR-24093",
+      "CSECR-24128",
+      "CSECR-24155",
+      "CSECR-24157",
+      "CSECR-25062",
+      "CSECR-25092",
+      "CSECR-25093",
+      "CSECR-25107"
+    ],
+    "observables": [
+      "Used Azure virtual machine run a PowerShell script that installed AAD Internals and setup a backdoor using ConvertTo-AADIntBackdoor method",
+      "Used PS to attempt to download various RMM tools and ran numerous PS scripts to gather information",
+      "Used PS to attempt to download various RMM tools and ran numerous PS scripts to gather information.\n\nUses the AADInternals PowerShell module to interact with Microsoft Entra ID.\n\nUses PowerShell to reboot Windows systems into safe mode: powershell.exe -WindowStyle Hidden -Command \"bcdedit /set '{default}' safeboot network; shutdown /r\""
+    ]
+  },
+  {
+    "id": "ta0002_t1059.003",
+    "tactic_id": "ta0002",
+    "tactic_name": "Execution",
+    "technique_id": "t1059.003",
+    "technique_name": "Windows Command Shell",
+    "reports": [
+      "CSECR-24128",
+      "CSECR-24155",
+      "CSECR-25062",
+      "CSECR-25092"
+    ],
+    "observables": [
+      "Used command shell to run numerous system utilities"
+    ]
+  },
+  {
+    "id": "ta0002_t1059.004",
+    "tactic_id": "ta0002",
+    "tactic_name": "Execution",
+    "technique_id": "t1059.004",
+    "technique_name": "Unix Shell",
+    "reports": [
+      "CSA-231462"
+    ],
+    "observables": [
+      "The Kohgapy Python executes commands like ls and chmod +x in a Unix Shell on the target host"
+    ]
+  },
+  {
+    "id": "ta0002_t1059.006",
+    "tactic_id": "ta0002",
+    "tactic_name": "Execution",
+    "technique_id": "t1059.006",
+    "technique_name": "Python",
+    "reports": [
+      "CSA-231462",
+      "CSA-250504",
+      "CSA-250971",
+      "CSA-251334"
+    ],
+    "observables": [
+      "Installed Python to execute Impacket\u2019s Python utilities",
+      "Installed Python to execute Impacket\u2019s Python utilities.\n\nUses the Kohgapy Python script to Deploy ransomware to ESXi Hosts"
+    ]
+  },
+  {
+    "id": "ta0002_t1204",
+    "tactic_id": "ta0002",
+    "tactic_name": "Execution",
+    "technique_id": "t1204",
+    "technique_name": "User Execution",
+    "reports": [
+      "CSECR-24082",
+      "CSECR-24108"
+    ]
+  },
+  {
+    "id": "ta0002_t1204.001",
+    "tactic_id": "ta0002",
+    "tactic_name": "Execution",
+    "technique_id": "t1204.001",
+    "technique_name": "Malicious Link",
+    "observables": [
+      "In some cases, users were socially engineered via phone to navigate to a malicious link to download malware"
+    ]
+  },
+  {
+    "id": "ta0002_t1569",
+    "tactic_id": "ta0002",
+    "tactic_name": "Execution",
+    "technique_id": "t1569",
+    "technique_name": "System Services",
+    "reports": [
+      "CSECR-24128"
+    ]
+  },
+  {
+    "id": "ta0002_t1569.002",
+    "tactic_id": "ta0002",
+    "tactic_name": "Execution",
+    "technique_id": "t1569.002",
+    "technique_name": "Service Execution",
+    "reports": [
+      "CSECR-24128"
+    ],
+    "observables": [
+      "Began services on remote hosts using PSExec or RemCom"
+    ]
+  },
+  {
+    "id": "ta0002_t1610",
+    "tactic_id": "ta0002",
+    "tactic_name": "Execution",
+    "technique_id": "t1610",
+    "technique_name": "Deploy Container",
+    "reports": [
+      "CSA-231583"
+    ]
+  },
+  {
+    "id": "ta0002_t1648",
+    "tactic_id": "ta0002",
+    "tactic_name": "Execution",
+    "technique_id": "t1648",
+    "technique_name": "Serverless Execution",
+    "reports": [
+      "CSA-241262"
+    ],
+    "observables": [
+      "Created and executed Azure Automation jobs through Azure Portal (Write an Azure Automation runbook, Create an Azure Automation job)"
+    ]
+  },
+  {
+    "id": "ta0003_t1053",
+    "tactic_id": "ta0003",
+    "tactic_name": "Persistence",
+    "technique_id": "t1053",
+    "technique_name": "Scheduled Task/Job",
+    "reports": [
+      "CSECR-24027"
+    ]
+  },
+  {
+    "id": "ta0003_t1078",
+    "tactic_id": "ta0003",
+    "tactic_name": "Persistence",
+    "technique_id": "t1078",
+    "technique_name": "Valid Accounts",
+    "reports": [
+      "CSECR-25035",
+      "CSECR-25086",
+      "CSECR-25087",
+      "CSECR-25122"
+    ],
+    "observables": [
+      "Captured accounts allowed the adversary to maintain access to most victim environments without malware. To maintain persistent access, the adversary continued to log in with valid credentials when possible."
+    ]
+  },
+  {
+    "id": "ta0003_t1078.004",
+    "tactic_id": "ta0003",
+    "tactic_name": "Persistence",
+    "technique_id": "t1078.004",
+    "technique_name": "Cloud Accounts",
+    "reports": [
+      "CSA-230990",
+      "CSA-240146",
+      "CSA-240720"
+    ],
+    "observables": [
+      "Accessed several Entra ID accounts",
+      "Controlled Okta users and Entra ID users"
+    ]
+  },
+  {
+    "id": "ta0003_t1098",
+    "tactic_id": "ta0003",
+    "tactic_name": "Persistence",
+    "technique_id": "t1098",
+    "technique_name": "Account Manipulation",
+    "reports": [
+      "CSA-240215",
+      "CSECR-24128",
+      "CSECR-24155",
+      "CSECR-24157",
+      "CSECR-25086"
+    ],
+    "observables": [
+      "Used net to change several existing users\u2019 passwords and modified UAC restrictions on certain passwords. On AWS, the adversary modified the existing role to escalate user privileges."
+    ]
+  },
+  {
+    "id": "ta0003_t1098.001",
+    "tactic_id": "ta0003",
+    "tactic_name": "Persistence",
+    "technique_id": "t1098.001",
+    "technique_name": "Additional Cloud Credentials",
+    "reports": [
+      "CSA-230990",
+      "CSA-240146",
+      "CSA-240244",
+      "CSA-240720",
+      "CSA-240837",
+      "CSA-241262"
+    ],
+    "observables": [
+      "Added AWS IAM access keys to pre-existing users (CreateAccessKey)",
+      "Added credentials to Entra ID application registration (corresponding Entra ID audit log event: Update application \u2013 Certificates and secrets management )",
+      "Created a new access key for an AWS account (CreateAccessKey)",
+      "Reset passwords of Okta users (user.mfa.factor.deactivate). Added backdoor access key (CreateAccessKey) and console login password for backdoor AWS IAM user (CreateLoginProfile)",
+      "SCATTERED SPIDER has created an access key for a pre-existing IAM user (CreateAccessKey) and attempted to create AWS login profile user password (UpdateLoginProfile)"
+    ]
+  },
+  {
+    "id": "ta0003_t1098.004",
+    "tactic_id": "ta0003",
+    "tactic_name": "Persistence",
+    "technique_id": "t1098.004",
+    "technique_name": "SSH Authorized Keys",
+    "reports": [
+      "CSA-240215",
+      "CSA-240720"
+    ],
+    "observables": [
+      "Created a new SSH key for an adversary-created EC2 instance (CreateKeyPair)"
+    ]
+  },
+  {
+    "id": "ta0003_t1098.005",
+    "tactic_id": "ta0003",
+    "tactic_name": "Persistence",
+    "technique_id": "t1098.005",
+    "technique_name": "Device Registration",
+    "reports": [
+      "CSA-230990",
+      "CSA-240146",
+      "CSA-240720",
+      "CSECR-24027",
+      "CSECR-24128"
+    ],
+    "observables": [
+      "Registered a phone app as an additional authentication factor in Entra ID (Update user)",
+      "To circumvent MFA, the actor registered adversary-controlled devices with Azure AD/Microsoft Authenticator or Google Authenticator."
+    ]
+  },
+  {
+    "id": "ta0003_t1136",
+    "tactic_id": "ta0003",
+    "tactic_name": "Persistence",
+    "technique_id": "t1136",
+    "technique_name": "Create Account",
+    "reports": [
+      "CSECR-24082",
+      "CSECR-24155",
+      "CSECR-24157"
+    ]
+  },
+  {
+    "id": "ta0003_t1136.001",
+    "tactic_id": "ta0003",
+    "tactic_name": "Persistence",
+    "technique_id": "t1136.001",
+    "technique_name": "Local Account",
+    "reports": [
+      "CSECR-24157"
+    ]
+  },
+  {
+    "id": "ta0003_t1136.002",
+    "tactic_id": "ta0003",
+    "tactic_name": "Persistence",
+    "technique_id": "t1136.002",
+    "technique_name": "Domain Account",
+    "reports": [
+      "CSA-240434"
+    ],
+    "observables": [
+      "SCATTERED SPIDER in some cases created additional domain accounts to enable persistent access"
+    ]
+  },
+  {
+    "id": "ta0003_t1136.003",
+    "tactic_id": "ta0003",
+    "tactic_name": "Persistence",
+    "technique_id": "t1136.003",
+    "technique_name": "Cloud Account",
+    "reports": [
+      "CSA-230990",
+      "CSA-240146",
+      "CSA-240837",
+      "CSECR-24027"
+    ],
+    "observables": [
+      "Created backdoor Entra ID (Add user) and AWS IAM user (CreateUser)",
+      "Registered the Afi Backup Entra ID app which lead to the creation of a service principal (corresponding Entra ID audit log event: Add service principal) and registered the Veeam backup application in Entra ID (corresponding Entra ID audit log event: Add application)"
+    ]
+  },
+  {
+    "id": "ta0003_t1542",
+    "tactic_id": "ta0003",
+    "tactic_name": "Persistence",
+    "technique_id": "t1542",
+    "technique_name": "Pre-OS Boot"
+  },
+  {
+    "id": "ta0003_t1542.003",
+    "tactic_id": "ta0003",
+    "tactic_name": "Persistence",
+    "technique_id": "t1542.003",
+    "technique_name": "Bootkit"
+  },
+  {
+    "id": "ta0003_t1547",
+    "tactic_id": "ta0003",
+    "tactic_name": "Persistence",
+    "technique_id": "t1547",
+    "technique_name": "Boot or Logon Autostart Execution"
+  },
+  {
+    "id": "ta0003_t1547.006",
+    "tactic_id": "ta0003",
+    "tactic_name": "Persistence",
+    "technique_id": "t1547.006",
+    "technique_name": "Kernel Modules and Extensions"
+  },
+  {
+    "id": "ta0004_t1068",
+    "tactic_id": "ta0004",
+    "tactic_name": "Privilege Escalation",
+    "technique_id": "t1068",
+    "technique_name": "Exploitation for Privilege Escalation",
+    "reports": [
+      "CSECR-23028",
+      "CSECR-24155",
+      "CSECR-24157",
+      "CSECR-25086",
+      "CSECR-25092",
+      "CSECR-25122"
+    ]
+  },
+  {
+    "id": "ta0004_t1134",
+    "tactic_id": "ta0004",
+    "tactic_name": "Privilege Escalation",
+    "technique_id": "t1134",
+    "technique_name": "Access Token Manipulation"
+  },
+  {
+    "id": "ta0004_t1484",
+    "tactic_id": "ta0004",
+    "tactic_name": "Privilege Escalation",
+    "technique_id": "t1484",
+    "technique_name": "Domain or Tenant Policy Modification",
+    "reports": [
+      "CSA-230990",
+      "CSECR-24027",
+      "CSECR-24128",
+      "CSECR-24157",
+      "CSECR-25107"
+    ]
+  },
+  {
+    "id": "ta0004_t1484.002",
+    "tactic_id": "ta0004",
+    "tactic_name": "Privilege Escalation",
+    "technique_id": "t1484.002",
+    "technique_name": "Trust Modification",
+    "reports": [
+      "CSA-231179",
+      "CSA-231696",
+      "CSA-240146",
+      "CSA-240672",
+      "CSA-250504",
+      "CSECR-24027"
+    ],
+    "observables": [
+      "Activated Cross-tenant access via Entra ID Cross-Tenant Synchronization",
+      "SCATTERED SPIDER added an additional actor-controlled identity provider to Okta and added a federated domain to Azure AD"
+    ]
+  },
+  {
+    "id": "ta0004_t1547",
+    "tactic_id": "ta0004",
+    "tactic_name": "Privilege Escalation",
+    "technique_id": "t1547",
+    "technique_name": "Boot or Logon Autostart Execution"
+  },
+  {
+    "id": "ta0004_t1547.006",
+    "tactic_id": "ta0004",
+    "tactic_name": "Privilege Escalation",
+    "technique_id": "t1547.006",
+    "technique_name": "Kernel Modules and Extensions"
+  },
+  {
+    "id": "ta0004_t1548",
+    "tactic_id": "ta0004",
+    "tactic_name": "Privilege Escalation",
+    "technique_id": "t1548",
+    "technique_name": "Abuse Elevation Control Mechanism",
+    "observables": [
+      "Used Invoke-ACLPwn to attempt to elevate privileges"
+    ]
+  },
+  {
+    "id": "ta0004_t1548.002",
+    "tactic_id": "ta0004",
+    "tactic_name": "Privilege Escalation",
+    "technique_id": "t1548.002",
+    "technique_name": "Bypass User Account Control",
+    "observables": [
+      "Ran likely UAC-bypass binaries or disabled UAC restrictions by modifying accounts"
+    ]
+  },
+  {
+    "id": "ta0005_t1014",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1014",
+    "technique_name": "Rootkit",
+    "reports": [
+      "CSECR-24128"
+    ],
+    "observables": [
+      "SCATTERED SPIDER has used the publicly available bdvl rootkit on ESXi systems"
+    ]
+  },
+  {
+    "id": "ta0005_t1027",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1027",
+    "technique_name": "Obfuscated Files or Information",
+    "reports": [
+      "CSA-250971",
+      "CSECR-24082"
+    ]
+  },
+  {
+    "id": "ta0005_t1027.001",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1027.001",
+    "technique_name": "Binary Padding",
+    "observables": [
+      "To evade static AV scanning, the adversary used Pumpy to increase the size of binaries on disk."
+    ]
+  },
+  {
+    "id": "ta0005_t1027.005",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1027.005",
+    "technique_name": "Indicator Removal from Tools"
+  },
+  {
+    "id": "ta0005_t1036",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1036",
+    "technique_name": "Masquerading",
+    "reports": [
+      "CSECR-24082",
+      "CSECR-25062"
+    ]
+  },
+  {
+    "id": "ta0005_t1036.003",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1036.003",
+    "technique_name": "Rename Legitimate Utilities",
+    "observables": [
+      "Used the uncommon net1 utility, likely to avoid net-related detections"
+    ]
+  },
+  {
+    "id": "ta0005_t1036.005",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1036.005",
+    "technique_name": "Match Legitimate Resource Name or Location",
+    "observables": [
+      "Named newly provisioned VMs according to victim VM-naming scheme"
+    ]
+  },
+  {
+    "id": "ta0005_t1055.002",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1055.002",
+    "technique_name": "Portable Executable Injection"
+  },
+  {
+    "id": "ta0005_t1070.001",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1070.001",
+    "technique_name": "Clear Windows Event Logs",
+    "reports": [
+      "CSECR-24128"
+    ],
+    "observables": [
+      "SCATTERED SPIDER has used the following command to display and clear event logs: wevtutil el | Foreach-Object {wevtutil cl $_}"
+    ]
+  },
+  {
+    "id": "ta0005_t1070.008",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1070.008",
+    "technique_name": "Clear Mailbox Data",
+    "reports": [
+      "CSA-241262"
+    ],
+    "observables": [
+      "Deleted emails that were triggered by the adversaries activity e.g., emails related to the enrollment and resetting of MFA (MoveToDeletedItems)",
+      "Removed emails connected to the password reset events (HardDelete)"
+    ]
+  },
+  {
+    "id": "ta0005_t1078",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1078",
+    "technique_name": "Valid Accounts",
+    "reports": [
+      "CSECR-24093",
+      "CSECR-25086",
+      "CSECR-25122"
+    ]
+  },
+  {
+    "id": "ta0005_t1197",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1197",
+    "technique_name": "BITS Jobs"
+  },
+  {
+    "id": "ta0005_t1211",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1211",
+    "technique_name": "Exploitation for Defense Evasion"
+  },
+  {
+    "id": "ta0005_t1484",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1484",
+    "technique_name": "Domain or Tenant Policy Modification",
+    "reports": [
+      "CSECR-25107"
+    ]
+  },
+  {
+    "id": "ta0005_t1484.002",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1484.002",
+    "technique_name": "Trust Modification",
+    "reports": [
+      "CSA-230709",
+      "CSA-231179",
+      "CSA-240720",
+      "CSECR-24027"
+    ],
+    "observables": [
+      "Added two actor-controlled federated domains in Entra ID (Add unverified domain, Verify domain, Add verified domain, Set domain authentication)",
+      "Converted preexisting managed Entra ID domain to federated to add a federated identity provider (Set domain authentication)"
+    ]
+  },
+  {
+    "id": "ta0005_t1542",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1542",
+    "technique_name": "Pre-OS Boot"
+  },
+  {
+    "id": "ta0005_t1542.003",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1542.003",
+    "technique_name": "Bootkit"
+  },
+  {
+    "id": "ta0005_t1550",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1550",
+    "technique_name": "Use Alternate Authentication Material",
+    "reports": [
+      "CSECR-24157"
+    ]
+  },
+  {
+    "id": "ta0005_t1550.004",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1550.004",
+    "technique_name": "Web Session Cookie",
+    "observables": [
+      "In one case, SCATTERED SPIDER authenticated via an allowlisted IP address, then transferred a session cookie to enable a new session from a different IP address"
+    ]
+  },
+  {
+    "id": "ta0005_t1556",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1556",
+    "technique_name": "Modify Authentication Process",
+    "observables": [
+      "On AWS, the adversary disabled one user\u2019s MFA. Separately, the adversary attempted to disable MFA enforcement for several on-premises users."
+    ]
+  },
+  {
+    "id": "ta0005_t1556.006",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1556.006",
+    "technique_name": "Multi-Factor Authentication",
+    "observables": [
+      "Reset MFA for Okta users via socially engineering the helpdesk"
+    ]
+  },
+  {
+    "id": "ta0005_t1562",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1562",
+    "technique_name": "Impair Defenses",
+    "reports": [
+      "CSA-240434",
+      "CSECR-24082",
+      "CSECR-24128",
+      "CSECR-25062"
+    ]
+  },
+  {
+    "id": "ta0005_t1562.001",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1562.001",
+    "technique_name": "Disable or Modify Tools",
+    "reports": [
+      "CSA-230967",
+      "CSA-240001",
+      "CSA-240044",
+      "CSA-240720",
+      "CSA-250507",
+      "CSECR-24027",
+      "CSECR-24128",
+      "CSECR-24155",
+      "CSECR-25122"
+    ],
+    "observables": [
+      "Attempted to deactivate GuardDuty (DeleteDetector) and CloudWatch alarms (DeleteAlarms)",
+      "SCATTERED SPIDER often uses the publicly available script privacy-script.bat, which contains commands to disable Microsoft Defender functionality.\n\nESXi execInstalledOnly security control disabled.",
+      "To disable or uninstall EDR, SCATTERED SPIDER used regedit, batch scripts, or binaries to modify select registry values. After making these modifications, the adversary attempted to reboot victim machines in safe mode. The adversary also attempted to disable Duo enforcement via registry key modifications."
+    ]
+  },
+  {
+    "id": "ta0005_t1562.003",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1562.003",
+    "technique_name": "Impair Command History Logging",
+    "reports": [
+      "CSA-240001"
+    ],
+    "observables": [
+      "Unset the HISTFILE variable to prevent command logging on Linux hosts in AWS"
+    ]
+  },
+  {
+    "id": "ta0005_t1562.004",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1562.004",
+    "technique_name": "Disable or Modify System Firewall",
+    "reports": [
+      "CSA-250012",
+      "CSECR-25062"
+    ],
+    "observables": [
+      "Altered firewall rules on AWS to allow ingress from a specific AWS subnet",
+      "Altered firewall rules on AWS to allow ingress from a specific AWS subnet.\n\nSCATTERED SPIDER often uses the publicly available script privacy-script.bat which contains commands to modify firewall settings"
+    ]
+  },
+  {
+    "id": "ta0005_t1562.007",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1562.007",
+    "technique_name": "Disable or Modify Cloud Firewall",
+    "reports": [
+      "CSA-230990",
+      "CSA-240215",
+      "CSA-240720",
+      "CSECR-24128",
+      "CSECR-25086"
+    ],
+    "observables": [
+      "Deleted VPC firewall rules and added a new one that allowed egress traffic to all IP addresses (DeleteNetworkAclEntry, CreateNetworkAclEntry)",
+      "Modified security groups (AuthorizeSecurityGroupIngress) and AWS Firewall (DeleteNetworkAclEntry, CreateNetworkAclEntry, ReplaceNetworkAclEntry) to publicly expose an RDS instance",
+      "Sets firewall rules for actor-created EC2 instances to allow all incoming RDP or all traffic"
+    ]
+  },
+  {
+    "id": "ta0005_t1562.008",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1562.008",
+    "technique_name": "Disable or Modify Cloud Logs",
+    "reports": [
+      "CSA-230967",
+      "CSA-240720",
+      "CSECR-24027",
+      "CSECR-24128"
+    ],
+    "observables": [
+      "Attempted to update CloudTrail trail settings (UpdateTrail) and to delete flow logs (DeleteFlowLogs)"
+    ]
+  },
+  {
+    "id": "ta0005_t1562.009",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1562.009",
+    "technique_name": "Safe Mode Boot",
+    "reports": [
+      "CSECR-24128"
+    ],
+    "observables": [
+      "SCATTERED SPIDER reboots Windows systems into safe mode using the command powershell.exe -WindowStyle Hidden -Command \"bcdedit /set '{default}' safeboot network; shutdown /r\""
+    ]
+  },
+  {
+    "id": "ta0005_t1578",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1578",
+    "technique_name": "Modify Cloud Compute Infrastructure",
+    "reports": [
+      "CSA-241262"
+    ]
+  },
+  {
+    "id": "ta0005_t1578.002",
+    "tactic_id": "ta0005",
+    "tactic_name": "Defense Evasion",
+    "technique_id": "t1578.002",
+    "technique_name": "Create Cloud Instance",
+    "reports": [
+      "CSA-230990",
+      "CSA-240044",
+      "CSA-240215",
+      "CSA-240720",
+      "CSECR-24027"
+    ],
+    "observables": [
+      "Created EC2 instances in victim's AWS environment to mount the disk and dump the Active Directory credentials of the domain controller running on a preexisting EC2 instance in the same environment",
+      "Created VMs in Azure (Create or Update Virtual Machine) and AWS (RunInstances)",
+      "Provisioned new VMs within Azure to bypass VPN authentication while accessing on-premises network",
+      "Reset password for Azure VM."
+    ]
+  },
+  {
+    "id": "ta0006_t1003",
+    "tactic_id": "ta0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "t1003",
+    "technique_name": "OS Credential Dumping",
+    "reports": [
+      "CSECR-24082",
+      "CSECR-24128",
+      "CSECR-24137",
+      "CSECR-24157",
+      "CSECR-25107"
+    ]
+  },
+  {
+    "id": "ta0006_t1003.001",
+    "tactic_id": "ta0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "t1003.001",
+    "technique_name": "LSASS Memory",
+    "observables": [
+      "Mimikatz and MAGNET Ram Capture can harvest LSASS credentials."
+    ]
+  },
+  {
+    "id": "ta0006_t1003.003",
+    "tactic_id": "ta0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "t1003.003",
+    "technique_name": "NTDS",
+    "reports": [
+      "CSA-231449",
+      "CSA-240434",
+      "CSA-241030",
+      "CSA-250504",
+      "CSA-250697",
+      "CSECR-24128",
+      "CSECR-24155",
+      "CSECR-24157",
+      "CSECR-25107",
+      "CSECR-25122"
+    ],
+    "observables": [
+      "Dumped password hashes from NTDS using Gosecretsdump",
+      "The adversary used secretsdump.py and Volume Shadow Copy (with wmic shadowcopy create) to access NTDS.DIT.",
+      "The adversary used secretsdump.py, GoSecretsDump, and Volume Shadow Copy (with wmic shadowcopy create) to access NTDS.DIT."
+    ]
+  },
+  {
+    "id": "ta0006_t1003.004",
+    "tactic_id": "ta0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "t1003.004",
+    "technique_name": "LSA Secrets"
+  },
+  {
+    "id": "ta0006_t1003.006",
+    "tactic_id": "ta0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "t1003.006",
+    "technique_name": "DCSync",
+    "observables": [
+      "SCATTERED SPIDER ran DCSync to pull passwords from victim domain controllers."
+    ]
+  },
+  {
+    "id": "ta0006_t1056",
+    "tactic_id": "ta0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "t1056",
+    "technique_name": "Input Capture",
+    "observables": [
+      "Phishing pages captured credentials users willingly provided"
+    ]
+  },
+  {
+    "id": "ta0006_t1111",
+    "tactic_id": "ta0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "t1111",
+    "technique_name": "Multi-Factor Authentication Interception",
+    "reports": [
+      "CSA-241256"
+    ]
+  },
+  {
+    "id": "ta0006_t1539",
+    "tactic_id": "ta0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "t1539",
+    "technique_name": "Steal Web Session Cookie",
+    "reports": [
+      "CSECR-24128",
+      "CSECR-25087"
+    ],
+    "observables": [
+      "SCATTERED SPIDER has installed the Cookie Quick Manager and EditThisCookie browser extensions to export session cookies"
+    ]
+  },
+  {
+    "id": "ta0006_t1552",
+    "tactic_id": "ta0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "t1552",
+    "technique_name": "Unsecured Credentials",
+    "reports": [
+      "CSA-240531",
+      "CSA-240837"
+    ],
+    "observables": [
+      "In one case, the adversary obtained a VPN-authentication certificate from a victim server. Separately, on AWS, the adversary used cat and grep to identify credentials in files on S3. To attempt to capture unsecured credentials, the adversary queried the AWS-instance metadata API at two different victims.",
+      "Retrieved credentials for Azure Storage (corresponding Azure activity log event: List Storage Account Keys); Almost certainly used MicroBurst to discover credentials accessible to Automation Accounts in Azure (corresponding Azure activity log event: Create or Update an Azure Automation Runbook)"
+    ]
+  },
+  {
+    "id": "ta0006_t1552.001",
+    "tactic_id": "ta0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "t1552.001",
+    "technique_name": "Credentials In Files",
+    "reports": [
+      "CSA-230990",
+      "CSA-250624",
+      "CSECR-24155",
+      "CSECR-25092",
+      "CSECR-25122"
+    ],
+    "observables": [
+      "Copied data.mdb file containing the vCenter SAML private signing key",
+      "In one case, the adversary obtained a VPN-authentication certificate from a victim server. Separately, on AWS, the adversary used cat and grep to identify credentials in files on S3."
+    ]
+  },
+  {
+    "id": "ta0006_t1552.005",
+    "tactic_id": "ta0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "t1552.005",
+    "technique_name": "Cloud Instance Metadata API",
+    "observables": [
+      "To attempt to capture unsecured credentials, the adversary queried the AWS-instance metadata API at two different victims."
+    ]
+  },
+  {
+    "id": "ta0006_t1555",
+    "tactic_id": "ta0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "t1555",
+    "technique_name": "Credentials from Password Stores",
+    "reports": [
+      "CSA-230990",
+      "CSA-240720",
+      "CSECR-24027",
+      "CSECR-24128"
+    ],
+    "observables": [
+      "Downloaded credentials from privileged access management solution"
+    ]
+  },
+  {
+    "id": "ta0006_t1555.005",
+    "tactic_id": "ta0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "t1555.005",
+    "technique_name": "Password Managers",
+    "observables": [
+      "Used actor-controlled Okta users to access privileged access management system to obtain Entra ID account credentials."
+    ]
+  },
+  {
+    "id": "ta0006_t1555.006",
+    "tactic_id": "ta0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "t1555.006",
+    "technique_name": "Cloud Secrets Management Stores",
+    "observables": [
+      "Listed secrets in AWS Secrets Manager (ListSecrets)"
+    ]
+  },
+  {
+    "id": "ta0006_t1556.006",
+    "tactic_id": "ta0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "t1556.006",
+    "technique_name": "Multi-Factor Authentication",
+    "reports": [
+      "CSA-250507",
+      "CSECR-25093"
+    ]
+  },
+  {
+    "id": "ta0006_t1556.007",
+    "tactic_id": "ta0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "t1556.007",
+    "technique_name": "Hybrid Identity",
+    "reports": [
+      "CSA-250577"
+    ],
+    "observables": [
+      "Almost certainly attempted to obtain Entra Connect Sync credentials"
+    ]
+  },
+  {
+    "id": "ta0006_t1606.002",
+    "tactic_id": "ta0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "t1606.002",
+    "technique_name": "SAML Tokens",
+    "reports": [
+      "CSA-250624"
+    ],
+    "observables": [
+      "Almost certainly attempted to forge a SAML token for vCenter Single-Sign-On"
+    ]
+  },
+  {
+    "id": "ta0006_t1621",
+    "tactic_id": "ta0006",
+    "tactic_name": "Credential Access",
+    "technique_id": "t1621",
+    "technique_name": "Multi-Factor Authentication Request Generation",
+    "reports": [
+      "CSECR-24027"
+    ],
+    "observables": [
+      "SCATTERED SPIDER typically attempted to authenticate using usernames and passwords, leading to generation of MFA push notifications to fatigue users"
+    ]
+  },
+  {
+    "id": "ta0007_t1016",
+    "tactic_id": "ta0007",
+    "tactic_name": "Discovery",
+    "technique_id": "t1016",
+    "technique_name": "System Network Configuration Discovery",
+    "reports": [
+      "CSECR-24093",
+      "CSECR-25107"
+    ],
+    "observables": [
+      "The adversary heavily used ping to test connectivity to file-sharing sites and RMM tool-hosting sites.",
+      "To employ System Network Configuration Discovery, a threat actor attempts to collect details about a network configuration and its settings. Multiple tools are available to help actors leverage this technique, including arp, ipconfig/ifconfig, ping, nltest, and route.\n\nThreat actors commonly use multiple discovery techniques immediately following initial access and frequently employ additional discovery techniques during intrusions using LOLbins, including Security Software Discovery (T1018.001), Domain Trust Discovery (T1482) using nltest, System Information Discovery (T1082), System Owner/User Discovery (T1033), and Account Discovery (T1087).\n\nSCATTERED SPIDER extensively uses the ping utility to test connectivity to various legitimate file- or RMM-hosting sites. In early 2023, the adversary accessed multiple North America-based technology companies that specialize in Business Process Outsourcing (BPO) and used the ping command to test connectivity to two different North America-based cellular providers.\nAdditionally, SCATTERED SPIDER used LOTL utilities, including ping and net, to discover information about network architecture and Active Directory (AD) information. SCATTERED SPIDER has employed this technique on both on-premise and Cloud environments."
+    ]
+  },
+  {
+    "id": "ta0007_t1016.001",
+    "tactic_id": "ta0007",
+    "tactic_name": "Discovery",
+    "technique_id": "t1016.001",
+    "technique_name": "Internet Connection Discovery",
+    "observables": [
+      "The adversary heavily used ping to test connectivity to file-sharing sites and RMM tool-hosting sites."
+    ]
+  },
+  {
+    "id": "ta0007_t1018",
+    "tactic_id": "ta0007",
+    "tactic_name": "Discovery",
+    "technique_id": "t1018",
+    "technique_name": "Remote System Discovery",
+    "reports": [
+      "CSA-240217",
+      "CSA-240434",
+      "CSA-240507",
+      "CSA-241030",
+      "CSECR-24093",
+      "CSECR-24128",
+      "CSECR-24155",
+      "CSECR-24157",
+      "CSECR-25107"
+    ]
+  },
+  {
+    "id": "ta0007_t1046",
+    "tactic_id": "ta0007",
+    "tactic_name": "Discovery",
+    "technique_id": "t1046",
+    "technique_name": "Network Service Discovery",
+    "reports": [
+      "CSECR-24155"
+    ],
+    "observables": [
+      "The adversary used Advanced Port Scanner to enable internal reconnaissance."
+    ]
+  },
+  {
+    "id": "ta0007_t1069",
+    "tactic_id": "ta0007",
+    "tactic_name": "Discovery",
+    "technique_id": "t1069",
+    "technique_name": "Permission Groups Discovery",
+    "reports": [
+      "CSECR-24027"
+    ],
+    "observables": [
+      "SCATTERED SPIDER used ADRecon to gather information about domain accounts, trusts, group policy objects, and permission groups."
+    ]
+  },
+  {
+    "id": "ta0007_t1069.003",
+    "tactic_id": "ta0007",
+    "tactic_name": "Discovery",
+    "technique_id": "t1069.003",
+    "technique_name": "Cloud Groups",
+    "reports": [
+      "CSA-230990",
+      "CSA-240244"
+    ],
+    "observables": [
+      "Listed AWS IAM groups (ListGroups), roles (ListRoles), and policies (ListPolicies, ListGroupsForUser)\nDownloaded Entra ID role assignments (Download role assignments - finished (bulk))"
+    ]
+  },
+  {
+    "id": "ta0007_t1083",
+    "tactic_id": "ta0007",
+    "tactic_name": "Discovery",
+    "technique_id": "t1083",
+    "technique_name": "File and Directory Discovery",
+    "reports": [
+      "CSECR-24128"
+    ],
+    "observables": [
+      "The adversary manually searches for and downloads victim data"
+    ]
+  },
+  {
+    "id": "ta0007_t1087",
+    "tactic_id": "ta0007",
+    "tactic_name": "Discovery",
+    "technique_id": "t1087",
+    "technique_name": "Account Discovery",
+    "reports": [
+      "CSA-240217",
+      "CSA-240507",
+      "CSA-250697",
+      "CSECR-24027",
+      "CSECR-24093",
+      "CSECR-24128",
+      "CSECR-25107"
+    ],
+    "observables": [
+      "SCATTERED SPIDER used ADRecon and ADExplorer to gather information about domain accounts, trusts, group policy objects, and permission groups.",
+      "SCATTERED SPIDER used ADRecon to gather information about domain accounts, trusts, group policy objects, and permission groups."
+    ]
+  },
+  {
+    "id": "ta0007_t1087.001",
+    "tactic_id": "ta0007",
+    "tactic_name": "Discovery",
+    "technique_id": "t1087.001",
+    "technique_name": "Local Account"
+  },
+  {
+    "id": "ta0007_t1087.002",
+    "tactic_id": "ta0007",
+    "tactic_name": "Discovery",
+    "technique_id": "t1087.002",
+    "technique_name": "Domain Account",
+    "reports": [
+      "CSECR-24157",
+      "CSECR-25107"
+    ]
+  },
+  {
+    "id": "ta0007_t1087.004",
+    "tactic_id": "ta0007",
+    "tactic_name": "Discovery",
+    "technique_id": "t1087.004",
+    "technique_name": "Cloud Account",
+    "reports": [
+      "CSA-230990",
+      "CSA-240244",
+      "CSA-241262",
+      "CSECR-24128"
+    ],
+    "observables": [
+      "Listed AWS IAM users (ListUsers)",
+      "SCATTERED SPIDER used ScoutSuite to discover information about AWS accounts."
+    ]
+  },
+  {
+    "id": "ta0007_t1482",
+    "tactic_id": "ta0007",
+    "tactic_name": "Discovery",
+    "technique_id": "t1482",
+    "technique_name": "Domain Trust Discovery",
+    "reports": [
+      "CSA-240434",
+      "CSECR-24093",
+      "CSECR-24157"
+    ],
+    "observables": [
+      "SCATTERED SPIDER used ADRecon to gather information about domain accounts, trusts, group policy objects, and permission groups."
+    ]
+  },
+  {
+    "id": "ta0007_t1526",
+    "tactic_id": "ta0007",
+    "tactic_name": "Discovery",
+    "technique_id": "t1526",
+    "technique_name": "Cloud Service Discovery",
+    "reports": [
+      "CSA-240244",
+      "CSA-241262",
+      "CSECR-24027"
+    ],
+    "observables": [
+      "SCATTERED SPIDER used ScoutSuite and aws ssm describe-instance-information to discover information about AWS services running in the victim environment.",
+      "Used MyApps to traverse to Entra ID SSO Applications"
+    ]
+  },
+  {
+    "id": "ta0007_t1538",
+    "tactic_id": "ta0007",
+    "tactic_name": "Discovery",
+    "technique_id": "t1538",
+    "technique_name": "Cloud Service Dashboard",
+    "reports": [
+      "CSA-230990",
+      "CSA-240244",
+      "CSECR-24027"
+    ],
+    "observables": [
+      "Looked at EC2 management dashboard to view EC2 instances"
+    ]
+  },
+  {
+    "id": "ta0007_t1580",
+    "tactic_id": "ta0007",
+    "tactic_name": "Discovery",
+    "technique_id": "t1580",
+    "technique_name": "Cloud Infrastructure Discovery",
+    "reports": [
+      "CSA-230990",
+      "CSA-240233",
+      "CSA-240244",
+      "CSECR-24027",
+      "CSECR-25086"
+    ],
+    "observables": [
+      "Listed EC2 instances (DescribeInstances) and RDS databases (DescribeDBInstances, DescribeDBSnapshots)",
+      "SCATTERED SPIDER used AWS IMDS to gather information about IP addresses and subnets within the victim environment."
+    ]
+  },
+  {
+    "id": "ta0007_t1615",
+    "tactic_id": "ta0007",
+    "tactic_name": "Discovery",
+    "technique_id": "t1615",
+    "technique_name": "Group Policy Discovery",
+    "observables": [
+      "SCATTERED SPIDER used ADRecon to gather information about domain accounts, trusts, group policy objects, and permission groups."
+    ]
+  },
+  {
+    "id": "ta0007_t1619",
+    "tactic_id": "ta0007",
+    "tactic_name": "Discovery",
+    "technique_id": "t1619",
+    "technique_name": "Cloud Storage Object Discovery",
+    "reports": [
+      "CSA-240233",
+      "CSA-240244",
+      "CSECR-25086"
+    ],
+    "observables": [
+      "Listed S3 buckets and objects (ListBuckets, ListObjects)",
+      "SCATTERED SPIDER enumerated S3 buckets using the S3Browser utility."
+    ]
+  },
+  {
+    "id": "ta0008_t1021",
+    "tactic_id": "ta0008",
+    "tactic_name": "Lateral Movement",
+    "technique_id": "t1021",
+    "technique_name": "Remote Services",
+    "reports": [
+      "CSA-230990",
+      "CSA-240001",
+      "CSA-240215",
+      "CSA-240720",
+      "CSECR-24027",
+      "CSECR-24082",
+      "CSECR-24128",
+      "CSECR-25093"
+    ]
+  },
+  {
+    "id": "ta0008_t1021.001",
+    "tactic_id": "ta0008",
+    "tactic_name": "Lateral Movement",
+    "technique_id": "t1021.001",
+    "technique_name": "Remote Desktop Protocol",
+    "reports": [
+      "CSA-230990",
+      "CSA-250577",
+      "CSECR-24128",
+      "CSECR-24155",
+      "CSECR-25092"
+    ],
+    "observables": [
+      "The adversary used mstsc.exe to establish RDP connections within victim environments."
+    ]
+  },
+  {
+    "id": "ta0008_t1021.002",
+    "tactic_id": "ta0008",
+    "tactic_name": "Lateral Movement",
+    "technique_id": "t1021.002",
+    "technique_name": "SMB/Windows Admin Shares",
+    "reports": [
+      "CSECR-25092"
+    ],
+    "observables": [
+      "In one case, SCATTERED SPIDER attempted to deploy RemCom using Impacket\u2019s smbexec.py tool."
+    ]
+  },
+  {
+    "id": "ta0008_t1021.004",
+    "tactic_id": "ta0008",
+    "tactic_name": "Lateral Movement",
+    "technique_id": "t1021.004",
+    "technique_name": "SSH",
+    "reports": [
+      "CSA-231462",
+      "CSA-240044",
+      "CSA-250624",
+      "CSECR-25092"
+    ],
+    "observables": [
+      "Moved laterally via SSH to vCenter server appliance",
+      "Particularly for Linux environments, the adversary used SSH keys to move laterally.",
+      "SSH used for lateral movement to ESXi servers"
+    ]
+  },
+  {
+    "id": "ta0008_t1021.006",
+    "tactic_id": "ta0008",
+    "tactic_name": "Lateral Movement",
+    "technique_id": "t1021.006",
+    "technique_name": "Windows Remote Management",
+    "observables": [
+      "In limited circumstances, the adversary used WinRM to run commands on remote services."
+    ]
+  },
+  {
+    "id": "ta0008_t1021.007",
+    "tactic_id": "ta0008",
+    "tactic_name": "Lateral Movement",
+    "technique_id": "t1021.007",
+    "technique_name": "Cloud Services",
+    "reports": [
+      "CSECR-24128"
+    ],
+    "observables": [
+      "Used Okta SSO to move laterally to AWS"
+    ]
+  },
+  {
+    "id": "ta0008_t1570",
+    "tactic_id": "ta0008",
+    "tactic_name": "Lateral Movement",
+    "technique_id": "t1570",
+    "technique_name": "Lateral Tool Transfer",
+    "reports": [
+      "CSA-231462",
+      "CSECR-24156"
+    ]
+  },
+  {
+    "id": "ta0009_t1005",
+    "tactic_id": "ta0009",
+    "tactic_name": "Collection",
+    "technique_id": "t1005",
+    "technique_name": "Data from Local System",
+    "observables": [
+      "SCATTERED SPIDER opened Citrix configuration files using text editors such as Notepad++."
+    ]
+  },
+  {
+    "id": "ta0009_t1074.002",
+    "tactic_id": "ta0009",
+    "tactic_name": "Collection",
+    "technique_id": "t1074.002",
+    "technique_name": "Remote Data Staging",
+    "observables": [
+      "Enabled anonymous access to OneDrive (SharingPolicyChanged)"
+    ]
+  },
+  {
+    "id": "ta0009_t1114",
+    "tactic_id": "ta0009",
+    "tactic_name": "Collection",
+    "technique_id": "t1114",
+    "technique_name": "Email Collection",
+    "reports": [
+      "CSECR-24128"
+    ]
+  },
+  {
+    "id": "ta0009_t1114.002",
+    "tactic_id": "ta0009",
+    "tactic_name": "Collection",
+    "technique_id": "t1114.002",
+    "technique_name": "Remote Email Collection",
+    "reports": [
+      "CSA-230990",
+      "CSA-240248"
+    ],
+    "observables": [
+      "Accessed emails using added Entra ID enterprise apps (MailItemsAccessed)"
+    ]
+  },
+  {
+    "id": "ta0009_t1114.003",
+    "tactic_id": "ta0009",
+    "tactic_name": "Collection",
+    "technique_id": "t1114.003",
+    "technique_name": "Email Forwarding Rule",
+    "reports": [
+      "CSECR-24128"
+    ],
+    "observables": [
+      "SCATTERED SPIDER leverages email-forwarding rules for defense evasion, typically to prevent users from receiving suspicious account activity notifications or security alerts"
+    ]
+  },
+  {
+    "id": "ta0009_t1213",
+    "tactic_id": "ta0009",
+    "tactic_name": "Collection",
+    "technique_id": "t1213",
+    "technique_name": "Data from Information Repositories",
+    "reports": [
+      "CSA-240248"
+    ],
+    "observables": [
+      "Collected RDS database snapshot via export feature (StartExportTask)",
+      "The adversary attempted to capture data from internal customer/user databases, particularly CRM applications"
+    ]
+  },
+  {
+    "id": "ta0009_t1213.001",
+    "tactic_id": "ta0009",
+    "tactic_name": "Collection",
+    "technique_id": "t1213.001",
+    "technique_name": "Confluence",
+    "observables": [
+      "Accessed wikipages"
+    ]
+  },
+  {
+    "id": "ta0009_t1213.002",
+    "tactic_id": "ta0009",
+    "tactic_name": "Collection",
+    "technique_id": "t1213.002",
+    "technique_name": "Sharepoint",
+    "reports": [
+      "CSA-230990",
+      "CSA-240248",
+      "CSECR-24027"
+    ],
+    "observables": [
+      "Downloaded data from SharePoint in particular security relevant files related to MFA and VPN setup",
+      "From victim SharePoint repositories, SCATTERED SPIDER gathered information on networking, MFA and remote access, and user onboarding."
+    ]
+  },
+  {
+    "id": "ta0009_t1213.003",
+    "tactic_id": "ta0009",
+    "tactic_name": "Collection",
+    "technique_id": "t1213.003",
+    "technique_name": "Code Repositories",
+    "reports": [
+      "CSA-230990",
+      "CSECR-24027"
+    ]
+  },
+  {
+    "id": "ta0009_t1530",
+    "tactic_id": "ta0009",
+    "tactic_name": "Collection",
+    "technique_id": "t1530",
+    "technique_name": "Data from Cloud Storage",
+    "reports": [
+      "CSA-240233",
+      "CSA-240244",
+      "CSA-250697",
+      "CSECR-24128",
+      "CSECR-25086"
+    ],
+    "observables": [
+      "Downloaded data from S3 buckets",
+      "SCATTERED SPIDER gathered data from S3 buckets; in a separate case, the adversary accessed corporate information on GSuite."
+    ]
+  },
+  {
+    "id": "ta0010_t1029",
+    "tactic_id": "ta0010",
+    "tactic_name": "Exfiltration",
+    "technique_id": "t1029",
+    "technique_name": "Scheduled Transfer",
+    "reports": [
+      "CSECR-24128"
+    ]
+  },
+  {
+    "id": "ta0010_t1048.003",
+    "tactic_id": "ta0010",
+    "tactic_name": "Exfiltration",
+    "technique_id": "t1048.003",
+    "technique_name": "Exfiltration Over Unencrypted Non-C2 Protocol",
+    "observables": [
+      "SCATTERED SPIDER has attempted to send victim data from compromised email addresses to adversary-owned email addresses"
+    ]
+  },
+  {
+    "id": "ta0010_t1567",
+    "tactic_id": "ta0010",
+    "tactic_name": "Exfiltration",
+    "technique_id": "t1567",
+    "technique_name": "Exfiltration Over Web Service",
+    "reports": [
+      "CSA-240507",
+      "CSA-240720",
+      "CSECR-24128"
+    ],
+    "observables": [
+      "",
+      "Downloaded data directly from SharePoint (FileDownloaded).\nDownloaded objects from S3 bucket including parts of the exported database snapshot via the AWS Console (GetObject)",
+      "Downloaded data from AWS S3 buckets using S3 Browser"
+    ]
+  },
+  {
+    "id": "ta0010_t1567.001",
+    "tactic_id": "ta0010",
+    "tactic_name": "Exfiltration",
+    "technique_id": "t1567.001",
+    "technique_name": "Exfiltration to Code Repository",
+    "observables": [
+      "SCATTERED SPIDER has attempted to exfiltrate data to adversary-controlled GitHub repositories"
+    ]
+  },
+  {
+    "id": "ta0010_t1567.002",
+    "tactic_id": "ta0010",
+    "tactic_name": "Exfiltration",
+    "technique_id": "t1567.002",
+    "technique_name": "Exfiltration to Cloud Storage",
+    "reports": [
+      "CSA-240507",
+      "CSA-241030",
+      "CSA-241262",
+      "CSA-250504",
+      "CSA-250697",
+      "CSECR-24155"
+    ],
+    "observables": [
+      "Exfiltrated data from Snowflake to AWS S3 bucket",
+      "SCATTERED SPIDER exfiltrated some Jenkins-related files from AWS to transfer.sh and exfiltrated a file from a Docker container to bashupload[.]com."
+    ]
+  },
+  {
+    "id": "ta0011_t1071",
+    "tactic_id": "ta0011",
+    "tactic_name": "Command and Control",
+    "technique_id": "t1071",
+    "technique_name": "Application Layer Protocol",
+    "reports": [
+      "CSECR-24082"
+    ]
+  },
+  {
+    "id": "ta0011_t1071.001",
+    "tactic_id": "ta0011",
+    "tactic_name": "Command and Control",
+    "technique_id": "t1071.001",
+    "technique_name": "Web Protocols",
+    "reports": [
+      "CSA-250971",
+      "CSA-251334",
+      "CSECR-24093"
+    ],
+    "observables": [
+      "While most incidents did not involve malware, in one case, the adversary deployed several legitimate RMM tools and malicious RATs, which use web protocols for C2"
+    ]
+  },
+  {
+    "id": "ta0011_t1090",
+    "tactic_id": "ta0011",
+    "tactic_name": "Command and Control",
+    "technique_id": "t1090",
+    "technique_name": "Proxy",
+    "reports": [
+      "CSA-250504",
+      "CSA-250697"
+    ]
+  },
+  {
+    "id": "ta0011_t1090.001",
+    "tactic_id": "ta0011",
+    "tactic_name": "Command and Control",
+    "technique_id": "t1090.001",
+    "technique_name": "Internal Proxy",
+    "reports": [
+      "CSA-231583"
+    ],
+    "observables": [
+      "SCATTERED SPIDER used a Twingate connector as an internal proxy to obtain and maintain network access to private resources"
+    ]
+  },
+  {
+    "id": "ta0011_t1090.002",
+    "tactic_id": "ta0011",
+    "tactic_name": "Command and Control",
+    "technique_id": "t1090.002",
+    "technique_name": "External Proxy",
+    "observables": [
+      "SCATTERED SPIDER deployed several proxy tools, including rsocx."
+    ]
+  },
+  {
+    "id": "ta0011_t1102",
+    "tactic_id": "ta0011",
+    "tactic_name": "Command and Control",
+    "technique_id": "t1102",
+    "technique_name": "Web Service",
+    "reports": [
+      "CSECR-24082",
+      "CSECR-24128"
+    ],
+    "observables": [
+      "SCATTERED SPIDER often downloads tooling from filebin[.]net, transfer[.]sh, and upload[.]ee, as well as remote S3 buckets, BackBlaze, and shz[.]al URLs"
+    ]
+  },
+  {
+    "id": "ta0011_t1219",
+    "tactic_id": "ta0011",
+    "tactic_name": "Command and Control",
+    "technique_id": "t1219",
+    "technique_name": "Remote Access Tools",
+    "reports": [
+      "CSA-230978",
+      "CSA-241030",
+      "CSECR-24155"
+    ],
+    "observables": [
+      "SCATTERED SPIDER employed an unprecedented variety of legitimate RMM tools to maintain persistent access."
+    ]
+  },
+  {
+    "id": "ta0011_t1571",
+    "tactic_id": "ta0011",
+    "tactic_name": "Command and Control",
+    "technique_id": "t1571",
+    "technique_name": "Non-Standard Port",
+    "observables": [
+      "Some remote administration tools used by SCATTERED SPIDER used high TCP ports for C2 (4444, 5565, and 29381)"
+    ]
+  },
+  {
+    "id": "ta0040_t1485",
+    "tactic_id": "ta0040",
+    "tactic_name": "Impact",
+    "technique_id": "t1485",
+    "technique_name": "Data Destruction",
+    "reports": [
+      "CSA-240215",
+      "CSA-240720",
+      "CSECR-24019",
+      "CSECR-24021",
+      "CSECR-24027",
+      "CSECR-24108",
+      "CSECR-24128",
+      "CSECR-25086"
+    ],
+    "observables": [
+      "Deleted AMIs (DeregisterImage) and EC2 instance snapshots (DeleteSnapshot); deleted and deactivated AWS Backups (DeleteRecoveryPoint)"
+    ]
+  },
+  {
+    "id": "ta0040_t1486",
+    "tactic_id": "ta0040",
+    "tactic_name": "Impact",
+    "technique_id": "t1486",
+    "technique_name": "Data Encrypted for Impact",
+    "reports": [
+      "CSA-231445",
+      "CSA-231462",
+      "CSA-240001",
+      "CSA-240044",
+      "CSA-240215",
+      "CSA-240217",
+      "CSA-240434",
+      "CSA-240507",
+      "CSA-240720",
+      "CSA-250504",
+      "CSA-250697",
+      "CSECR-24027",
+      "CSECR-24108",
+      "CSECR-24128",
+      "CSECR-24155",
+      "CSECR-25062",
+      "CSECR-25086",
+      "CSECR-25122"
+    ],
+    "observables": [
+      "Deployed AlphV ransomware to ESXi systems, Azure, and AWS VMs",
+      "SCATTERED SPIDER has used Qilin ransomware and ALPHA SPIDER's Alphv ransomware to encrypt data on both Windows and ESXi systems."
+    ]
+  },
+  {
+    "id": "ta0040_t1529",
+    "tactic_id": "ta0040",
+    "tactic_name": "Impact",
+    "technique_id": "t1529",
+    "technique_name": "System Shutdown/Reboot",
+    "reports": [
+      "CSA-240215",
+      "CSECR-24108",
+      "CSECR-24155"
+    ],
+    "observables": [
+      "One of SCATTERED SPIDER\u2019s EDR-bypass tools attempts to reboot a system in safe mode. Additionally, the adversary attempted to reboot an AWS host when troubleshooting.",
+      "One of SCATTERED SPIDER\u2019s EDR-bypass tools attempts to reboot a system in safe mode. Additionally, the adversary has attempted to reboot an AWS host when troubleshooting.",
+      "Shutdown EC2 instance hosting domain controller to detach the mounted disks. Then mounted the disks in an actor-created EC2 instance to dump the NTDS.dit. Ultimately reattached the disks back to the original EC2 instance hosting the domain controller and rebooted the instance."
+    ]
+  },
+  {
+    "id": "ta0040_t1531",
+    "tactic_id": "ta0040",
+    "tactic_name": "Impact",
+    "technique_id": "t1531",
+    "technique_name": "Account Access Removal",
+    "reports": [
+      "CSA-240217",
+      "CSA-240507",
+      "CSA-240720",
+      "CSECR-24108",
+      "CSECR-24128"
+    ],
+    "observables": [
+      "On AWS, SCATTERED SPIDER deleted one user\u2019s access key.",
+      "Reset the authentication factor to obtain access to the Entra ID account; access removal was not the primary objective",
+      "SCATTERED SPIDER often uses VMware PowerCLI to change root account passwords on ESXi hypervisors to complicate recovery.\n\nOn AWS, SCATTERED SPIDER deleted one user\u2019s access key."
+    ]
+  },
+  {
+    "id": "ta0042_t1583",
+    "tactic_id": "ta0042",
+    "tactic_name": "Resource Development",
+    "technique_id": "t1583",
+    "technique_name": "Acquire Infrastructure",
+    "reports": [
+      "CSA-230171"
+    ],
+    "observables": [
+      "SCATTERED SPIDER set up numerous phishing domains to harvest credentials"
+    ]
+  },
+  {
+    "id": "ta0042_t1587",
+    "tactic_id": "ta0042",
+    "tactic_name": "Resource Development",
+    "technique_id": "t1587",
+    "technique_name": "Develop Capabilities",
+    "reports": [
+      "CSECR-25016"
+    ]
+  },
+  {
+    "id": "ta0042_t1587.001",
+    "tactic_id": "ta0042",
+    "tactic_name": "Resource Development",
+    "technique_id": "t1587.001",
+    "technique_name": "Malware",
+    "reports": [
+      "CSA-231462"
+    ]
+  },
+  {
+    "id": "ta0042_t1588.002",
+    "tactic_id": "ta0042",
+    "tactic_name": "Resource Development",
+    "technique_id": "t1588.002",
+    "technique_name": "Tool"
+  },
+  {
+    "id": "ta0042_t1588.005",
+    "tactic_id": "ta0042",
+    "tactic_name": "Resource Development",
+    "technique_id": "t1588.005",
+    "technique_name": "Exploits",
+    "reports": [
+      "CSA-250971",
+      "CSA-251334"
+    ]
+  },
+  {
+    "id": "ta0042_t1608.002",
+    "tactic_id": "ta0042",
+    "tactic_name": "Resource Development",
+    "technique_id": "t1608.002",
+    "technique_name": "Upload Tool"
+  }
+]

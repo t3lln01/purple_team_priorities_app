@@ -10,7 +10,8 @@ import TidPriority from "@/pages/TidPriority";
 import TacticsScores from "@/pages/TacticsScores";
 import RiskRate from "@/pages/RiskRate";
 import AllProcedures from "@/pages/AllProcedures";
-import { Shield, Users, Activity, Target, ChartBar, AlertTriangle, List } from "lucide-react";
+import DataSources from "@/pages/DataSources";
+import { Shield, Users, Activity, Target, ChartBar, AlertTriangle, List, Database } from "lucide-react";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ const navItems = [
   { path: "/tactics-scores", label: "Tactic Scores", icon: AlertTriangle },
   { path: "/risk-rate", label: "Risk Rate", icon: Shield },
   { path: "/all-procedures", label: "All Procedures", icon: List },
+  { path: "/data-sources", label: "Data Sources", icon: Database },
 ];
 
 function Sidebar() {
@@ -86,6 +88,7 @@ function Router() {
         <Route path="/tactics-scores" component={TacticsScores} />
         <Route path="/risk-rate" component={RiskRate} />
         <Route path="/all-procedures" component={AllProcedures} />
+        <Route path="/data-sources" component={DataSources} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
