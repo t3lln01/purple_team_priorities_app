@@ -13,6 +13,7 @@ type Procedure = {
 
 const allProcedures: Procedure[] = (data as any).allProcedures;
 const techTacticMap: Record<string, string[]> = (data as any).techTacticMap ?? {};
+const techNameMap: Record<string, string> = (data as any).techNameMap ?? {};
 
 const procedureActors: string[] = Array.from(
   new Set(allProcedures.map(r => r.actor).filter(Boolean))
@@ -437,6 +438,7 @@ export default function AllProcedures() {
               <tr className="border-b border-border bg-muted/30">
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">Actor / Group</th>
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">MITRE ID</th>
+                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">Technique Name</th>
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Procedure</th>
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">Date</th>
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">External Reference</th>
@@ -446,7 +448,7 @@ export default function AllProcedures() {
             <tbody>
               {pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted-foreground">
                     No procedures match the current filters.
                   </td>
                 </tr>
@@ -467,6 +469,11 @@ export default function AllProcedures() {
                           </span>
                         )}
                       </div>
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-foreground whitespace-nowrap max-w-[200px]">
+                      <span className="truncate block" title={techNameMap[row.mitreId] ?? ""}>
+                        {techNameMap[row.mitreId] ?? "—"}
+                      </span>
                     </td>
                     <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-[420px]">
                       <p className="line-clamp-2" title={row.procedure}>{row.procedure}</p>
