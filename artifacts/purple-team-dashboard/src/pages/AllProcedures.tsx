@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearch } from "wouter";
 import data from "@/data.json";
 
 type Procedure = {
@@ -30,12 +31,23 @@ function riskColor(r: number) {
 }
 
 export default function AllProcedures() {
+  const search = useSearch();
   const [actorFilter, setActorFilter] = useState("");
-  const [mitreFilter, setMitreFilter] = useState("");
+  const [mitreFilter, setMitreFilter] = useState(() => {
+    const params = new URLSearchParams(search);
+    return params.get("mitre") ?? "";
+  });
   const [procedureSearch, setProcedureSearch] = useState("");
   const [minRisk, setMinRisk] = useState("");
   const [maxRisk, setMaxRisk] = useState("");
   const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const mitre = params.get("mitre") ?? "";
+    setMitreFilter(mitre);
+    setPage(1);
+  }, [search]);
 
   const filtered = useMemo(() => {
     const lo = minRisk !== "" ? Number(minRisk) : -Infinity;

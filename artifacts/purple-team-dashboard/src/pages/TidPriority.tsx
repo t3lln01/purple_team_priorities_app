@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import data from "@/data.json";
 
 type TIDRow = {
@@ -70,7 +71,9 @@ export default function TidPriority() {
             {[...tidPriority].sort((a, b) => b.risk - a.risk).slice(0, 15).map(row => (
               <div key={row.tid}>
                 <div className="flex justify-between text-xs mb-1">
-                  <span className="font-mono text-primary">{row.tid}</span>
+                  <Link href={`/all-procedures?mitre=${encodeURIComponent(row.tid)}`}>
+                    <span className="font-mono text-primary hover:underline cursor-pointer" title="View procedures">{row.tid}</span>
+                  </Link>
                   <span className="text-muted-foreground">{row.risk.toFixed(0)}</span>
                 </div>
                 <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -91,7 +94,9 @@ export default function TidPriority() {
               return (
                 <div key={row.tid}>
                   <div className="flex justify-between text-xs mb-1">
-                    <span className="font-mono text-primary">{row.tid}</span>
+                    <Link href={`/all-procedures?mitre=${encodeURIComponent(row.tid)}`}>
+                      <span className="font-mono text-primary hover:underline cursor-pointer" title="View procedures">{row.tid}</span>
+                    </Link>
                     <span className="text-muted-foreground">{row.count} procedures</span>
                   </div>
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -149,14 +154,11 @@ export default function TidPriority() {
                   <tr key={row.tid} className="border-b border-border/40 hover:bg-accent/20 transition-colors">
                     <td className="px-4 py-2.5 text-xs text-muted-foreground">{i + 1}</td>
                     <td className="px-4 py-2.5">
-                      <a
-                        href={`https://attack.mitre.org/techniques/${row.tid.replace(".", "/")}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-mono text-xs text-primary bg-primary/10 px-2 py-0.5 rounded hover:bg-primary/20 transition-colors"
-                      >
-                        {row.tid}
-                      </a>
+                      <Link href={`/all-procedures?mitre=${encodeURIComponent(row.tid)}`}>
+                        <span className="font-mono text-xs text-primary bg-primary/10 px-2 py-0.5 rounded hover:bg-primary/20 transition-colors cursor-pointer" title="View procedures for this technique">
+                          {row.tid}
+                        </span>
+                      </Link>
                     </td>
                     <td className="px-4 py-2.5 text-xs text-foreground font-semibold">{row.count}</td>
                     <td className="px-4 py-2.5 text-xs text-muted-foreground">{excelDateToStr(row.lastObs)}</td>
