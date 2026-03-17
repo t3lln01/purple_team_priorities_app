@@ -5,9 +5,9 @@ import data from "@/data.json";
 type Procedure = {
   actor: string;
   mitreId: string;
+  externalRef: string;
   procedure: string;
   date: number | null;
-  source: string;
   risk: number;
 };
 
@@ -27,6 +27,14 @@ const PAGE_SIZE = 30;
 function formatDate(ms: number | null) {
   if (!ms) return "—";
   return new Date(ms).toLocaleDateString("en-GB", { year: "numeric", month: "short", day: "2-digit" });
+}
+
+function parseExternalRef(ref: string): { label: string; url: string | null } {
+  if (!ref) return { label: "—", url: null };
+  const urlMatch = ref.match(/https?:\/\/\S+/);
+  const url = urlMatch ? urlMatch[0] : null;
+  const label = url ? ref.replace(url, "").replace(/\s*-\s*$/, "").trim() : ref.trim();
+  return { label, url };
 }
 
 function riskColor(r: number) {
@@ -212,7 +220,7 @@ export default function AllProcedures() {
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">MITRE ID</th>
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Procedure</th>
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">Date</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">Source</th>
+                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">External Reference</th>
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">Risk Score</th>
               </tr>
             </thead>
@@ -240,8 +248,20 @@ export default function AllProcedures() {
                     <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
                       {formatDate(row.date)}
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
-                      {row.source}
+                    <td className="px-4 py-2.5 text-xs max-w-[260px]">
+                      {(() => {
+                        const { label, url } = parseExternalRef(row.externalRef);
+                        return (
+                          <div className="space-y-0.5">
+                            <p className="text-muted-foreground line-clamp-2" title={label}>{label || "—"}</p>
+                            {url && (
+                              <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate block max-w-full text-[10px]" title={url}>
+                                ↗ {url.replace(/^https?:\/\//, "").substring(0, 45)}{url.length > 53 ? "…" : ""}
+                              </a>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-2.5">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${riskColor(row.risk)}`}>
