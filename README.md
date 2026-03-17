@@ -229,6 +229,45 @@ Clear any of these with the trash icon on the relevant Data Sources panel, or vi
 
 ## Troubleshooting
 
+**`ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL` / Exit status 1**
+
+Run the command with output redirected so you can see the actual Vite error:
+
+```bash
+pnpm --filter @workspace/purple-team-dashboard run dev 2>&1 | head -50
+```
+
+Common causes and fixes:
+
+| Symptom | Fix |
+|---------|-----|
+| You ran `sudo pnpm …` | Never use `sudo` with pnpm — it changes the home directory and breaks the pnpm store. Run without sudo. |
+| Node.js < 18 | This project requires Node.js 18 or later. Check with `node --version`. |
+| macOS / Windows | The `pnpm-workspace.yaml` strips non-Linux-x64 platform binaries (esbuild, rollup, Tailwind oxide). See below. |
+| Conda `(base)` environment | The conda Node.js may be outdated. Install Node.js via [nvm](https://github.com/nvm-sh/nvm) instead and run outside conda. |
+
+**Running on macOS or Windows**
+
+The `pnpm-workspace.yaml` has overrides that exclude non-Linux-x64 platform packages to keep Replit's install lean. On macOS or Windows you need to remove those exclusions. Open `pnpm-workspace.yaml` and delete the entire `overrides:` block (everything from `overrides:` to the end of the file), then re-run `pnpm install`.
+
+**Node.js version**
+
+Check your version:
+
+```bash
+node --version   # needs to be v18 or higher
+pnpm --version   # needs to be v9 or higher
+```
+
+Install the latest Node.js LTS via [nvm](https://github.com/nvm-sh/nvm):
+
+```bash
+nvm install --lts
+nvm use --lts
+```
+
+---
+
 **MITRE ATT&CK fetch fails**
 The raw GitHub file is ~75 MB. Download it manually from the link shown on the error panel and upload it via the file picker.
 
