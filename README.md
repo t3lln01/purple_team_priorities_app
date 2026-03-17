@@ -23,8 +23,8 @@ npm install -g pnpm
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/your-org/purple-team-dashboard.git
-cd purple-team-dashboard
+git clone https://github.com/your-org/purple_team_priorities_app.git
+cd purple_team_priorities_app
 
 # 2. Install all workspace dependencies
 pnpm install
@@ -72,7 +72,7 @@ PORT=5173 BASE_PATH=/ pnpm --filter @workspace/purple-team-dashboard run serve
 
 The `dist/public/` folder is a standard static-site bundle — deploy it to any web server, S3 bucket, Nginx, GitHub Pages, Netlify, Cloudflare Pages, etc.
 
-For GitHub Pages or a subdirectory deployment, set `BASE_PATH` to match your repo path, e.g. `BASE_PATH=/purple-team-dashboard/`.
+For GitHub Pages or a subdirectory deployment, set `BASE_PATH` to match your repo path, e.g. `BASE_PATH=/purple_team_priorities_app/`.
 
 ---
 
@@ -236,7 +236,7 @@ Clear any of these with the trash icon on the relevant Data Sources panel, or vi
 Set `PORT=5173` before running, or add it to `artifacts/purple-team-dashboard/.env`.
 
 **`Error: BASE_PATH environment variable is required`**
-Set `BASE_PATH=/` for local dev. For a subdirectory deployment set it to the path prefix (e.g. `/dashboard/`).
+Set `BASE_PATH=/` for local dev. For a subdirectory deployment set it to the path prefix (e.g. `/purple_team_priorities_app/`).
 
 **MITRE ATT&CK fetch fails**
 The raw GitHub file is ~75 MB. Download it manually from the link shown on the error panel and upload it via the file picker.
