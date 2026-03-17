@@ -30,29 +30,26 @@ cd purple_team_priorities_app
 pnpm install
 
 # 3. Start the dev server
-PORT=5173 BASE_PATH=/ pnpm --filter @workspace/purple-team-dashboard run dev
+pnpm --filter @workspace/purple-team-dashboard run dev
 ```
 
 Open http://localhost:5173 in your browser.
 
-> **Why `PORT` and `BASE_PATH`?**
-> The Vite config reads these at startup. `PORT` sets the listen port; `BASE_PATH` is the URL prefix the app is served under (`/` for local dev).
-
 ---
 
-## Using a `.env` file (recommended)
+## Changing port or base path (optional)
 
-Create a file called `.env` inside `artifacts/purple-team-dashboard/`:
-
-```env
-PORT=5173
-BASE_PATH=/
-```
-
-Then run:
+By default the dev server runs on port **5173** at path **`/`**. Override with environment variables if needed:
 
 ```bash
-pnpm --filter @workspace/purple-team-dashboard run dev
+PORT=8080 BASE_PATH=/dashboard/ pnpm --filter @workspace/purple-team-dashboard run dev
+```
+
+Or create `artifacts/purple-team-dashboard/.env`:
+
+```env
+PORT=8080
+BASE_PATH=/
 ```
 
 ---
@@ -61,18 +58,18 @@ pnpm --filter @workspace/purple-team-dashboard run dev
 
 ```bash
 # Build the app
-PORT=5173 BASE_PATH=/ pnpm --filter @workspace/purple-team-dashboard run build
+pnpm --filter @workspace/purple-team-dashboard run build
 
 # The compiled output lands in:
 # artifacts/purple-team-dashboard/dist/public/
 
 # Serve the build locally to verify
-PORT=5173 BASE_PATH=/ pnpm --filter @workspace/purple-team-dashboard run serve
+pnpm --filter @workspace/purple-team-dashboard run serve
 ```
 
 The `dist/public/` folder is a standard static-site bundle — deploy it to any web server, S3 bucket, Nginx, GitHub Pages, Netlify, Cloudflare Pages, etc.
 
-For GitHub Pages or a subdirectory deployment, set `BASE_PATH` to match your repo path, e.g. `BASE_PATH=/purple_team_priorities_app/`.
+For GitHub Pages or a subdirectory deployment, set `BASE_PATH` to match your repo path before building, e.g. `BASE_PATH=/purple_team_priorities_app/ pnpm --filter @workspace/purple-team-dashboard run build`.
 
 ---
 
@@ -231,12 +228,6 @@ Clear any of these with the trash icon on the relevant Data Sources panel, or vi
 ---
 
 ## Troubleshooting
-
-**`Error: PORT environment variable is required`**
-Set `PORT=5173` before running, or add it to `artifacts/purple-team-dashboard/.env`.
-
-**`Error: BASE_PATH environment variable is required`**
-Set `BASE_PATH=/` for local dev. For a subdirectory deployment set it to the path prefix (e.g. `/purple_team_priorities_app/`).
 
 **MITRE ATT&CK fetch fails**
 The raw GitHub file is ~75 MB. Download it manually from the link shown on the error panel and upload it via the file picker.
