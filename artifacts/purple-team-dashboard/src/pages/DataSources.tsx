@@ -11,7 +11,25 @@ import {
 } from "@/context/ViewContext";
 
 const MITRE_DEFAULT_URL =
-  "https://raw.githubusercontent.com/mitre-attack/attack-stix-data/refs/heads/master/enterprise-attack/enterprise-attack.json";
+  "https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json";
+
+const MITRE_DOWNLOAD_URL =
+  "https://github.com/mitre-attack/attack-stix-data/raw/master/enterprise-attack/enterprise-attack.json";
+
+function toBlobToRaw(url: string): string {
+  // Convert github.com/.../blob/... → raw.githubusercontent.com/...
+  const blobMatch = url.match(
+    /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/(.+)$/
+  );
+  if (blobMatch) {
+    return `https://raw.githubusercontent.com/${blobMatch[1]}/${blobMatch[2]}/${blobMatch[3]}`;
+  }
+  // Strip refs/heads/ from raw URLs if present
+  return url.replace(
+    /raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/refs\/heads\//,
+    "raw.githubusercontent.com/$1/$2/"
+  );
+}
 
 const LS_MITRE = "ds_mitre_stats";
 
@@ -149,13 +167,30 @@ export default function DataSources() {
   // ── MITRE handlers ────────────────────────────────────────────────
   async function fetchMitreUrl() {
     setMitreStatus("loading"); setMitreError("");
+    const rawUrl = toBlobToRaw(mitreUrl.trim());
+    if (rawUrl !== mitreUrl.trim()) setMitreUrl(rawUrl);
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 120_000); // 2 min timeout
+
     try {
-      const res = await fetch(mitreUrl);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const res = await fetch(rawUrl, { signal: controller.signal });
+      clearTimeout(timer);
+      if (!res.ok) throw new Error(`HTTP ${res.status} — ${res.statusText}`);
       const json = await res.json();
       const stats = parseMitre(json);
       setMitreStats(stats); lsSet(LS_MITRE, stats); setMitreStatus("done");
-    } catch (e: any) { setMitreError(e.message); setMitreStatus("error"); }
+    } catch (e: any) {
+      clearTimeout(timer);
+      if (e.name === "AbortError") {
+        setMitreError("Request timed out (file may be too large). Download the file and upload it instead.");
+      } else if (e.name === "TypeError" || e.message?.includes("fetch")) {
+        setMitreError("Network / CORS error. Download the file using the link below and upload it instead.");
+      } else {
+        setMitreError(e.message ?? "Unknown error");
+      }
+      setMitreStatus("error");
+    }
   }
 
   async function onMitreFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -312,13 +347,33 @@ export default function DataSources() {
                 {mitreStatus === "loading" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link2 className="w-3 h-3" />}Fetch
               </button>
             </div>
+            {mitreStatus === "loading" && (
+              <p className="text-[10px] text-yellow-400">
+                Downloading ~75 MB — this may take a minute on slower connections…
+              </p>
+            )}
+            <p className="text-[10px] text-muted-foreground">
+              Blob URLs are automatically converted to raw. If the fetch fails,{" "}
+              <a href={MITRE_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer"
+                className="text-primary underline">download the file</a>{" "}
+              then upload it below.
+            </p>
             <SH>Load via File</SH>
             <button onClick={() => mitreFileRef.current?.click()}
               className="w-full flex items-center justify-center gap-2 px-3 py-2.5 border-2 border-dashed border-border rounded-lg text-xs text-muted-foreground hover:border-primary/50 hover:text-foreground transition-colors">
               <Upload className="w-3.5 h-3.5" />Upload enterprise-attack.json
             </button>
             <input ref={mitreFileRef} type="file" accept=".json" className="hidden" onChange={onMitreFile} />
-            {mitreError && <p className="text-xs text-red-400">{mitreError}</p>}
+            {mitreError && (
+              <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 space-y-1">
+                <p className="text-xs text-red-400 font-medium">Fetch failed</p>
+                <p className="text-[10px] text-red-400/80">{mitreError}</p>
+                <a href={MITRE_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-[10px] text-primary underline">
+                  <Upload className="w-3 h-3" />Download enterprise-attack.json and upload it above
+                </a>
+              </div>
+            )}
             {mitreStats && (
               <div className="space-y-3 pt-1">
                 <SH>Summary</SH>
