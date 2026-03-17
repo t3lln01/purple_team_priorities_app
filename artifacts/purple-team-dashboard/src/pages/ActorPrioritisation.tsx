@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import data from "@/data.json";
 
@@ -16,9 +16,15 @@ type ActorRanking = {
   riskSum: number;
 };
 
+type Procedure = { actor: string; [key: string]: any };
+
 const actors: Actor[] = (data as any).actors;
 const actorRanking: ActorRanking[] = (data as any).actorRanking;
-const monitoringList: string[] = (data as any).monitoringList;
+const allProcedures: Procedure[] = (data as any).allProcedures;
+
+const procedureActors: string[] = Array.from(
+  new Set(allProcedures.map(r => r.actor).filter(Boolean))
+).sort();
 
 function riskColor(pct: number) {
   if (pct >= 0.8) return "text-red-400 bg-red-400/10 border border-red-400/30";
@@ -39,12 +45,11 @@ function BarChart({ value, max }: { value: number; max: number }) {
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-        <div
-          className="h-full bg-primary rounded-full transition-all"
-          style={{ width: `${pct}%` }}
-        />
+        <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${pct}%` }} />
       </div>
-      <span className="text-xs text-muted-foreground w-16 text-right">{value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+      <span className="text-xs text-muted-foreground w-16 text-right">
+        {value.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+      </span>
     </div>
   );
 }
@@ -55,31 +60,62 @@ type RiskLevel = typeof RISK_LEVELS[number];
 export default function ActorPrioritisation() {
   const [search, setSearch] = useState("");
   const [riskFilter, setRiskFilter] = useState<RiskLevel>("All");
+  const [selectedActors, setSelectedActors] = useState<Set<string>>(new Set());
+  const [chipSearch, setChipSearch] = useState("");
 
   const maxRisk = Math.max(...actorRanking.map(a => a.riskSum));
 
-  const filtered = actors.filter(actor => {
+  function toggleActor(name: string) {
+    setSelectedActors(prev => {
+      const next = new Set(prev);
+      next.has(name) ? next.delete(name) : next.add(name);
+      return next;
+    });
+  }
+
+  function clearActors() {
+    setSelectedActors(new Set());
+  }
+
+  const filtered = useMemo(() => actors.filter(actor => {
     const matchSearch = !search || actor.name.toLowerCase().includes(search.toLowerCase());
     const matchRisk = riskFilter === "All" || riskLabel(actor.riskPct) === riskFilter;
-    return matchSearch && matchRisk;
-  });
+    const matchChips = selectedActors.size === 0 ||
+      [...selectedActors].some(s => s.toLowerCase() === actor.name.toLowerCase());
+    return matchSearch && matchRisk && matchChips;
+  }), [search, riskFilter, selectedActors]);
 
-  const filteredRanking = actorRanking.filter(a =>
-    filtered.some(f => f.name.toLowerCase() === a.name.toLowerCase())
-  );
+  const filteredRanking = useMemo(() => {
+    if (selectedActors.size > 0) {
+      return actorRanking.filter(a =>
+        [...selectedActors].some(s => s.toLowerCase() === a.name.toLowerCase())
+      );
+    }
+    return actorRanking.filter(a =>
+      filtered.some(f => f.name.toLowerCase() === a.name.toLowerCase())
+    );
+  }, [filtered, selectedActors]);
 
   const topActors = filtered.slice(0, 10);
+
+  const visibleChips = chipSearch
+    ? procedureActors.filter(a => a.toLowerCase().includes(chipSearch.toLowerCase()))
+    : procedureActors;
 
   return (
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Final Actor Prioritisation</h1>
-        <p className="text-muted-foreground text-sm mt-1">Threat actor ranking based on intent, capability, and TTP risk scores</p>
+        <p className="text-muted-foreground text-sm mt-1">
+          Threat actor ranking based on intent, capability, and TTP risk scores
+        </p>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-card border border-card-border rounded-xl p-4">
-          <div className="text-2xl font-bold text-primary">{filtered.length}<span className="text-base text-muted-foreground font-normal"> / {actors.length}</span></div>
+          <div className="text-2xl font-bold text-primary">
+            {filtered.length}<span className="text-base text-muted-foreground font-normal"> / {actors.length}</span>
+          </div>
           <div className="text-sm text-muted-foreground mt-1">Tracked Actors</div>
         </div>
         <div className="bg-card border border-card-border rounded-xl p-4">
@@ -87,8 +123,8 @@ export default function ActorPrioritisation() {
           <div className="text-sm text-muted-foreground mt-1">High/Critical Priority</div>
         </div>
         <div className="bg-card border border-card-border rounded-xl p-4">
-          <div className="text-2xl font-bold text-chart-2">{monitoringList.filter(Boolean).length}</div>
-          <div className="text-sm text-muted-foreground mt-1">Under Active Monitoring</div>
+          <div className="text-2xl font-bold text-chart-2">{procedureActors.length}</div>
+          <div className="text-sm text-muted-foreground mt-1">Actors in Procedures</div>
         </div>
       </div>
 
@@ -155,7 +191,9 @@ export default function ActorPrioritisation() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">No actors match the current filter.</td>
+                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                      No actors match the current filter.
+                    </td>
                   </tr>
                 ) : (
                   filtered.map((actor, i) => (
@@ -163,7 +201,9 @@ export default function ActorPrioritisation() {
                       <td className="px-4 py-2.5 text-muted-foreground font-mono text-xs">{i + 1}</td>
                       <td className="px-4 py-2.5 text-xs">
                         <Link href={`/all-procedures?actor=${encodeURIComponent(actor.name)}`}>
-                          <span className="font-medium text-foreground hover:text-primary hover:underline cursor-pointer transition-colors" title="View procedures for this actor">{actor.name}</span>
+                          <span className="font-medium text-foreground hover:text-primary hover:underline cursor-pointer transition-colors" title="View procedures for this actor">
+                            {actor.name}
+                          </span>
                         </Link>
                       </td>
                       <td className="px-4 py-2.5 text-center">
@@ -205,7 +245,9 @@ export default function ActorPrioritisation() {
                 <div key={a.name}>
                   <div className="flex justify-between mb-1">
                     <Link href={`/all-procedures?actor=${encodeURIComponent(a.name)}`}>
-                      <span className="text-xs text-foreground hover:text-primary hover:underline cursor-pointer transition-colors" title="View procedures">{a.name}</span>
+                      <span className="text-xs text-foreground hover:text-primary hover:underline cursor-pointer transition-colors" title="View procedures">
+                        {a.name}
+                      </span>
                     </Link>
                   </div>
                   <BarChart value={a.riskSum} max={maxRisk} />
@@ -216,18 +258,54 @@ export default function ActorPrioritisation() {
 
           <div className="bg-card border border-card-border rounded-xl overflow-hidden">
             <div className="p-4 border-b border-border">
-              <h2 className="font-semibold text-foreground">Active Monitoring Q3-Q4 FY2026</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Threat actors under monitoring</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-semibold text-foreground">Active Monitoring</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Select actors to filter the ranking and TTP chart
+                    {selectedActors.size > 0 && (
+                      <span className="ml-2 text-primary font-medium">({selectedActors.size} selected)</span>
+                    )}
+                  </p>
+                </div>
+                {selectedActors.size > 0 && (
+                  <button
+                    onClick={clearActors}
+                    className="text-xs text-muted-foreground hover:text-foreground underline transition-colors flex-shrink-0"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <input
+                type="search"
+                placeholder="Search actors…"
+                value={chipSearch}
+                onChange={e => setChipSearch(e.target.value)}
+                className="mt-2 w-full bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
             </div>
-            <div className="p-4">
-              <div className="flex flex-wrap gap-2">
-                {monitoringList.filter(Boolean).map(actor => (
-                  <Link key={actor} href={`/all-procedures?actor=${encodeURIComponent(actor)}`}>
-                    <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 border border-primary/30 text-primary font-medium hover:bg-primary/20 cursor-pointer transition-colors" title="View procedures">
+            <div className="p-3 max-h-52 overflow-y-auto">
+              <div className="flex flex-wrap gap-1.5">
+                {visibleChips.map(actor => {
+                  const active = selectedActors.has(actor);
+                  return (
+                    <button
+                      key={actor}
+                      onClick={() => toggleActor(actor)}
+                      className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
+                        active
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-primary/10 border-primary/30 text-primary hover:bg-primary/20"
+                      }`}
+                    >
                       {actor}
-                    </span>
-                  </Link>
-                ))}
+                    </button>
+                  );
+                })}
+                {visibleChips.length === 0 && (
+                  <span className="text-xs text-muted-foreground">No actors match.</span>
+                )}
               </div>
             </div>
           </div>
@@ -255,7 +333,9 @@ export default function ActorPrioritisation() {
                 <tr key={actor.name} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
                   <td className="px-4 py-3">
                     <Link href={`/all-procedures?actor=${encodeURIComponent(actor.name)}`}>
-                      <span className="font-semibold text-foreground hover:text-primary hover:underline cursor-pointer transition-colors" title="View procedures for this actor">{actor.name}</span>
+                      <span className="font-semibold text-foreground hover:text-primary hover:underline cursor-pointer transition-colors" title="View procedures for this actor">
+                        {actor.name}
+                      </span>
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-chart-2">{actor.intent}</td>
