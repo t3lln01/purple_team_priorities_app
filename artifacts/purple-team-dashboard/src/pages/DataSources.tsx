@@ -57,16 +57,41 @@ function parseMitre(json: any): MitreStats {
   return { total: techs.length, tactics, sample: techs.slice(0, 50), loadedAt: new Date().toISOString() };
 }
 
+// Normalise last_updated / created_date to ms timestamp — handles unix-seconds, unix-ms, and ISO strings
+function toMs(val: any): number {
+  if (!val) return 0;
+  if (typeof val === "number") return val < 10_000_000_000 ? val * 1000 : val;
+  if (typeof val === "string") { const d = Date.parse(val); return isNaN(d) ? 0 : d; }
+  return 0;
+}
+
+function fmtDate(ms: number): string {
+  if (!ms) return "—";
+  return new Date(ms).toLocaleDateString("en-GB", { year: "numeric", month: "short", day: "2-digit" });
+}
+
 function parseReports(json: any): { stats: ReportsStats; lookup: ReportsLookup } {
   const resources = json?.api_object?.resources ?? json?.resources ?? (Array.isArray(json) ? json : []);
   const lookup: ReportsLookup = {};
   const mapped = resources.map((r: any) => {
     const slug = (r.slug ?? "").toLowerCase();
-    if (slug) lookup[slug] = { name: r.name ?? "", url: r.url ?? "", created_date: r.created_date ?? 0 };
+    // Prefer last_updated; fall back to created_date
+    const dateMs = toMs(r.last_updated) || toMs(r.created_date);
+    if (slug) {
+      lookup[slug] = {
+        reportId: slug.toUpperCase(),
+        name: r.name ?? "",
+        url: r.url ?? "",
+        last_updated: dateMs,
+      };
+    }
     return {
-      id: r.id, name: r.name ?? "", url: r.url ?? "",
-      date: r.created_date ? new Date(r.created_date * 1000).toLocaleDateString("en-GB", { year: "numeric", month: "short", day: "2-digit" }) : "—",
-      dateTs: r.created_date ?? 0, type: r.type?.name ?? "Unknown",
+      id: r.id,
+      name: r.name ?? "",
+      url: r.url ?? "",
+      date: fmtDate(dateMs),
+      dateTs: dateMs,
+      type: r.type?.name ?? "Unknown",
     };
   });
   const sorted = [...mapped].sort((a: any, b: any) => b.dateTs - a.dateTs);

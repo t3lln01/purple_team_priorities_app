@@ -100,7 +100,20 @@ export type StoredActorFile = {
   }>;
 };
 
-export type ReportsLookup = Record<string, { name: string; url: string; created_date: number }>;
+// last_updated can be unix seconds, unix ms, or ISO string — normalise to ms
+function toMs(val: any): number {
+  if (!val) return 0;
+  if (typeof val === "number") return val < 10_000_000_000 ? val * 1000 : val;
+  if (typeof val === "string") { const d = Date.parse(val); return isNaN(d) ? 0 : d; }
+  return 0;
+}
+
+export type ReportsLookup = Record<string, {
+  reportId: string;   // slug uppercased (e.g. "CSA-240217")
+  name: string;
+  url: string;
+  last_updated: number; // ms timestamp
+}>;
 
 export function generateView(
   actorFiles: StoredActorFile[],
@@ -116,19 +129,24 @@ export function generateView(
       const reports = entry.reports ?? [];
       const observables = entry.observables ?? [];
 
-      // Resolve report dates and refs
+      // Resolve report slugs → lookup entries
       const resolvedReports = reports
-        .map(slug => ({ slug, data: reportsLookup[slug.toLowerCase()] ?? reportsLookup[slug] }))
+        .map(slug => ({ slug, data: reportsLookup[slug.toLowerCase()] ?? reportsLookup[slug.toUpperCase()] ?? reportsLookup[slug] }))
         .filter(r => r.data);
 
+      // Pick the single newest report by last_updated
       const sortedByDate = [...resolvedReports].sort(
-        (a, b) => (b.data?.created_date ?? 0) - (a.data?.created_date ?? 0)
+        (a, b) => (b.data?.last_updated ?? 0) - (a.data?.last_updated ?? 0)
       );
       const latestReport = sortedByDate[0];
-      const latestDate = latestReport ? latestReport.data.created_date * 1000 : null;
+
+      // Date from newest report's last_updated
+      const latestDate = latestReport ? latestReport.data.last_updated : null;
+
+      // Report Ref = "SLUG — Title - URL" so ViewDetail can split URL out
       const externalRef = latestReport
-        ? `${latestReport.data.name} - ${latestReport.data.url}`
-        : reports.length > 0 ? reports.join(", ") : "";
+        ? `${latestReport.data.reportId} — ${latestReport.data.name} - ${latestReport.data.url}`
+        : reports.length > 0 ? reports.map(s => s.toUpperCase()).join(", ") : "";
 
       const risk = Math.round(reports.length * 100 + observables.length * 50);
 
