@@ -40,10 +40,10 @@ const TACTIC_COLORS: Record<string, string> = {
 };
 
 export default function TacticsScores() {
-  const maxConf = Math.max(...tactics.map(t => t.conf || 0));
-  const maxInt = Math.max(...tactics.map(t => t.integrity || 0));
-  const maxAvail = Math.max(...tactics.map(t => t.avail || 0));
-  const maxExtent = Math.max(...tactics.map(t => t.extent || 0));
+  const maxConf = Math.max(...tactics.map(t => Number(t.conf) || 0));
+  const maxInt = Math.max(...tactics.map(t => Number(t.integrity) || 0));
+  const maxAvail = Math.max(...tactics.map(t => Number(t.avail) || 0));
+  const maxExtent = Math.max(...tactics.map(t => Number(t.extent) || 0));
 
   return (
     <div className="p-6 space-y-6">
@@ -55,7 +55,7 @@ export default function TacticsScores() {
       <div className="grid grid-cols-2 gap-6">
         {tactics.map(tactic => {
           const color = TACTIC_COLORS[tactic.tactic] || "bg-primary";
-          const ciaTotal = (tactic.conf || 0) + (tactic.integrity || 0) + (tactic.avail || 0);
+          const ciaTotal = (Number(tactic.conf) || 0) + (Number(tactic.integrity) || 0) + (Number(tactic.avail) || 0);
           return (
             <div key={tactic.tactic} className="bg-card border border-card-border rounded-xl overflow-hidden">
               <div className={`h-1 ${color}`} />
@@ -75,30 +75,30 @@ export default function TacticsScores() {
                   <div>
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-muted-foreground">Confidentiality</span>
-                      <span className="text-foreground font-medium">{tactic.conf || 0}</span>
+                      <span className="text-foreground font-medium">{Number(tactic.conf) || 0}</span>
                     </div>
-                    <ScoreBar value={tactic.conf || 0} max={maxConf} color="bg-blue-500" />
+                    <ScoreBar value={Number(tactic.conf) || 0} max={maxConf} color="bg-blue-500" />
                   </div>
                   <div>
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-muted-foreground">Integrity</span>
-                      <span className="text-foreground font-medium">{tactic.integrity || 0}</span>
+                      <span className="text-foreground font-medium">{Number(tactic.integrity) || 0}</span>
                     </div>
-                    <ScoreBar value={tactic.integrity || 0} max={maxInt} color="bg-green-500" />
+                    <ScoreBar value={Number(tactic.integrity) || 0} max={maxInt} color="bg-green-500" />
                   </div>
                   <div>
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-muted-foreground">Availability</span>
-                      <span className="text-foreground font-medium">{tactic.avail || 0}</span>
+                      <span className="text-foreground font-medium">{Number(tactic.avail) || 0}</span>
                     </div>
-                    <ScoreBar value={tactic.avail || 0} max={maxAvail} color="bg-yellow-500" />
+                    <ScoreBar value={Number(tactic.avail) || 0} max={maxAvail} color="bg-yellow-500" />
                   </div>
                   <div>
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-muted-foreground">TTP Extent Score</span>
-                      <span className="text-foreground font-medium">{tactic.extent || 0}</span>
+                      <span className="text-foreground font-medium">{Number(tactic.extent) || 0}</span>
                     </div>
-                    <ScoreBar value={tactic.extent || 0} max={maxExtent} color="bg-primary" />
+                    <ScoreBar value={Number(tactic.extent) || 0} max={maxExtent} color="bg-primary" />
                   </div>
                 </div>
               </div>
@@ -125,11 +125,11 @@ export default function TacticsScores() {
             </thead>
             <tbody>
               {[...tactics].sort((a, b) => {
-                const aTotal = (a.conf || 0) + (a.integrity || 0) + (a.avail || 0);
-                const bTotal = (b.conf || 0) + (b.integrity || 0) + (b.avail || 0);
+                const aTotal = (Number(a.conf) || 0) + (Number(a.integrity) || 0) + (Number(a.avail) || 0);
+                const bTotal = (Number(b.conf) || 0) + (Number(b.integrity) || 0) + (Number(b.avail) || 0);
                 return bTotal - aTotal;
               }).map(tactic => {
-                const ciaTotal = (tactic.conf || 0) + (tactic.integrity || 0) + (tactic.avail || 0);
+                const ciaTotal = (Number(tactic.conf) || 0) + (Number(tactic.integrity) || 0) + (Number(tactic.avail) || 0);
                 const color = TACTIC_COLORS[tactic.tactic] || "bg-primary";
                 return (
                   <tr key={tactic.tactic} className="border-b border-border/40 hover:bg-accent/20 transition-colors">
