@@ -13,13 +13,15 @@ import AllProcedures from "@/pages/AllProcedures";
 import DataSources from "@/pages/DataSources";
 import ViewDetail from "@/pages/ViewDetail";
 import { ViewProvider, useViews } from "@/context/ViewContext";
-import { Shield, Users, Activity, Target, ChartBar, AlertTriangle, List, Database, Layers, Trash2 } from "lucide-react";
+import { Shield, Users, Activity, Target, ChartBar, AlertTriangle, List, Database, Layers, Trash2, Table2 } from "lucide-react";
+import ImpactTable from "@/pages/ImpactTable";
 
 const queryClient = new QueryClient();
 
 const navItems = [
   { path: "/", label: "Actor Prioritisation", icon: Users },
   { path: "/risk-calculation", label: "Risk Calculation", icon: Activity },
+  { path: "/impact-table", label: "Impact Table", icon: Table2 },
   { path: "/high-value-assets", label: "High Value Assets", icon: Target },
   { path: "/tid-priority", label: "TID Priority", icon: ChartBar },
   { path: "/tactics-scores", label: "Tactic Scores", icon: AlertTriangle },
@@ -122,6 +124,7 @@ function Router() {
       <Switch>
         <Route path="/" component={ActorPrioritisation} />
         <Route path="/risk-calculation" component={RiskCalculation} />
+        <Route path="/impact-table" component={ImpactTable} />
         <Route path="/high-value-assets" component={HighValueAssets} />
         <Route path="/tid-priority" component={TidPriority} />
         <Route path="/tactics-scores" component={TacticsScores} />

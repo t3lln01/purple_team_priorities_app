@@ -49,10 +49,27 @@ function parseMitre(json: any): MitreStats {
     .map((o: any) => ({
       id: (o.external_references ?? []).find((r: any) => r.source_name === "mitre-attack")?.external_id ?? "",
       name: o.name ?? "",
+      platforms: (o.x_mitre_platforms ?? []).join(", "),
       tactics: (o.kill_chain_phases ?? []).map((p: any) =>
         p.phase_name.replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
       ),
+      description: (o.description ?? "").replace(/\[.*?\]\(https?:\/\/[^)]+\)/g, match =>
+        match.replace(/\[([^\]]+)\].*/, "$1")
+      ).slice(0, 800),
     })).filter((t: any) => t.id);
+
+  // Store full technique metadata in localStorage for Impact Table / other pages to use
+  const stixMap: Record<string, { name: string; platforms: string; tactics: string; description: string }> = {};
+  for (const t of techs) {
+    stixMap[t.id] = {
+      name: t.name,
+      platforms: t.platforms,
+      tactics: t.tactics.join(", "),
+      description: t.description,
+    };
+  }
+  try { localStorage.setItem("pt_stix_techniques", JSON.stringify(stixMap)); } catch {}
+
   const tactics = Array.from(new Set(techs.flatMap((t: any) => t.tactics))).sort() as string[];
   return { total: techs.length, tactics, sample: techs.slice(0, 50), loadedAt: new Date().toISOString() };
 }

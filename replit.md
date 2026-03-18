@@ -91,6 +91,35 @@ Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used b
 
 Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
 
+### `artifacts/purple-team-dashboard` (`@workspace/purple-team-dashboard`)
+
+React + Vite SPA — Purple Team Adversary Prioritisation dashboard (dark navy/purple theme, MITRE ATT&CK v16).
+
+**Pages:**
+- Actor Prioritisation — ranked threat actors by TTP risk score
+- Risk Calculation — 200 priority techniques with CIA, impact, likelihood, risk scores; overridable via Impact Table
+- **Impact Table** — all 656 ATT&CK techniques; editable CIA (Conf/Int/Avail) + 9 TTP extent factor scores; live formula recalculation; overrides saved to `pt_impact_overrides` localStorage; propagates to Risk Calculation; STIX bundle updates technique metadata (`pt_stix_techniques`)
+- High Value Assets — asset-technique risk matrix
+- TID Priority — top-N technique frequency charts
+- Tactic Scores — per-tactic CIA baseline cards
+- Risk Rate — likelihood × impact matrix
+- All Procedures — full 3608-row ATT&CK procedures table (filterable by `?mitre=` or `?tactic=` URL params)
+- Data Sources — CSV reports, Enterprise ATT&CK STIX bundle, actor mapping files; Generate & Save View
+
+**Formula (verified vs Excel):**
+- CIA Score = Conf(L=1,M=2,H=3) + Int(L=1,M=2.25,H=3.5) + Avail(L=1,M=2.5,H=4)
+- TTP Extent = sum of 9 factor scores (from Impact_table sheet)
+- Impact Score = CIA × TTPExtent × HVA_Risk
+- Impact Rate: ≤10 VL / ≤12 L / ≤14 M / ≤16 H / >16 VH
+- Likelihood Score = TIDPriority × LastOccScore × ConfidenceScore × HVA_Likelihood
+- Risk Score = ImpactScore × LikelihoodScore
+
+**Static data:** `src/data.json` — keys: riskCalc (200 rows), actors, highvalue, hvscores, tidPriority, tactics, actorRanking, monitoringList, allProcedures, techTacticMap, techNameMap, **impactTable (656 rows)**
+
+**Utilities:**
+- `src/utils/impactFormulas.ts` — all formula constants and helpers
+- `src/hooks/useImpactOverrides.ts` — localStorage-backed override state
+
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.

@@ -1,6 +1,18 @@
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import data from "@/data.json";
+import { calcCIAScore, calcImpactScore, calcImpactRate, calcTTPExtent } from "@/utils/impactFormulas";
+
+function loadImpactOverrides(): Record<string, any> {
+  try { return JSON.parse(localStorage.getItem("pt_impact_overrides") ?? "{}"); } catch { return {}; }
+}
+
+function loadImpactTable(): Record<string, any> {
+  const rows = (data as any).impactTable ?? [];
+  const map: Record<string, any> = {};
+  for (const r of rows) map[r.id] = r;
+  return map;
+}
 
 type RiskRow = {
   TID: string;
@@ -29,7 +41,49 @@ type RiskRow = {
   "Risk Scores": number;
 };
 
-const riskCalc: RiskRow[] = (data as any).riskCalc;
+const rawRiskCalc: RiskRow[] = (data as any).riskCalc;
+
+function applyImpactOverrides(rows: RiskRow[]): RiskRow[] {
+  const overrides = loadImpactOverrides();
+  const impactMap = loadImpactTable();
+  if (Object.keys(overrides).length === 0) return rows;
+  return rows.map(row => {
+    const ov = overrides[row.TID];
+    if (!ov) return row;
+    const base = impactMap[row.TID];
+    if (!base) return row;
+    const conf  = ov.confidentiality  ?? row.Confidentiality;
+    const int_  = ov.integrity        ?? row.Integrity;
+    const avail = ov.availability     ?? row.Availability;
+    const ttpRow = {
+      initialTTPExtent:    ov.initialTTPExtent    ?? base.initialTTPExtent,
+      adScore:             ov.adScore             ?? base.adScore,
+      containerScore:      ov.containerScore      ?? base.containerScore,
+      cloudScore:          ov.cloudScore          ?? base.cloudScore,
+      supportRemoteScore:  ov.supportRemoteScore  ?? base.supportRemoteScore,
+      systemReqScore:      ov.systemReqScore      ?? base.systemReqScore,
+      capecSeverityScore:  ov.capecSeverityScore  ?? base.capecSeverityScore,
+      permRequiredScore:   ov.permRequiredScore   ?? base.permRequiredScore,
+      effectivePermsScore: ov.effectivePermsScore ?? base.effectivePermsScore,
+    };
+    const newCIA = calcCIAScore(conf, int_, avail);
+    const newExt = calcTTPExtent(ttpRow);
+    const newImpact = calcImpactScore(newCIA, newExt, row["HIGH VALUE ASSSET RISK"] || "");
+    const newRate   = calcImpactRate(newImpact);
+    return {
+      ...row,
+      Confidentiality:         conf,
+      "Confidentiality Score": newCIA > 0 ? (row["Confidentiality Score"] / (row["CIA Score"] || 1)) * newCIA : row["Confidentiality Score"],
+      Integrity:               int_,
+      Availability:            avail,
+      "CIA Score":             newCIA,
+      "TTP Extent Score":      newExt,
+      "Impact Score":          newImpact,
+      "Impact Rate":           newRate,
+      "Risk Scores":           newImpact * row["Likelihood Score"],
+    };
+  });
+}
 
 type SortKey = "TID" | "Technique Name" | "Tactic" | "CIA Score" | "Impact Rate" | "Likelihood Rate" | "Risk Scores";
 
@@ -70,6 +124,7 @@ export default function RiskCalculation() {
   const [sortKey, setSortKey] = useState<SortKey>("Risk Scores");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
+  const riskCalc = useMemo(() => applyImpactOverrides(rawRiskCalc), []);
   const tactics = ["All", ...Array.from(new Set(riskCalc.flatMap(r => r.Tactic?.split(", ") || []))).sort()];
 
   const filtered = riskCalc.filter(r => {
