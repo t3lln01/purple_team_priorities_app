@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import data from "@/data.json";
 
 type HVRow = {
@@ -93,7 +94,11 @@ export default function HighValueAssets() {
                 {hvscores.map(row => (
                   <tr key={row.tid} className="border-b border-border/40 hover:bg-accent/20 transition-colors">
                     <td className="px-4 py-3">
-                      <span className="font-mono text-xs text-primary bg-primary/10 px-2 py-0.5 rounded">{row.tid}</span>
+                      <Link href={`/all-procedures?mitre=${encodeURIComponent(row.tid)}`}>
+                        <span className="font-mono text-xs text-primary bg-primary/10 px-2 py-0.5 rounded hover:bg-primary/20 transition-colors cursor-pointer" title="View procedures for this technique">
+                          {row.tid}
+                        </span>
+                      </Link>
                     </td>
                     <td className="px-4 py-3 font-semibold text-foreground">{row.avgRisk.toFixed(2)}</td>
                     <td className="px-4 py-3 w-32">
@@ -173,10 +178,18 @@ export default function HighValueAssets() {
                     <div className="truncate">{row.target}</div>
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className="font-mono text-xs text-primary bg-primary/10 px-2 py-0.5 rounded">{row.tid}</span>
+                    <Link href={`/all-procedures?mitre=${encodeURIComponent(row.tid)}`}>
+                      <span className="font-mono text-xs text-primary bg-primary/10 px-2 py-0.5 rounded hover:bg-primary/20 transition-colors cursor-pointer" title="View procedures for this technique">
+                        {row.tid}
+                      </span>
+                    </Link>
                   </td>
                   <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-xs">
-                    <div className="truncate">{row.tidName}</div>
+                    <Link href={`/all-procedures?mitre=${encodeURIComponent(row.tid)}`}>
+                      <div className="truncate hover:text-primary hover:underline cursor-pointer transition-colors" title="View procedures for this technique">
+                        {row.tidName}
+                      </div>
+                    </Link>
                   </td>
                   <td className="px-4 py-2.5">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${riskStyle(row.risk)}`}>{row.risk || "—"}</span>

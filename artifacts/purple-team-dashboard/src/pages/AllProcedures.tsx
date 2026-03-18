@@ -314,7 +314,10 @@ export default function AllProcedures() {
   const [selectedMitreIds, setSelectedMitreIds] = useState<Set<string>>(() => {
     const params = new URLSearchParams(search);
     const mitre = params.get("mitre") ?? "";
-    return mitre && allMitreIds.includes(mitre) ? new Set([mitre]) : new Set();
+    if (mitre && allMitreIds.includes(mitre)) return new Set([mitre]);
+    const tactic = params.get("tactic") ?? "";
+    if (tactic) return mitreIdsForTactic(tactic);
+    return new Set();
   });
 
   const [procedureSearch, setProcedureSearch] = useState("");
@@ -329,7 +332,14 @@ export default function AllProcedures() {
     const actor = matchActor(params.get("actor") ?? "");
     setSelectedActors(actor ? new Set([actor]) : new Set());
     const mitre = params.get("mitre") ?? "";
-    setSelectedMitreIds(mitre && allMitreIds.includes(mitre) ? new Set([mitre]) : new Set());
+    const tactic = params.get("tactic") ?? "";
+    if (mitre && allMitreIds.includes(mitre)) {
+      setSelectedMitreIds(new Set([mitre]));
+    } else if (tactic) {
+      setSelectedMitreIds(mitreIdsForTactic(tactic));
+    } else {
+      setSelectedMitreIds(new Set());
+    }
     setPage(1);
   }, [search]);
 

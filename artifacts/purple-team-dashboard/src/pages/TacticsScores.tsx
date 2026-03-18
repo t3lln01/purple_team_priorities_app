@@ -1,3 +1,4 @@
+import { Link } from "wouter";
 import data from "@/data.json";
 
 type Tactic = {
@@ -62,7 +63,11 @@ export default function TacticsScores() {
               <div className="p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <h3 className="font-semibold text-foreground">{tactic.tactic}</h3>
+                    <Link href={`/all-procedures?tactic=${encodeURIComponent(tactic.tactic)}`}>
+                      <h3 className="font-semibold text-foreground hover:text-primary hover:underline cursor-pointer transition-colors" title="View procedures for this tactic">
+                        {tactic.tactic}
+                      </h3>
+                    </Link>
                     <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">{tactic.desc || "—"}</p>
                   </div>
                   <div className="flex-shrink-0 ml-3 text-right">
@@ -134,10 +139,12 @@ export default function TacticsScores() {
                 return (
                   <tr key={tactic.tactic} className="border-b border-border/40 hover:bg-accent/20 transition-colors">
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${color}`} />
-                        <span className="text-sm font-medium text-foreground">{tactic.tactic}</span>
-                      </div>
+                      <Link href={`/all-procedures?tactic=${encodeURIComponent(tactic.tactic)}`}>
+                        <div className="flex items-center gap-2 group cursor-pointer" title="View procedures for this tactic">
+                          <div className={`w-2 h-2 rounded-full ${color}`} />
+                          <span className="text-sm font-medium text-foreground group-hover:text-primary group-hover:underline transition-colors">{tactic.tactic}</span>
+                        </div>
+                      </Link>
                     </td>
                     <td className="px-4 py-3 text-xs text-blue-400 font-semibold">{tactic.conf || 0}</td>
                     <td className="px-4 py-3 text-xs text-green-400 font-semibold">{tactic.integrity || 0}</td>

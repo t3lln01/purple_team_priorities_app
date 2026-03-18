@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { Link } from "wouter";
 import data from "@/data.json";
 
 type RiskRow = {
@@ -197,10 +198,18 @@ export default function RiskCalculation() {
               {sorted.slice(0, 100).map((row, i) => (
                 <tr key={i} className="border-b border-border/40 hover:bg-accent/20 transition-colors">
                   <td className="px-4 py-2.5">
-                    <span className="font-mono text-xs text-primary bg-primary/10 px-2 py-0.5 rounded">{row.TID}</span>
+                    <Link href={`/all-procedures?mitre=${encodeURIComponent(row.TID)}`}>
+                      <span className="font-mono text-xs text-primary bg-primary/10 px-2 py-0.5 rounded hover:bg-primary/20 transition-colors cursor-pointer" title="View procedures for this technique">
+                        {row.TID}
+                      </span>
+                    </Link>
                   </td>
                   <td className="px-4 py-2.5 text-xs text-foreground max-w-xs">
-                    <div className="truncate">{row["Technique Name"]}</div>
+                    <Link href={`/all-procedures?mitre=${encodeURIComponent(row.TID)}`}>
+                      <div className="truncate hover:text-primary hover:underline cursor-pointer transition-colors" title="View procedures for this technique">
+                        {row["Technique Name"]}
+                      </div>
+                    </Link>
                   </td>
                   <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-xs">
                     <div className="truncate">{row.Tactic}</div>
