@@ -304,7 +304,7 @@ export default function ActorPrioritisation() {
     return combinedRanking.filter(a => filtered.some(f => f.name.toLowerCase() === a.name.toLowerCase()));
   }, [combinedRanking, filtered, selectedActors]);
 
-  const { sortKey: sk1, sortDir: sd1, toggle: tog1, sorted: sortedActors } = useSortTable(filtered);
+  const { sortKey: sk1, sortDir: sd1, toggle: tog1, sorted: sortedActors } = useSortTable(filtered, "riskPct", "desc");
   const { sortKey: sk2, sortDir: sd2, toggle: tog2, sorted: sortedAll }    = useSortTable(actors);
 
   const visibleChips = chipSearch
