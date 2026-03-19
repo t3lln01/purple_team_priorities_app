@@ -2,6 +2,8 @@ import { useState, useMemo, Fragment } from "react";
 import { Link } from "wouter";
 import data from "@/data.json";
 import { Plus, Pencil, Trash2, Check, X, RotateCcw, Info } from "lucide-react";
+import { useSortTable } from "@/hooks/useSortTable";
+import SortableTh from "@/components/SortableTh";
 
 type HVRow = {
   target: string;
@@ -151,6 +153,11 @@ export default function HighValueAssets() {
     const matchTarget = targetFilter === "All" || r.target === targetFilter;
     return matchSearch && matchTarget;
   }), [merged, search, targetFilter]);
+
+  // ── Sort hooks ───────────────────────────────────────────────────────────────
+
+  const { sortKey: hvSk, sortDir: hvSd, toggle: hvToggle, sorted: sortedHVScores } = useSortTable(hvscores, "avgRisk", "desc");
+  const { sortKey: mainSk, sortDir: mainSd, toggle: mainToggle, sorted: sortedFiltered } = useSortTable(filtered);
 
   // ── Stats ────────────────────────────────────────────────────────────────────
 
@@ -310,14 +317,14 @@ export default function HighValueAssets() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/20">
-                  <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">TID</th>
-                  <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Avg Risk</th>
+                  <SortableTh col="tid" sortKey={hvSk} sortDir={hvSd} toggle={hvToggle}>TID</SortableTh>
+                  <SortableTh col="avgRisk" sortKey={hvSk} sortDir={hvSd} toggle={hvToggle}>Avg Risk</SortableTh>
                   <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Risk Bar</th>
-                  <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Avg Likelihood</th>
+                  <SortableTh col="avgLikelihood" sortKey={hvSk} sortDir={hvSd} toggle={hvToggle}>Avg Likelihood</SortableTh>
                 </tr>
               </thead>
               <tbody>
-                {hvscores.map(row => (
+                {sortedHVScores.map(row => (
                   <tr key={row.tid} className="border-b border-border/40 hover:bg-accent/20 transition-colors">
                     <td className="px-4 py-3">
                       <Link href={`/all-procedures?mitre=${encodeURIComponent(row.tid)}`}>
@@ -512,19 +519,19 @@ export default function HighValueAssets() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/20">
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Target Asset</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">TID</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Technique</th>
-                <th className="text-center px-3 py-2.5 text-xs text-muted-foreground font-medium">Risk</th>
-                <th className="text-center px-3 py-2.5 text-xs text-muted-foreground font-medium">Likelihood</th>
-                <th className="text-center px-3 py-2.5 text-xs text-muted-foreground font-medium">Risk Score</th>
-                <th className="text-center px-3 py-2.5 text-xs text-muted-foreground font-medium">Lik. Score</th>
+                <SortableTh col="target" sortKey={mainSk} sortDir={mainSd} toggle={mainToggle}>Target Asset</SortableTh>
+                <SortableTh col="tid" sortKey={mainSk} sortDir={mainSd} toggle={mainToggle}>TID</SortableTh>
+                <SortableTh col="tidName" sortKey={mainSk} sortDir={mainSd} toggle={mainToggle}>Technique</SortableTh>
+                <SortableTh col="riskScore" sortKey={mainSk} sortDir={mainSd} toggle={mainToggle} align="center" className="px-3">Risk</SortableTh>
+                <SortableTh col="likelihoodScore" sortKey={mainSk} sortDir={mainSd} toggle={mainToggle} align="center" className="px-3">Likelihood</SortableTh>
+                <SortableTh col="riskScore" sortKey={mainSk} sortDir={mainSd} toggle={mainToggle} align="center" className="px-3">Risk Score</SortableTh>
+                <SortableTh col="likelihoodScore" sortKey={mainSk} sortDir={mainSd} toggle={mainToggle} align="center" className="px-3">Lik. Score</SortableTh>
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Impact</th>
                 <th className="w-24 px-3 py-2.5 text-xs text-muted-foreground font-medium"></th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map(row => {
+              {sortedFiltered.map(row => {
                 const isEditing = editId === row._key;
                 return (
                   <Fragment key={row._key}>

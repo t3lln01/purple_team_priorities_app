@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import data from "@/data.json";
+import { useSortTable } from "@/hooks/useSortTable";
+import SortableTh from "@/components/SortableTh";
 
 type Actor = {
   name: string;
@@ -98,6 +100,9 @@ export default function ActorPrioritisation() {
 
   const topActors = filtered.slice(0, 10);
 
+  const { sortKey: sk1, sortDir: sd1, toggle: tog1, sorted: sortedActors } = useSortTable(filtered);
+  const { sortKey: sk2, sortDir: sd2, toggle: tog2, sorted: sortedTopActors } = useSortTable(topActors);
+
   const visibleChips = chipSearch
     ? procedureActors.filter(a => a.toLowerCase().includes(chipSearch.toLowerCase()))
     : procedureActors;
@@ -181,22 +186,22 @@ export default function ActorPrioritisation() {
               <thead>
                 <tr className="border-b border-border bg-muted/30">
                   <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">#</th>
-                  <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Actor</th>
-                  <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Intent</th>
-                  <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Cap.</th>
-                  <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Risk %</th>
+                  <SortableTh col="name" sortKey={sk1} sortDir={sd1} toggle={tog1}>Actor</SortableTh>
+                  <SortableTh col="intent" sortKey={sk1} sortDir={sd1} toggle={tog1}>Intent</SortableTh>
+                  <SortableTh col="capability" sortKey={sk1} sortDir={sd1} toggle={tog1}>Cap.</SortableTh>
+                  <SortableTh col="riskPct" sortKey={sk1} sortDir={sd1} toggle={tog1}>Risk %</SortableTh>
                   <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Level</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 ? (
+                {sortedActors.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">
                       No actors match the current filter.
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((actor, i) => (
+                  sortedActors.map((actor, i) => (
                     <tr key={actor.name} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
                       <td className="px-4 py-2.5 text-muted-foreground font-mono text-xs">{i + 1}</td>
                       <td className="px-4 py-2.5 text-xs">
@@ -320,16 +325,16 @@ export default function ActorPrioritisation() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Actor</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Intent Score</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Capability Score</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">TTP Risk Score</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Priority Value</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Risk %</th>
+                <SortableTh col="name" sortKey={sk2} sortDir={sd2} toggle={tog2}>Actor</SortableTh>
+                <SortableTh col="intent" sortKey={sk2} sortDir={sd2} toggle={tog2}>Intent Score</SortableTh>
+                <SortableTh col="capability" sortKey={sk2} sortDir={sd2} toggle={tog2}>Capability Score</SortableTh>
+                <SortableTh col="ttpRisk" sortKey={sk2} sortDir={sd2} toggle={tog2}>TTP Risk Score</SortableTh>
+                <SortableTh col="priority" sortKey={sk2} sortDir={sd2} toggle={tog2}>Priority Value</SortableTh>
+                <SortableTh col="riskPct" sortKey={sk2} sortDir={sd2} toggle={tog2}>Risk %</SortableTh>
               </tr>
             </thead>
             <tbody>
-              {topActors.map(actor => (
+              {sortedTopActors.map(actor => (
                 <tr key={actor.name} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
                   <td className="px-4 py-3">
                     <Link href={`/all-procedures?actor=${encodeURIComponent(actor.name)}`}>

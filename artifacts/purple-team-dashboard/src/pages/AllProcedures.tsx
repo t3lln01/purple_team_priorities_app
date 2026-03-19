@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useSearch } from "wouter";
 import data from "@/data.json";
+import { useSortTable } from "@/hooks/useSortTable";
+import SortableTh from "@/components/SortableTh";
 
 type Procedure = {
   actor: string;
@@ -358,9 +360,11 @@ export default function AllProcedures() {
     });
   }, [selectedActors, selectedMitreIds, procedureSearch, minRisk, maxRisk, dateFrom, dateTo]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const { sortKey, sortDir, toggle, sorted: sortedFiltered } = useSortTable(filtered);
+
+  const totalPages = Math.max(1, Math.ceil(sortedFiltered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-  const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const pageRows = sortedFiltered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   function handleFilterChange(fn: () => void) { fn(); setPage(1); }
 
@@ -446,13 +450,13 @@ export default function AllProcedures() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">Actor / Group</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">MITRE ID</th>
+                <SortableTh col="actor" sortKey={sortKey} sortDir={sortDir} toggle={toggle}>Actor / Group</SortableTh>
+                <SortableTh col="mitreId" sortKey={sortKey} sortDir={sortDir} toggle={toggle}>MITRE ID</SortableTh>
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">Technique Name</th>
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Procedure</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">Date</th>
+                <SortableTh col="date" sortKey={sortKey} sortDir={sortDir} toggle={toggle}>Date</SortableTh>
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">External Reference</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">Risk Score</th>
+                <SortableTh col="risk" sortKey={sortKey} sortDir={sortDir} toggle={toggle} align="left">Risk Score</SortableTh>
               </tr>
             </thead>
             <tbody>

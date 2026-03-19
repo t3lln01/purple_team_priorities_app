@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import data from "@/data.json";
+import { useSortTable } from "@/hooks/useSortTable";
+import SortableTh from "@/components/SortableTh";
 
 type TIDRow = {
   tid: string;
@@ -26,11 +28,12 @@ function riskBand(risk: number) {
 
 export default function TidPriority() {
   const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState<"risk" | "count">("risk");
 
-  const filtered = tidPriority
-    .filter(r => !search || r.tid.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => sortBy === "risk" ? b.risk - a.risk : b.count - a.count);
+  const filteredBase = useMemo(() =>
+    tidPriority.filter(r => !search || r.tid.toLowerCase().includes(search.toLowerCase())),
+    [search]
+  );
+  const { sortKey, sortDir, toggle, sorted: filtered } = useSortTable(filteredBase, "risk", "desc");
 
   const maxRisk = Math.max(...tidPriority.map(r => r.risk));
   const critical = tidPriority.filter(r => r.risk >= 1000).length;
@@ -119,30 +122,17 @@ export default function TidPriority() {
             onChange={e => setSearch(e.target.value)}
             className="flex-1 bg-input border border-border rounded-lg px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
-          <div className="flex gap-2">
-            <button
-              onClick={() => setSortBy("risk")}
-              className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${sortBy === "risk" ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:bg-accent"}`}
-            >
-              By Risk
-            </button>
-            <button
-              onClick={() => setSortBy("count")}
-              className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${sortBy === "count" ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:bg-accent"}`}
-            >
-              By Count
-            </button>
-          </div>
+          <span className="text-xs text-muted-foreground whitespace-nowrap">{filtered.length} result{filtered.length !== 1 ? "s" : ""}</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/20">
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">#</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">TID</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Procedure Count</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Last Observed</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Risk Score</th>
+                <SortableTh col="tid" sortKey={sortKey} sortDir={sortDir} toggle={toggle}>TID</SortableTh>
+                <SortableTh col="count" sortKey={sortKey} sortDir={sortDir} toggle={toggle}>Procedure Count</SortableTh>
+                <SortableTh col="lastObs" sortKey={sortKey} sortDir={sortDir} toggle={toggle}>Last Observed</SortableTh>
+                <SortableTh col="risk" sortKey={sortKey} sortDir={sortDir} toggle={toggle}>Risk Score</SortableTh>
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Risk Band</th>
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Risk Bar</th>
               </tr>

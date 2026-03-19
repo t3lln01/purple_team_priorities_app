@@ -2,6 +2,8 @@ import { useState, useMemo } from "react";
 import { useRoute, Link } from "wouter";
 import { useViews, SavedView, ViewProcedure, ViewActorRank } from "@/context/ViewContext";
 import { Trash2, ChevronLeft } from "lucide-react";
+import { useSortTable } from "@/hooks/useSortTable";
+import SortableTh from "@/components/SortableTh";
 
 const PAGE_SIZE = 30;
 
@@ -47,6 +49,20 @@ export default function ViewDetail() {
   const [nameInput, setNameInput] = useState(view?.name ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  const [arSortKey, setArSortKey] = useState<string | null>("score");
+  const [arSortDir, setArSortDir] = useState<"asc" | "desc">("desc");
+  const [pSortKey, setPSortKey] = useState<string | null>(null);
+  const [pSortDir, setPSortDir] = useState<"asc" | "desc">("asc");
+
+  function toggleArSort(key: string) {
+    if (arSortKey === key) { setArSortDir(d => d === "asc" ? "desc" : "asc"); }
+    else { setArSortKey(key); setArSortDir("asc"); }
+  }
+  function togglePSort(key: string) {
+    if (pSortKey === key) { setPSortDir(d => d === "asc" ? "desc" : "asc"); }
+    else { setPSortKey(key); setPSortDir("asc"); }
+  }
+
   if (!view) {
     return (
       <div className="p-6 flex flex-col items-center justify-center min-h-[50vh] gap-4">
@@ -75,9 +91,29 @@ export default function ViewDetail() {
     return true;
   }), [procedures, actorFilter, tacticFilter, mitreSearch, procSearch]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const sortedActorRanking = useMemo(() => {
+    if (!arSortKey) return actorRanking;
+    return [...actorRanking].sort((a, b) => {
+      const av = (a as Record<string, unknown>)[arSortKey];
+      const bv = (b as Record<string, unknown>)[arSortKey];
+      let cmp = typeof av === "number" && typeof bv === "number" ? av - bv : String(av ?? "").localeCompare(String(bv ?? ""), undefined, { numeric: true });
+      return arSortDir === "asc" ? cmp : -cmp;
+    });
+  }, [actorRanking, arSortKey, arSortDir]);
+
+  const sortedFiltered = useMemo(() => {
+    if (!pSortKey) return filtered;
+    return [...filtered].sort((a, b) => {
+      const av = (a as Record<string, unknown>)[pSortKey];
+      const bv = (b as Record<string, unknown>)[pSortKey];
+      let cmp = typeof av === "number" && typeof bv === "number" ? av - bv : String(av ?? "").localeCompare(String(bv ?? ""), undefined, { numeric: true });
+      return pSortDir === "asc" ? cmp : -cmp;
+    });
+  }, [filtered, pSortKey, pSortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedFiltered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-  const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const pageRows = sortedFiltered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const filteredRanking: ViewActorRank[] = actorFilter
     ? actorRanking.filter(a => a.actor === actorFilter)
