@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, Fragment } from "react";
 import { Link } from "wouter";
 import data from "@/data.json";
 import { useImpactOverrides, ImpactOverride } from "@/hooks/useImpactOverrides";
+import { useTacticScores } from "@/context/TacticScoresContext";
 import {
   calcCIAScore,
   calcImpactScore,
@@ -88,6 +89,7 @@ type ComputedRow = ImpactRow & {
 
 export default function ImpactTable() {
   const { overrides, setOverride, resetOverride, resetAll } = useImpactOverrides();
+  const { overrides: tacticOverrides } = useTacticScores();
   const [search, setSearch] = useState("");
   const [tacticFilter, setTacticFilter] = useState("All");
   const [sortKey, setSortKey] = useState<SortKey>("impactRate");
@@ -109,9 +111,19 @@ export default function ImpactTable() {
     const ov = overrides[row.id] ?? {};
     const stix = stixOverrides[row.id] ?? {};
 
-    const conf  = ov.confidentiality !== undefined ? ov.confidentiality : row.confidentiality;
-    const int_  = ov.integrity !== undefined ? ov.integrity : row.integrity;
-    const avail = ov.availability !== undefined ? ov.availability : row.availability;
+    // CIA precedence: per-technique override > tactic-level override > base data.json
+    const primaryTactic = (row.tactics ?? "").split(",")[0].trim();
+    const tacticOv = tacticOverrides[primaryTactic] ?? {};
+
+    const conf  = ov.confidentiality !== undefined ? ov.confidentiality
+                : tacticOv.conf      !== undefined ? tacticOv.conf
+                : row.confidentiality;
+    const int_  = ov.integrity       !== undefined ? ov.integrity
+                : tacticOv.integrity !== undefined ? tacticOv.integrity
+                : row.integrity;
+    const avail = ov.availability    !== undefined ? ov.availability
+                : tacticOv.avail     !== undefined ? tacticOv.avail
+                : row.availability;
 
     const ttpRow = {
       initialTTPExtent:    ov.initialTTPExtent    !== undefined ? ov.initialTTPExtent    : row.initialTTPExtent,
@@ -144,9 +156,9 @@ export default function ImpactTable() {
       _ciaScore:    ciaScore,
       _impactScore: impactScore,
       _impactRate:  impactRate,
-      _hasOverride: Object.keys(ov).length > 0,
+      _hasOverride: Object.keys(ov).length > 0 || Object.keys(tacticOv).length > 0,
     };
-  }), [overrides, stixOverrides]);
+  }), [overrides, stixOverrides, tacticOverrides]);
 
   const filtered = useMemo(() => computed.filter(r => {
     const q = search.toLowerCase();

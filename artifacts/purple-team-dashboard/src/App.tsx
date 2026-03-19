@@ -13,6 +13,7 @@ import AllProcedures from "@/pages/AllProcedures";
 import DataSources from "@/pages/DataSources";
 import ViewDetail from "@/pages/ViewDetail";
 import { ViewProvider, useViews } from "@/context/ViewContext";
+import { TacticScoresProvider } from "@/context/TacticScoresContext";
 import { Shield, Users, Activity, Target, ChartBar, AlertTriangle, List, Database, Layers, Trash2, Table2 } from "lucide-react";
 import ImpactTable from "@/pages/ImpactTable";
 
@@ -142,11 +143,13 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <ViewProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Router />
-          </WouterRouter>
-        </ViewProvider>
+        <TacticScoresProvider>
+          <ViewProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <Router />
+            </WouterRouter>
+          </ViewProvider>
+        </TacticScoresProvider>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

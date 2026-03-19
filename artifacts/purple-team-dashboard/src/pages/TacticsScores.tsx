@@ -1,29 +1,29 @@
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
-import data from "@/data.json";
+import { Pencil, Check, X, RotateCcw } from "lucide-react";
 import { CONF_SCORES, INT_SCORES, AVAIL_SCORES } from "@/utils/impactFormulas";
+import {
+  useTacticScores,
+  baseTactics,
+  type Tactic,
+  type TacticField,
+} from "@/context/TacticScoresContext";
 
-type Tactic = {
-  tactic: string;
-  desc: string;
-  conf: string;
-  integrity: string;
-  avail: string;
-  extent: number;
-};
-
-const tactics: Tactic[] = (data as any).tactics;
-
-/** Convert a rating label to its numeric CIA weight */
+// ── score helpers ─────────────────────────────────────────────────────────────
 function confScore(v: string):  number { return CONF_SCORES[v]  ?? 0; }
 function intScore(v: string):   number { return INT_SCORES[v]   ?? 0; }
 function availScore(v: string): number { return AVAIL_SCORES[v] ?? 0; }
 function ciaTotal(t: Tactic):   number { return confScore(t.conf) + intScore(t.integrity) + availScore(t.avail); }
 
+// ── sub-components ────────────────────────────────────────────────────────────
 function ScoreBar({ value, max, color }: { value: number; max: number; color: string }) {
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${max > 0 ? Math.min(100, (value / max) * 100) : 0}%` }} />
+        <div
+          className={`h-full rounded-full transition-all duration-300 ${color}`}
+          style={{ width: `${max > 0 ? Math.min(100, (value / max) * 100) : 0}%` }}
+        />
       </div>
       <span className="text-xs text-muted-foreground w-10 text-right font-mono">{value.toFixed(2)}</span>
     </div>
@@ -53,6 +53,8 @@ const RATING_BADGE: Record<string, string> = {
   Low:    "text-green-400 bg-green-400/10 border border-green-400/30",
 };
 
+const CIA_OPTIONS = ["Low", "Medium", "High"] as const;
+
 function RatingBadge({ label }: { label: string }) {
   return (
     <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${RATING_BADGE[label] ?? "text-muted-foreground"}`}>
@@ -61,24 +63,246 @@ function RatingBadge({ label }: { label: string }) {
   );
 }
 
+// ── rating selector used in edit mode ─────────────────────────────────────────
+function RatingSelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="text-[11px] px-1.5 py-0.5 rounded border border-border bg-card text-foreground focus:outline-none focus:border-primary"
+    >
+      {CIA_OPTIONS.map(o => (
+        <option key={o} value={o}>{o}</option>
+      ))}
+    </select>
+  );
+}
+
+// ── single tactic card ────────────────────────────────────────────────────────
+function TacticCard({
+  tactic,
+  isEdited,
+  maxConf, maxInt, maxAvail, maxExtent, maxCIA,
+  onSave,
+  onReset,
+}: {
+  tactic: Tactic;
+  isEdited: boolean;
+  maxConf: number; maxInt: number; maxAvail: number; maxExtent: number; maxCIA: number;
+  onSave: (field: TacticField, value: string | number) => void;
+  onReset: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<Tactic>(tactic);
+
+  const color  = TACTIC_COLORS[tactic.tactic] || "bg-primary";
+  const c      = confScore(tactic.conf);
+  const i      = intScore(tactic.integrity);
+  const a      = availScore(tactic.avail);
+  const total  = c + i + a;
+
+  function startEdit() {
+    setDraft({ ...tactic });
+    setEditing(true);
+  }
+
+  function save() {
+    if (draft.conf      !== tactic.conf)      onSave("conf", draft.conf);
+    if (draft.integrity !== tactic.integrity)  onSave("integrity", draft.integrity);
+    if (draft.avail     !== tactic.avail)      onSave("avail", draft.avail);
+    if (draft.extent    !== tactic.extent)     onSave("extent", Number(draft.extent));
+    setEditing(false);
+  }
+
+  function cancel() { setEditing(false); }
+
+  const draftC     = confScore(draft.conf);
+  const draftI     = intScore(draft.integrity);
+  const draftA     = availScore(draft.avail);
+  const draftTotal = draftC + draftI + draftA;
+  const live = editing ? { c: draftC, i: draftI, a: draftA, total: draftTotal, ext: Number(draft.extent) }
+                       : { c, i, a, total, ext: Number(tactic.extent) };
+
+  return (
+    <div className="bg-card border border-card-border rounded-xl overflow-hidden">
+      <div className={`h-1 ${color}`} />
+      <div className="p-4">
+        {/* header row */}
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <Link href={`/all-procedures?tactic=${encodeURIComponent(tactic.tactic)}`}>
+                <h3 className="font-semibold text-foreground hover:text-primary hover:underline cursor-pointer transition-colors">
+                  {tactic.tactic}
+                </h3>
+              </Link>
+              {isEdited && !editing && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/30 font-semibold">
+                  edited
+                </span>
+              )}
+            </div>
+            {tactic.desc && (
+              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">{tactic.desc}</p>
+            )}
+          </div>
+
+          {/* action buttons */}
+          <div className="flex-shrink-0 ml-3 flex items-center gap-1">
+            {editing ? (
+              <>
+                <button onClick={save} title="Save" className="p-1 rounded hover:bg-green-500/10 text-green-400 hover:text-green-300 transition-colors">
+                  <Check className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={cancel} title="Cancel" className="p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </>
+            ) : (
+              <>
+                {isEdited && (
+                  <button onClick={onReset} title="Reset to defaults" className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-orange-400 transition-colors">
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button onClick={startEdit} title="Edit scores" className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-primary transition-colors">
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
+            {!editing && (
+              <div className="text-right">
+                <div className="text-xs text-muted-foreground">CIA Total</div>
+                <div className="text-xl font-bold text-foreground">{live.total.toFixed(2)}</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {/* Confidentiality */}
+          <div>
+            <div className="flex justify-between text-xs mb-1 items-center">
+              <span className="text-muted-foreground">Confidentiality</span>
+              <div className="flex items-center gap-2">
+                {editing
+                  ? <RatingSelect value={draft.conf} onChange={v => setDraft(d => ({ ...d, conf: v }))} />
+                  : <RatingBadge label={tactic.conf} />
+                }
+                <span className="text-blue-400 font-semibold font-mono">{live.c.toFixed(2)}</span>
+              </div>
+            </div>
+            <ScoreBar value={live.c} max={maxConf} color="bg-blue-500" />
+          </div>
+
+          {/* Integrity */}
+          <div>
+            <div className="flex justify-between text-xs mb-1 items-center">
+              <span className="text-muted-foreground">Integrity</span>
+              <div className="flex items-center gap-2">
+                {editing
+                  ? <RatingSelect value={draft.integrity} onChange={v => setDraft(d => ({ ...d, integrity: v }))} />
+                  : <RatingBadge label={tactic.integrity} />
+                }
+                <span className="text-green-400 font-semibold font-mono">{live.i.toFixed(2)}</span>
+              </div>
+            </div>
+            <ScoreBar value={live.i} max={maxInt} color="bg-green-500" />
+          </div>
+
+          {/* Availability */}
+          <div>
+            <div className="flex justify-between text-xs mb-1 items-center">
+              <span className="text-muted-foreground">Availability</span>
+              <div className="flex items-center gap-2">
+                {editing
+                  ? <RatingSelect value={draft.avail} onChange={v => setDraft(d => ({ ...d, avail: v }))} />
+                  : <RatingBadge label={tactic.avail} />
+                }
+                <span className="text-yellow-400 font-semibold font-mono">{live.a.toFixed(2)}</span>
+              </div>
+            </div>
+            <ScoreBar value={live.a} max={maxAvail} color="bg-yellow-500" />
+          </div>
+
+          {/* CIA Total bar */}
+          <div className="pt-1 border-t border-border/40">
+            <div className="flex justify-between text-xs mb-1 items-center">
+              <span className="text-muted-foreground font-medium">CIA Total (C+I+A)</span>
+              <span className="text-foreground font-bold font-mono">{live.total.toFixed(2)}</span>
+            </div>
+            <ScoreBar value={live.total} max={maxCIA} color="bg-primary" />
+          </div>
+
+          {/* TTP Extent */}
+          <div>
+            <div className="flex justify-between text-xs mb-1 items-center">
+              <span className="text-muted-foreground">TTP Extent Score</span>
+              {editing
+                ? (
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    value={draft.extent}
+                    onChange={e => setDraft(d => ({ ...d, extent: parseFloat(e.target.value) || 0 }))}
+                    className="w-20 text-right text-xs px-1.5 py-0.5 rounded border border-border bg-card text-primary font-mono focus:outline-none focus:border-primary"
+                  />
+                )
+                : <span className="text-primary font-semibold font-mono">{live.ext}</span>
+              }
+            </div>
+            <ScoreBar value={live.ext} max={maxExtent} color="bg-violet-500" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── page ──────────────────────────────────────────────────────────────────────
 export default function TacticsScores() {
-  const maxConf   = Math.max(...tactics.map(t => confScore(t.conf)));
-  const maxInt    = Math.max(...tactics.map(t => intScore(t.integrity)));
-  const maxAvail  = Math.max(...tactics.map(t => availScore(t.avail)));
-  const maxExtent = Math.max(...tactics.map(t => Number(t.extent) || 0));
-  const maxCIA    = Math.max(...tactics.map(t => ciaTotal(t)));
+  const { liveTactics, overrides, setOverride, resetOverride, resetAll } = useTacticScores();
+
+  const editedCount = Object.keys(overrides).length;
+
+  const maxConf   = useMemo(() => Math.max(...liveTactics.map(t => confScore(t.conf))),       [liveTactics]);
+  const maxInt    = useMemo(() => Math.max(...liveTactics.map(t => intScore(t.integrity))),    [liveTactics]);
+  const maxAvail  = useMemo(() => Math.max(...liveTactics.map(t => availScore(t.avail))),      [liveTactics]);
+  const maxExtent = useMemo(() => Math.max(...liveTactics.map(t => Number(t.extent) || 0)),   [liveTactics]);
+  const maxCIA    = useMemo(() => Math.max(...liveTactics.map(t => ciaTotal(t))),              [liveTactics]);
+
+  const sortedForTable = useMemo(() => [...liveTactics].sort((a, b) => ciaTotal(b) - ciaTotal(a)), [liveTactics]);
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Tactic Default Scores</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Baseline CIA and extent scores per MITRE ATT&CK tactic.
-          CIA Total = C + I + A using the formula weights (Conf: L=1/M=2/H=3, Int: L=1/M=2.25/H=3.5, Avail: L=1/M=2.5/H=4).
-        </p>
+      {/* header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Tactic Default Scores</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Baseline CIA and extent scores per MITRE ATT&CK tactic. Edits propagate to Impact Table and Risk Calculation.
+            <br />CIA Total = C + I + A using formula weights (Conf: L=1/M=2/H=3 · Int: L=1/M=2.25/H=3.5 · Avail: L=1/M=2.5/H=4).
+          </p>
+        </div>
+        {editedCount > 0 && (
+          <button
+            onClick={resetAll}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-orange-400 hover:border-orange-400/40 transition-colors"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Reset all ({editedCount})
+          </button>
+        )}
       </div>
 
-      {/* ── Weight reference legend ── */}
+      {/* weight reference legend */}
       <div className="grid grid-cols-3 gap-4 text-xs">
         {[
           { label: "Confidentiality", scores: CONF_SCORES,  color: "text-blue-400" },
@@ -97,98 +321,40 @@ export default function TacticsScores() {
         ))}
       </div>
 
-      {/* ── Tactic cards ── */}
+      {/* tactic cards grid */}
       <div className="grid grid-cols-2 gap-6">
-        {tactics.map(tactic => {
-          const color  = TACTIC_COLORS[tactic.tactic] || "bg-primary";
-          const c      = confScore(tactic.conf);
-          const i      = intScore(tactic.integrity);
-          const a      = availScore(tactic.avail);
-          const total  = c + i + a;
-
+        {liveTactics.map(tactic => {
+          const base = baseTactics.find(b => b.tactic === tactic.tactic);
+          const isEdited = overrides[tactic.tactic] !== undefined;
           return (
-            <div key={tactic.tactic} className="bg-card border border-card-border rounded-xl overflow-hidden">
-              <div className={`h-1 ${color}`} />
-              <div className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1 min-w-0">
-                    <Link href={`/all-procedures?tactic=${encodeURIComponent(tactic.tactic)}`}>
-                      <h3 className="font-semibold text-foreground hover:text-primary hover:underline cursor-pointer transition-colors">
-                        {tactic.tactic}
-                      </h3>
-                    </Link>
-                    {tactic.desc && (
-                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">{tactic.desc}</p>
-                    )}
-                  </div>
-                  <div className="flex-shrink-0 ml-3 text-right">
-                    <div className="text-xs text-muted-foreground">CIA Total</div>
-                    <div className="text-xl font-bold text-foreground">{total.toFixed(2)}</div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  {/* Confidentiality */}
-                  <div>
-                    <div className="flex justify-between text-xs mb-1 items-center">
-                      <span className="text-muted-foreground">Confidentiality</span>
-                      <div className="flex items-center gap-2">
-                        <RatingBadge label={tactic.conf} />
-                        <span className="text-blue-400 font-semibold font-mono">{c.toFixed(2)}</span>
-                      </div>
-                    </div>
-                    <ScoreBar value={c} max={maxConf} color="bg-blue-500" />
-                  </div>
-                  {/* Integrity */}
-                  <div>
-                    <div className="flex justify-between text-xs mb-1 items-center">
-                      <span className="text-muted-foreground">Integrity</span>
-                      <div className="flex items-center gap-2">
-                        <RatingBadge label={tactic.integrity} />
-                        <span className="text-green-400 font-semibold font-mono">{i.toFixed(2)}</span>
-                      </div>
-                    </div>
-                    <ScoreBar value={i} max={maxInt} color="bg-green-500" />
-                  </div>
-                  {/* Availability */}
-                  <div>
-                    <div className="flex justify-between text-xs mb-1 items-center">
-                      <span className="text-muted-foreground">Availability</span>
-                      <div className="flex items-center gap-2">
-                        <RatingBadge label={tactic.avail} />
-                        <span className="text-yellow-400 font-semibold font-mono">{a.toFixed(2)}</span>
-                      </div>
-                    </div>
-                    <ScoreBar value={a} max={maxAvail} color="bg-yellow-500" />
-                  </div>
-                  {/* CIA Total bar */}
-                  <div className="pt-1 border-t border-border/40">
-                    <div className="flex justify-between text-xs mb-1 items-center">
-                      <span className="text-muted-foreground font-medium">CIA Total (C+I+A)</span>
-                      <span className="text-foreground font-bold font-mono">{total.toFixed(2)}</span>
-                    </div>
-                    <ScoreBar value={total} max={maxCIA} color="bg-primary" />
-                  </div>
-                  {/* TTP Extent */}
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-muted-foreground">TTP Extent Score</span>
-                      <span className="text-primary font-semibold font-mono">{Number(tactic.extent) || 0}</span>
-                    </div>
-                    <ScoreBar value={Number(tactic.extent) || 0} max={maxExtent} color="bg-violet-500" />
-                  </div>
-                </div>
-              </div>
-            </div>
+            <TacticCard
+              key={tactic.tactic}
+              tactic={tactic}
+              isEdited={isEdited}
+              maxConf={maxConf}
+              maxInt={maxInt}
+              maxAvail={maxAvail}
+              maxExtent={maxExtent}
+              maxCIA={maxCIA}
+              onSave={(field, value) => setOverride(tactic.tactic, field, value)}
+              onReset={() => resetOverride(tactic.tactic)}
+            />
           );
         })}
       </div>
 
-      {/* ── Comparison table ── */}
+      {/* comparison table */}
       <div className="bg-card border border-card-border rounded-xl overflow-hidden">
-        <div className="p-4 border-b border-border">
-          <h2 className="font-semibold">Tactic Comparison Table</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Sorted by CIA Total (descending)</p>
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold">Tactic Comparison Table</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Sorted by CIA Total (descending) · overrides highlighted</p>
+          </div>
+          {editedCount > 0 && (
+            <span className="text-xs text-primary bg-primary/10 border border-primary/30 px-2 py-0.5 rounded">
+              {editedCount} tactic{editedCount !== 1 ? "s" : ""} edited
+            </span>
+          )}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -206,14 +372,15 @@ export default function TacticsScores() {
               </tr>
             </thead>
             <tbody>
-              {[...tactics].sort((a, b) => ciaTotal(b) - ciaTotal(a)).map(tactic => {
+              {sortedForTable.map(tactic => {
                 const color = TACTIC_COLORS[tactic.tactic] || "bg-primary";
                 const c = confScore(tactic.conf);
                 const i = intScore(tactic.integrity);
                 const a = availScore(tactic.avail);
                 const total = c + i + a;
+                const isEdited = overrides[tactic.tactic] !== undefined;
                 return (
-                  <tr key={tactic.tactic} className="border-b border-border/40 hover:bg-accent/20 transition-colors">
+                  <tr key={tactic.tactic} className={`border-b border-border/40 hover:bg-accent/20 transition-colors ${isEdited ? "bg-primary/5" : ""}`}>
                     <td className="px-4 py-3">
                       <Link href={`/all-procedures?tactic=${encodeURIComponent(tactic.tactic)}`}>
                         <div className="flex items-center gap-2 group cursor-pointer">
@@ -221,6 +388,9 @@ export default function TacticsScores() {
                           <span className="text-sm font-medium text-foreground group-hover:text-primary group-hover:underline transition-colors">
                             {tactic.tactic}
                           </span>
+                          {isEdited && (
+                            <span className="text-[10px] px-1 py-0.5 rounded bg-primary/10 text-primary border border-primary/30 font-semibold">edited</span>
+                          )}
                         </div>
                       </Link>
                     </td>

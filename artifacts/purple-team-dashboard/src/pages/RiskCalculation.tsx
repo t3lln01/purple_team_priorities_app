@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import data from "@/data.json";
 import { calcCIAScore, calcImpactScore, calcImpactRate, calcTTPExtent } from "@/utils/impactFormulas";
+import { useTacticScores, type TacticOverrides } from "@/context/TacticScoresContext";
 
 function loadImpactOverrides(): Record<string, any> {
   try { return JSON.parse(localStorage.getItem("pt_impact_overrides") ?? "{}"); } catch { return {}; }
@@ -54,27 +55,35 @@ type RiskRow = {
 
 const rawRiskCalc: RiskRow[] = (data as any).riskCalc;
 
-function applyImpactOverrides(rows: RiskRow[]): RiskRow[] {
+function applyImpactOverrides(rows: RiskRow[], tacticOvMap: TacticOverrides = {}): RiskRow[] {
   const overrides = loadImpactOverrides();
   const impactMap = loadImpactTable();
   const hvaScores = loadHVAScores();
   const hasOverrides = Object.keys(overrides).length > 0;
   const hasHVA = Object.keys(hvaScores).length > 0;
-  if (!hasOverrides && !hasHVA) return rows;
+  const hasTacticOv = Object.keys(tacticOvMap).length > 0;
+  if (!hasOverrides && !hasHVA && !hasTacticOv) return rows;
 
   return rows.map(row => {
     const ov      = overrides[row.TID];
     const base    = impactMap[row.TID];
     const hvaLive = hvaScores[row.TID];
 
+    // Tactic-level fallback (CIA precedence: per-technique > tactic-level > base data)
+    const primaryTactic = (row.Tactic ?? "").split(",")[0].trim();
+    const tacticOv = tacticOvMap[primaryTactic] ?? {};
+    const hasTacticRowOv = Object.keys(tacticOv).length > 0;
+
     // If no changes to this row at all, return as-is
-    if (!ov && !hvaLive) return row;
+    if (!ov && !hvaLive && !hasTacticRowOv) return row;
 
     // CIA / TTP overrides (only if explicit override exists for this TID)
-    const conf  = ov?.confidentiality  ?? row.Confidentiality;
-    const int_  = ov?.integrity        ?? row.Integrity;
-    const avail = ov?.availability     ?? row.Availability;
-    const newCIA = (ov && base) ? calcCIAScore(conf, int_, avail) : row["CIA Score"];
+    const conf  = ov?.confidentiality  ?? tacticOv.conf      ?? row.Confidentiality;
+    const int_  = ov?.integrity        ?? tacticOv.integrity  ?? row.Integrity;
+    const avail = ov?.availability     ?? tacticOv.avail      ?? row.Availability;
+    const newCIA = (ov || hasTacticRowOv) && base
+      ? calcCIAScore(conf, int_, avail)
+      : row["CIA Score"];
 
     const ttpRow = base ? {
       initialTTPExtent:    ov?.initialTTPExtent    ?? base.initialTTPExtent,
@@ -158,7 +167,11 @@ export default function RiskCalculation() {
   const [sortKey, setSortKey] = useState<SortKey>("Risk Scores");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
-  const riskCalc = useMemo(() => applyImpactOverrides(rawRiskCalc), []);
+  const { overrides: tacticOverrides } = useTacticScores();
+  const riskCalc = useMemo(
+    () => applyImpactOverrides(rawRiskCalc, tacticOverrides),
+    [tacticOverrides]
+  );
   const tactics = ["All", ...Array.from(new Set(riskCalc.flatMap(r => r.Tactic?.split(", ") || []))).sort()];
 
   const filtered = riskCalc.filter(r => {
