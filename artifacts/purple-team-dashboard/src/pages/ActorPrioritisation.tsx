@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Link } from "wouter";
 import data from "@/data.json";
 import { useSortTable } from "@/hooks/useSortTable";
 import SortableTh from "@/components/SortableTh";
-import { Pencil, Check, X, RotateCcw, Trash2, Plus, Undo2, ChevronDown, ChevronUp } from "lucide-react";
+import { Pencil, Check, X, RotateCcw, Trash2, Plus, Undo2, ChevronDown, ChevronUp, CalendarRange } from "lucide-react";
 
 type Actor = {
   name: string;
@@ -26,13 +26,12 @@ const procedureActors: string[] = Array.from(
   new Set(allProcedures.map(r => r.actor).filter(Boolean))
 ).sort();
 
-// Build ttpRisk directly from ALL procedures (133 actors, not just the top ~19 in actorRanking)
-const baseTtpRiskMap: Record<string, number> = {};
-allProcedures.forEach(p => {
-  if (!p.actor) return;
-  const key = p.actor.toUpperCase().trim();
-  baseTtpRiskMap[key] = (baseTtpRiskMap[key] ?? 0) + (p.risk ?? 0);
-});
+// ──────────────────────────── date filter types ───────────────────────────────
+type DateRange = "all" | "3m" | "6m" | "9m" | "1y" | "custom";
+const DATE_RANGE_LABELS: Record<DateRange, string> = {
+  all: "All time", "3m": "Last 3 months", "6m": "Last 6 months",
+  "9m": "Last 9 months", "1y": "Last year", custom: "Custom",
+};
 
 // ──────────────────────────── persistence ────────────────────────────────────
 const LS_OV  = "pt_actor_overrides";
@@ -123,20 +122,61 @@ export default function ActorPrioritisation() {
   const [overrides, setOverrides]     = useState<Overrides>(loadOverrides);
   const [customActors, setCustomActors] = useState<CustomActor[]>(loadCustom);
 
-  // Include custom procedures (added in All Procedures page) in ttpRisk totals
+  // ── date filter state ──────────────────────────────────────────────────────
+  const [dateRange, setDateRange]   = useState<DateRange>("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo,   setCustomTo]   = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const datePickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onOut(e: MouseEvent) {
+      if (datePickerRef.current && !datePickerRef.current.contains(e.target as Node))
+        setShowDatePicker(false);
+    }
+    document.addEventListener("mousedown", onOut);
+    return () => document.removeEventListener("mousedown", onOut);
+  }, []);
+
+  // Resolve the active time window (inclusive ms bounds)
+  const { fromMs, toMs } = useMemo(() => {
+    const now = Date.now();
+    const DAY = 86_400_000;
+    if (dateRange === "3m") return { fromMs: now - 90  * DAY, toMs: now };
+    if (dateRange === "6m") return { fromMs: now - 180 * DAY, toMs: now };
+    if (dateRange === "9m") return { fromMs: now - 270 * DAY, toMs: now };
+    if (dateRange === "1y") return { fromMs: now - 365 * DAY, toMs: now };
+    if (dateRange === "custom") return {
+      fromMs: customFrom ? new Date(customFrom).getTime()            : -Infinity,
+      toMs:   customTo   ? new Date(customTo).getTime() + DAY - 1   :  Infinity,
+    };
+    return { fromMs: -Infinity, toMs: Infinity };
+  }, [dateRange, customFrom, customTo]);
+
+  // TTP risk map — filtered by date, covers ALL procedures + custom procedures
   const ttpRiskMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    const inWindow = (date: number | null) => {
+      if (dateRange === "all") return true;
+      if (date === null) return false;          // unknown date excluded when filtering
+      return date >= fromMs && date <= toMs;
+    };
+    allProcedures.forEach(p => {
+      if (!p.actor || !inWindow(p.date ?? null)) return;
+      const key = p.actor.toUpperCase().trim();
+      map[key] = (map[key] ?? 0) + (p.risk ?? 0);
+    });
     try {
-      const customProcs: Array<{ actor?: string; risk?: number }> =
+      const customProcs: Array<{ actor?: string; risk?: number; date?: number | null }> =
         JSON.parse(localStorage.getItem("pt_procedures_custom") ?? "[]");
-      const map = { ...baseTtpRiskMap };
       customProcs.forEach(p => {
-        if (!p.actor) return;
+        if (!p.actor || !inWindow(p.date ?? null)) return;
         const key = p.actor.toUpperCase().trim();
         map[key] = (map[key] ?? 0) + (p.risk ?? 0);
       });
-      return map;
-    } catch { return baseTtpRiskMap; }
-  }, []);
+    } catch {}
+    return map;
+  }, [dateRange, fromMs, toMs]);
 
   const [editName, setEditName]       = useState<string | null>(null);
   const [editForm, setEditForm]       = useState<{ intent: number; capability: number }>({ intent: 4, capability: 4 });
@@ -147,7 +187,9 @@ export default function ActorPrioritisation() {
 
   const [showRemoved, setShowRemoved] = useState(false);
 
-  // Build the live actor list with overrides applied and deleted actors removed
+  // Build the live actor list with overrides applied and deleted actors removed.
+  // ttpRisk for ALL actors is derived from the date-filtered ttpRiskMap so every
+  // calculation (Priority, Risk %) reacts instantly to the date window change.
   const actors: Actor[] = useMemo(() => {
     const merged: Actor[] = [
       // Base actors (with overrides, skip deleted)
@@ -157,7 +199,8 @@ export default function ActorPrioritisation() {
           const ov = overrides[a.name] ?? {};
           const intent = ov.intent ?? a.intent;
           const capability = ov.capability ?? a.capability;
-          return { ...a, intent, capability, priority: 0, riskPct: 0 };
+          const ttpRisk = ttpRiskMap[a.name.toUpperCase().trim()] ?? 0;
+          return { ...a, intent, capability, ttpRisk, priority: 0, riskPct: 0 };
         }),
       // Custom actors
       ...customActors.map(c => ({
@@ -173,7 +216,7 @@ export default function ActorPrioritisation() {
 
     const maxP = Math.max(...merged.map(a => a.priority), 1);
     return merged.map(a => ({ ...a, riskPct: a.priority / maxP }));
-  }, [overrides, customActors]);
+  }, [overrides, customActors, ttpRiskMap]);
 
   // Deleted base actors list (for restore panel)
   const deletedActors = useMemo(() =>
@@ -317,11 +360,83 @@ export default function ActorPrioritisation() {
   // ─────────────────────────────────────────────────────────────────────────────
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Final Actor Prioritisation</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Threat actor ranking based on intent, capability, and TTP risk scores
-        </p>
+      {/* ── Page header + date filter ──────────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Final Actor Prioritisation</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Threat actor ranking based on intent, capability, and TTP risk scores
+          </p>
+        </div>
+
+        {/* Date filter — top-right */}
+        <div className="relative flex-shrink-0" ref={datePickerRef}>
+          <button
+            onClick={() => setShowDatePicker(v => !v)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium transition-colors shadow-sm ${
+              dateRange !== "all"
+                ? "bg-primary/15 text-primary border-primary/40 hover:bg-primary/25"
+                : "bg-card border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+            }`}
+          >
+            <CalendarRange className="w-3.5 h-3.5" />
+            <span>{DATE_RANGE_LABELS[dateRange]}</span>
+            {dateRange === "custom" && customFrom && customTo && (
+              <span className="text-muted-foreground font-normal">
+                ({new Date(customFrom).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })} – {new Date(customTo).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })})
+              </span>
+            )}
+            <ChevronDown className={`w-3 h-3 transition-transform ${showDatePicker ? "rotate-180" : ""}`} />
+          </button>
+
+          {showDatePicker && (
+            <div className="absolute right-0 top-full mt-1.5 z-50 w-72 bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
+              <div className="p-3 border-b border-border">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Calculation date window</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Only procedures within this window contribute to TTP Risk, Priority, and Risk %</p>
+              </div>
+              <div className="p-2 space-y-0.5">
+                {(["all", "3m", "6m", "9m", "1y", "custom"] as DateRange[]).map(opt => (
+                  <button key={opt} onClick={() => { setDateRange(opt); if (opt !== "custom") setShowDatePicker(false); }}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-colors text-left ${
+                      dateRange === opt ? "bg-primary/15 text-primary font-medium" : "text-foreground hover:bg-accent"
+                    }`}>
+                    <span>{DATE_RANGE_LABELS[opt]}</span>
+                    {dateRange === opt && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+                  </button>
+                ))}
+              </div>
+              {dateRange === "custom" && (
+                <div className="px-3 pb-3 pt-2 border-t border-border space-y-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-muted-foreground font-medium">From</label>
+                    <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+                      className="bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring [color-scheme:dark]" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-muted-foreground font-medium">To</label>
+                    <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+                      className="bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring [color-scheme:dark]" />
+                  </div>
+                  {(customFrom || customTo) && (
+                    <button onClick={() => setShowDatePicker(false)}
+                      className="w-full py-1.5 text-xs bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium">
+                      Apply
+                    </button>
+                  )}
+                </div>
+              )}
+              {dateRange !== "all" && (
+                <div className="px-3 pb-3">
+                  <button onClick={() => { setDateRange("all"); setCustomFrom(""); setCustomTo(""); setShowDatePicker(false); }}
+                    className="w-full text-xs text-muted-foreground hover:text-foreground underline transition-colors text-center">
+                    Reset to all time
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* KPI cards */}
