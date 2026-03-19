@@ -285,14 +285,23 @@ export async function runSync(options: { since?: number } = {}): Promise<void> {
 
 export async function maybeAutoSync(): Promise<void> {
   if (!hasCredentials()) return;
-  const state = await loadState();
-  if (state.status === "running") return;
+  // syncRunning is the in-memory truth for this process
+  if (syncRunning) return;
 
-  const lastSync   = state.lastSync ? new Date(state.lastSync).getTime() : 0;
+  const state = await loadState();
+
+  // If the file claims "running" but this process is not syncing, the previous
+  // server was killed mid-sync — clean up the stale state so the UI reflects reality
+  if (state.status === "running") {
+    console.log("[CS] Stale 'running' state from previous server — resetting");
+    await saveState({ ...state, status: "error", error: "Sync interrupted by server restart" });
+    state.status = "error";
+  }
+
+  const lastSync    = state.lastSync ? new Date(state.lastSync).getTime() : 0;
   const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
   if (Date.now() - lastSync >= sevenDaysMs) {
     console.log("[CS] Weekly auto-sync triggered");
-    // Only send delta since last sync (not full history)
     runSync({ since: lastSync || undefined }).catch(console.error);
   }
 }
