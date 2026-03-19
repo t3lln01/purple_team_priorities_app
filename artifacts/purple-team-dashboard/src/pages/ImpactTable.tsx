@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import data from "@/data.json";
 import { useImpactOverrides, ImpactOverride } from "@/hooks/useImpactOverrides";
 import { useTacticScores } from "@/context/TacticScoresContext";
+import { useAppData } from "@/context/AppDataContext";
 import {
   calcCIAScore,
   calcImpactScore,
@@ -90,6 +91,7 @@ type ComputedRow = ImpactRow & {
 export default function ImpactTable() {
   const { overrides, setOverride, resetOverride, resetAll } = useImpactOverrides();
   const { overrides: tacticOverrides } = useTacticScores();
+  const { activeNewImpactRows } = useAppData();
   const [search, setSearch] = useState("");
   const [tacticFilter, setTacticFilter] = useState("All");
   const [sortKey, setSortKey] = useState<SortKey>("impactRate");
@@ -102,12 +104,17 @@ export default function ImpactTable() {
     try { return JSON.parse(localStorage.getItem("pt_stix_techniques") ?? "{}"); } catch { return {}; }
   }, []);
 
-  const allTactics = useMemo(() =>
-    ["All", ...Array.from(new Set(rawRows.flatMap(r => r.tactics?.split(", ").map(t => t.trim()) || []))).sort()],
-    []
+  const allSourceRows = useMemo(
+    () => [...(rawRows as ImpactRow[]), ...(activeNewImpactRows as ImpactRow[])],
+    [activeNewImpactRows]
   );
 
-  const computed: ComputedRow[] = useMemo(() => rawRows.map(row => {
+  const allTactics = useMemo(
+    () => ["All", ...Array.from(new Set(allSourceRows.flatMap(r => r.tactics?.split(", ").map(t => t.trim()) || []))).sort()],
+    [allSourceRows]
+  );
+
+  const computed: ComputedRow[] = useMemo(() => allSourceRows.map(row => {
     const ov = overrides[row.id] ?? {};
     const stix = stixOverrides[row.id] ?? {};
 
@@ -158,7 +165,7 @@ export default function ImpactTable() {
       _impactRate:  impactRate,
       _hasOverride: Object.keys(ov).length > 0 || Object.keys(tacticOv).length > 0,
     };
-  }), [overrides, stixOverrides, tacticOverrides]);
+  }), [allSourceRows, overrides, stixOverrides, tacticOverrides]);
 
   const filtered = useMemo(() => computed.filter(r => {
     const q = search.toLowerCase();

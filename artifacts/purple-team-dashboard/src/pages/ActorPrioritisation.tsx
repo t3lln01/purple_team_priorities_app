@@ -3,7 +3,8 @@ import { Link } from "wouter";
 import data from "@/data.json";
 import { useSortTable } from "@/hooks/useSortTable";
 import SortableTh from "@/components/SortableTh";
-import { Pencil, Check, X, RotateCcw, Trash2, Plus, Undo2, ChevronDown, ChevronUp, CalendarRange } from "lucide-react";
+import { Pencil, Check, X, RotateCcw, Trash2, Plus, Undo2, ChevronDown, ChevronUp, CalendarRange, Shield, Activity, XCircle } from "lucide-react";
+import { useAppData } from "@/context/AppDataContext";
 
 type Actor = {
   name: string;
@@ -114,6 +115,14 @@ type RiskLevel = typeof RISK_LEVELS[number];
 
 // ──────────────────────────── component ──────────────────────────────────────
 export default function ActorPrioritisation() {
+  const {
+    liveActorData,
+    clearLiveActorData,
+    mitreVersions,
+    activeMitreVersionId,
+    setActiveMitreVersionId,
+  } = useAppData();
+
   const [search, setSearch]           = useState("");
   const [riskFilter, setRiskFilter]   = useState<RiskLevel>("All");
   const [selectedActors, setSelectedActors] = useState<Set<string>>(new Set());
@@ -153,7 +162,36 @@ export default function ActorPrioritisation() {
     return { fromMs: -Infinity, toMs: Infinity };
   }, [dateRange, customFrom, customTo]);
 
-  // TTP risk map — filtered by date, covers ALL procedures + custom procedures
+  // Source procedures: use live actor data when active, else base data.json
+  const sourceProcedures = useMemo(() => {
+    if (liveActorData) return liveActorData.procedures;
+    return allProcedures;
+  }, [liveActorData]);
+
+  // Source base actors: use live actor data when active, else base data.json actors
+  const sourceBaseActors: Actor[] = useMemo(() => {
+    if (liveActorData) {
+      return liveActorData.actorRanking.map(rank => ({
+        name: rank.actor.toUpperCase().trim(),
+        intent: 4,
+        capability: 4,
+        ttpRisk: 0,
+        priority: 0,
+        riskPct: 0,
+      }));
+    }
+    return baseActors;
+  }, [liveActorData]);
+
+  // Source procedure actors for chips (for the actor filter pills)
+  const sourceProcedureActors = useMemo(() => {
+    if (liveActorData) {
+      return Array.from(new Set(liveActorData.procedures.map(p => p.actor).filter(Boolean))).sort();
+    }
+    return procedureActors;
+  }, [liveActorData]);
+
+  // TTP risk map — filtered by date, covers source procedures + custom procedures
   const ttpRiskMap = useMemo(() => {
     const map: Record<string, number> = {};
     const inWindow = (date: number | null) => {
@@ -161,11 +199,12 @@ export default function ActorPrioritisation() {
       if (date === null) return false;          // unknown date excluded when filtering
       return date >= fromMs && date <= toMs;
     };
-    allProcedures.forEach(p => {
+    sourceProcedures.forEach((p: any) => {
       if (!p.actor || !inWindow(p.date ?? null)) return;
       const key = p.actor.toUpperCase().trim();
       map[key] = (map[key] ?? 0) + (p.risk ?? 0);
     });
+    // Always include custom procedures
     try {
       const customProcs: Array<{ actor?: string; risk?: number; date?: number | null }> =
         JSON.parse(localStorage.getItem("pt_procedures_custom") ?? "[]");
@@ -176,7 +215,7 @@ export default function ActorPrioritisation() {
       });
     } catch {}
     return map;
-  }, [dateRange, fromMs, toMs]);
+  }, [dateRange, fromMs, toMs, sourceProcedures]);
 
   const [editName, setEditName]       = useState<string | null>(null);
   const [editForm, setEditForm]       = useState<{ intent: number; capability: number }>({ intent: 4, capability: 4 });
@@ -192,8 +231,8 @@ export default function ActorPrioritisation() {
   // calculation (Priority, Risk %) reacts instantly to the date window change.
   const actors: Actor[] = useMemo(() => {
     const merged: Actor[] = [
-      // Base actors (with overrides, skip deleted)
-      ...baseActors
+      // Base/live actors (with overrides, skip deleted)
+      ...sourceBaseActors
         .filter(a => !overrides[a.name]?.deleted)
         .map(a => {
           const ov = overrides[a.name] ?? {};
@@ -216,12 +255,12 @@ export default function ActorPrioritisation() {
 
     const maxP = Math.max(...merged.map(a => a.priority), 1);
     return merged.map(a => ({ ...a, riskPct: a.priority / maxP }));
-  }, [overrides, customActors, ttpRiskMap]);
+  }, [sourceBaseActors, overrides, customActors, ttpRiskMap]);
 
-  // Deleted base actors list (for restore panel)
+  // Deleted actors list (for restore panel) — reflects live or base source
   const deletedActors = useMemo(() =>
-    baseActors.filter(a => overrides[a.name]?.deleted),
-    [overrides]
+    sourceBaseActors.filter(a => overrides[a.name]?.deleted),
+    [sourceBaseActors, overrides]
   );
 
   // ── edit helpers ────────────────────────────────────────────────────────────
@@ -351,8 +390,8 @@ export default function ActorPrioritisation() {
   const { sortKey: sk2, sortDir: sd2, toggle: tog2, sorted: sortedAll }    = useSortTable(actors);
 
   const visibleChips = chipSearch
-    ? procedureActors.filter(a => a.toLowerCase().includes(chipSearch.toLowerCase()))
-    : procedureActors;
+    ? sourceProcedureActors.filter(a => a.toLowerCase().includes(chipSearch.toLowerCase()))
+    : sourceProcedureActors;
 
   const overrideCount = Object.values(overrides).filter(ov => ov.intent !== undefined || ov.capability !== undefined).length;
   const modifiedCount = overrideCount + customActors.length;
@@ -439,6 +478,28 @@ export default function ActorPrioritisation() {
         </div>
       </div>
 
+      {/* ── Live data indicator ──────────────────────────────────────────── */}
+      {liveActorData && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-chart-4/10 border border-chart-4/30 rounded-xl">
+          <Activity className="w-4 h-4 text-chart-4 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <span className="text-xs font-semibold text-chart-4">Live Data Active</span>
+            <span className="text-xs text-muted-foreground ml-2">{liveActorData.label}</span>
+            <span className="text-xs text-muted-foreground ml-2">·</span>
+            <span className="text-xs text-muted-foreground ml-2">
+              {liveActorData.actorRanking.length} actors · {liveActorData.procedures.length.toLocaleString()} procedures
+            </span>
+          </div>
+          <button
+            onClick={clearLiveActorData}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-red-400 transition-colors flex-shrink-0"
+            title="Clear live data and revert to base dataset"
+          >
+            <XCircle className="w-3.5 h-3.5" />Clear
+          </button>
+        </div>
+      )}
+
       {/* KPI cards */}
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-card border border-card-border rounded-xl p-4">
@@ -452,7 +513,7 @@ export default function ActorPrioritisation() {
           <div className="text-sm text-muted-foreground mt-1">High/Critical Priority</div>
         </div>
         <div className="bg-card border border-card-border rounded-xl p-4">
-          <div className="text-2xl font-bold text-chart-2">{procedureActors.length}</div>
+          <div className="text-2xl font-bold text-chart-2">{sourceProcedureActors.length}</div>
           <div className="text-sm text-muted-foreground mt-1">Actors in Procedures</div>
         </div>
       </div>
@@ -773,6 +834,11 @@ export default function ActorPrioritisation() {
         <div className="px-4 py-3 border-t border-border bg-muted/10 flex items-center justify-between gap-4 flex-wrap text-xs text-muted-foreground">
           <div className="flex items-center gap-3 flex-wrap">
             <span><span className="font-medium text-foreground">{actors.length}</span> actors</span>
+            {liveActorData && (
+              <span className="flex items-center gap-1 text-chart-4">
+                <Activity className="w-3 h-3" />live
+              </span>
+            )}
             {customActors.length > 0 && <span className="text-chart-2">{customActors.length} custom</span>}
             {overrideCount > 0 && <span className="text-yellow-400">{overrideCount} override{overrideCount !== 1 ? "s" : ""}</span>}
             {deletedActors.length > 0 && (
@@ -783,6 +849,22 @@ export default function ActorPrioritisation() {
                 {showRemoved ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                 {deletedActors.length} hidden
               </button>
+            )}
+            {mitreVersions.length > 0 && (
+              <div className="flex items-center gap-1.5 border-l border-border pl-3">
+                <Shield className="w-3 h-3 text-muted-foreground/60" />
+                <span className="text-muted-foreground/60">ATT&amp;CK:</span>
+                <select
+                  value={activeMitreVersionId ?? ""}
+                  onChange={e => setActiveMitreVersionId(e.target.value || null)}
+                  className="bg-input border border-border rounded px-1.5 py-0.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="">Base (data.json)</option>
+                  {mitreVersions.map(v => (
+                    <option key={v.id} value={v.id}>{v.label}</option>
+                  ))}
+                </select>
+              </div>
             )}
           </div>
           <span className="text-muted-foreground/50 hidden lg:block">

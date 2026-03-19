@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import data from "@/data.json";
 import { calcCIAScore, calcImpactScore, calcImpactRate, calcTTPExtent } from "@/utils/impactFormulas";
 import { useTacticScores, type TacticOverrides } from "@/context/TacticScoresContext";
+import { useAppData } from "@/context/AppDataContext";
 
 function loadImpactOverrides(): Record<string, any> {
   try { return JSON.parse(localStorage.getItem("pt_impact_overrides") ?? "{}"); } catch { return {}; }
@@ -168,9 +169,16 @@ export default function RiskCalculation() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const { overrides: tacticOverrides } = useTacticScores();
+  const { activeNewRiskRows } = useAppData();
+
+  const allRawRows = useMemo(
+    () => [...rawRiskCalc, ...(activeNewRiskRows as RiskRow[])],
+    [activeNewRiskRows]
+  );
+
   const riskCalc = useMemo(
-    () => applyImpactOverrides(rawRiskCalc, tacticOverrides),
-    [tacticOverrides]
+    () => applyImpactOverrides(allRawRows, tacticOverrides),
+    [allRawRows, tacticOverrides]
   );
   const tactics = ["All", ...Array.from(new Set(riskCalc.flatMap(r => r.Tactic?.split(", ") || []))).sort()];
 

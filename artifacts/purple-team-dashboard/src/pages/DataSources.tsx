@@ -10,6 +10,7 @@ import {
   loadActorFiles, saveActorFiles, loadReportsLookup, saveReportsLookup,
   SavedView,
 } from "@/context/ViewContext";
+import { useAppData, buildMitreVersionData, type LiveActorData } from "@/context/AppDataContext";
 
 const MITRE_DEFAULT_URL =
   "https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json";
@@ -242,6 +243,11 @@ function SH({ children }: { children: React.ReactNode }) {
 export default function DataSources() {
   const { saveView, savedViews } = useViews();
   const [, navigate] = useLocation();
+  const {
+    liveActorData, setLiveActorData,
+    mitreVersions, activeMitreVersionId, setActiveMitreVersionId,
+    addMitreVersion, removeMitreVersion,
+  } = useAppData();
 
   // ── MITRE ATT&CK ────────────────────────────────────────────────
   const [mitreUrl, setMitreUrl] = useState(MITRE_DEFAULT_URL);
@@ -287,6 +293,9 @@ export default function DataSources() {
   const [generating, setGenerating] = useState(false);
   const [genPreview, setGenPreview] = useState<{ procedures: number; actors: number; actorNames: string[] } | null>(null);
 
+  // ── Push-to-app state ────────────────────────────────────────────
+  const [pushMsg, setPushMsg] = useState("");
+
   const reportsLookup = loadReportsLookup();
 
   // ── MITRE handlers ────────────────────────────────────────────────
@@ -305,6 +314,12 @@ export default function DataSources() {
       const json = await res.json();
       const stats = parseMitre(json);
       setMitreStats(stats); lsSet(LS_MITRE, stats); setMitreStatus("done");
+      try {
+        const { version, stixMap } = buildMitreVersionData(json);
+        addMitreVersion(version);
+        if (!activeMitreVersionId) setActiveMitreVersionId(version.id);
+        localStorage.setItem("pt_stix_techniques", JSON.stringify(stixMap));
+      } catch {}
     } catch (e: any) {
       clearTimeout(timer);
       if (e.name === "AbortError") {
@@ -325,6 +340,12 @@ export default function DataSources() {
       const json = await readJson(file);
       const stats = parseMitre(json);
       setMitreStats(stats); lsSet(LS_MITRE, stats); setMitreStatus("done");
+      try {
+        const { version, stixMap } = buildMitreVersionData(json);
+        addMitreVersion(version);
+        if (!activeMitreVersionId) setActiveMitreVersionId(version.id);
+        localStorage.setItem("pt_stix_techniques", JSON.stringify(stixMap));
+      } catch {}
     } catch (err: any) { setMitreError(err.message); setMitreStatus("error"); }
     e.target.value = "";
   }
@@ -457,17 +478,19 @@ export default function DataSources() {
       const data = await res.json() as { reports: any[]; actors: Array<{ filename: string; actor: string; entries: any[] }>; meta: { reportCount: number; actorCount: number } };
 
       // Load reports into localStorage (same as manual JSON upload)
+      let newLookup: ReportsLookup = loadReportsLookup();
       if (data.reports && data.reports.length > 0) {
         const { stats, lookup } = parseReportsJson({ resources: data.reports });
         setReportsStats(stats); setReportsStatus("done");
         lsSet("ds_reports_stats", stats);
         saveReportsLookup(lookup);
-        setReportsLookup(lookup);
+        newLookup = lookup;
       }
 
       // Load actor MITRE files into localStorage (same as manual actor upload)
+      let mergedActors = actorFiles;
       if (data.actors && data.actors.length > 0) {
-        const incoming: StoredActorFile[] = data.actors.map(a => ({
+        const incoming: StoredActorFile[] = data.actors.map((a: any) => ({
           filename: a.filename,
           actor: a.actor,
           entries: Array.isArray(a.entries) ? a.entries.map((e: any) => ({
@@ -478,14 +501,26 @@ export default function DataSources() {
             observables: e.observables ?? [],
           })) : [],
         }));
-        const merged = [...actorFiles.filter(f => !incoming.some(i => i.filename === f.filename)), ...incoming];
-        setActorFiles(merged);
-        saveActorFiles(merged);
+        mergedActors = [...actorFiles.filter(f => !incoming.some(i => i.filename === f.filename)), ...incoming];
+        setActorFiles(mergedActors);
+        saveActorFiles(mergedActors);
+      }
+
+      // Auto-push to Actor Prioritisation
+      if (mergedActors.length > 0) {
+        const { procedures, actorRanking } = generateView(mergedActors, newLookup);
+        const liveData: LiveActorData = {
+          procedures,
+          actorRanking,
+          label: `CrowdStrike Sync — ${new Date().toLocaleDateString()}`,
+          loadedAt: new Date().toISOString(),
+        };
+        setLiveActorData(liveData);
       }
 
       const rCount = meta?.reportCount ?? data.reports?.length ?? 0;
       const aCount = meta?.actorCount ?? data.actors?.length ?? 0;
-      setCsLoadMsg(`Loaded: ${rCount} reports · ${aCount} actor MITRE maps`);
+      setCsLoadMsg(`Loaded: ${rCount} reports · ${aCount} actor MITRE maps — Actor Prioritisation updated`);
       await fetchCsStatus();
     } catch (e: any) {
       setCsLoadMsg(`Load error: ${e.message}`);
@@ -518,6 +553,23 @@ export default function DataSources() {
   function fmtAbsolute(iso: string | null): string {
     if (!iso) return "—";
     return new Date(iso).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  }
+
+  // ── Push directly to Actor Prioritisation ────────────────────────
+  function pushToActorPrioritisation() {
+    if (actorFiles.length === 0) return;
+    setPushMsg("");
+    const lookup = loadReportsLookup();
+    const { procedures, actorRanking } = generateView(actorFiles, lookup);
+    const liveData: LiveActorData = {
+      procedures,
+      actorRanking,
+      label: `${actorFiles.map(f => f.actor).join(", ")} — ${new Date().toLocaleDateString()}`,
+      loadedAt: new Date().toISOString(),
+    };
+    setLiveActorData(liveData);
+    setPushMsg(`Applied: ${actorRanking.length} actors · ${procedures.length} procedures`);
+    setTimeout(() => setPushMsg(""), 4000);
   }
 
   // ── Generation ────────────────────────────────────────────────────
@@ -675,6 +727,48 @@ export default function DataSources() {
                 )}
               </div>
             )}
+            {mitreVersions.length > 0 && (
+              <div className="space-y-2 pt-1">
+                <SH>Loaded Versions</SH>
+                {mitreVersions.map(v => (
+                  <div key={v.id} className={`flex items-center gap-2 rounded-lg px-3 py-2 border transition-colors ${
+                    v.id === activeMitreVersionId
+                      ? "bg-primary/10 border-primary/40"
+                      : "bg-muted/20 border-border"
+                  }`}>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-foreground truncate">{v.label}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {v.totalTechniques.toLocaleString()} techniques
+                        {v.newTechniqueCount > 0 && <span className="text-chart-2 ml-1">+{v.newTechniqueCount} new</span>}
+                        {v.newTechniqueCount === 0 && <span className="text-muted-foreground/60 ml-1">· no delta vs base</span>}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {v.id === activeMitreVersionId ? (
+                        <button
+                          onClick={() => setActiveMitreVersionId(null)}
+                          className="text-[10px] px-2 py-1 rounded bg-primary/20 text-primary hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                        >Active</button>
+                      ) : (
+                        <button
+                          onClick={() => setActiveMitreVersionId(v.id)}
+                          className="text-[10px] px-2 py-1 rounded bg-muted/40 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                        >Activate</button>
+                      )}
+                      <button
+                        onClick={() => removeMitreVersion(v.id)}
+                        className="text-muted-foreground hover:text-red-400 transition-colors p-1"
+                        title="Remove version"
+                      ><Trash2 className="w-3 h-3" /></button>
+                    </div>
+                  </div>
+                ))}
+                {activeMitreVersionId === null && (
+                  <p className="text-[10px] text-muted-foreground">No version active — using base v16 technique set.</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -815,7 +909,7 @@ export default function DataSources() {
             {actorError && <p className="text-xs text-red-400">{actorError}</p>}
 
             {actorFiles.length > 0 && (
-              <div className="pt-1 space-y-2">
+              <div className="pt-1 space-y-3">
                 <SH>Aggregate Stats</SH>
                 <div className="flex flex-wrap gap-2">
                   <StatPill label="Actors" value={actorFiles.length} />
@@ -823,6 +917,23 @@ export default function DataSources() {
                   <StatPill label="Tactics" value={new Set(actorFiles.flatMap(f => f.entries.map(e => e.tactic_name))).size} />
                   <StatPill label="Techniques" value={new Set(actorFiles.flatMap(f => f.entries.map(e => e.technique_id))).size} />
                 </div>
+                <SH>Apply to Dashboard</SH>
+                <button
+                  onClick={pushToActorPrioritisation}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-chart-4/10 border border-chart-4/40 text-chart-4 rounded-lg text-xs font-medium hover:bg-chart-4/20 transition-colors"
+                >
+                  <Layers className="w-3.5 h-3.5" />Push to Actor Prioritisation
+                </button>
+                {pushMsg && (
+                  <p className="text-xs text-green-400 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />{pushMsg}
+                  </p>
+                )}
+                {liveActorData && !pushMsg && (
+                  <p className="text-[10px] text-chart-4/70">
+                    Live: {liveActorData.actorRanking.length} actors active in Actor Prioritisation
+                  </p>
+                )}
               </div>
             )}
           </div>
