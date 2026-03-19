@@ -147,8 +147,6 @@ export default function ActorPrioritisation() {
 
   const [showRemoved, setShowRemoved] = useState(false);
 
-  const maxRisk = Math.max(...actorRanking.map(a => a.riskSum));
-
   // Build the live actor list with overrides applied and deleted actors removed
   const actors: Actor[] = useMemo(() => {
     const merged: Actor[] = [
@@ -290,11 +288,21 @@ export default function ActorPrioritisation() {
     return matchSearch && matchRisk && matchChips;
   }), [actors, search, riskFilter, selectedActors]);
 
+  // Combined ranking built from the live actors array (includes custom actors and overrides)
+  const combinedRanking = useMemo(() =>
+    [...actors]
+      .map(a => ({ name: a.name, riskSum: a.ttpRisk }))
+      .sort((a, b) => b.riskSum - a.riskSum),
+    [actors]
+  );
+
+  const maxRisk = Math.max(...combinedRanking.map(a => a.riskSum), 1);
+
   const filteredRanking = useMemo(() => {
     if (selectedActors.size > 0)
-      return actorRanking.filter(a => [...selectedActors].some(s => s.toLowerCase() === a.name.toLowerCase()));
-    return actorRanking.filter(a => filtered.some(f => f.name.toLowerCase() === a.name.toLowerCase()));
-  }, [filtered, selectedActors]);
+      return combinedRanking.filter(a => [...selectedActors].some(s => s.toLowerCase() === a.name.toLowerCase()));
+    return combinedRanking.filter(a => filtered.some(f => f.name.toLowerCase() === a.name.toLowerCase()));
+  }, [combinedRanking, filtered, selectedActors]);
 
   const { sortKey: sk1, sortDir: sd1, toggle: tog1, sorted: sortedActors } = useSortTable(filtered);
   const { sortKey: sk2, sortDir: sd2, toggle: tog2, sorted: sortedAll }    = useSortTable(actors);
@@ -390,14 +398,11 @@ export default function ActorPrioritisation() {
                   <tr key={actor.name} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
                     <td className="px-4 py-2.5 text-muted-foreground font-mono text-xs">{i + 1}</td>
                     <td className="px-4 py-2.5 text-xs">
-                      <div className="flex items-center gap-1.5">
-                        <Link href={`/all-procedures?actor=${encodeURIComponent(actor.name)}`}>
-                          <span className={`font-medium hover:text-primary hover:underline cursor-pointer transition-colors ${actor.isCustom ? "text-chart-2" : hasIntentCapOverride(actor.name) ? "text-primary" : "text-foreground"}`}>
-                            {actor.name}
-                          </span>
-                        </Link>
-                        {actor.isCustom && <span className="text-[10px] px-1 py-0.5 rounded bg-chart-2/15 text-chart-2 border border-chart-2/30 font-medium">custom</span>}
-                      </div>
+                      <Link href={`/all-procedures?actor=${encodeURIComponent(actor.name)}`}>
+                        <span className={`font-medium hover:text-primary hover:underline cursor-pointer transition-colors ${hasIntentCapOverride(actor.name) ? "text-primary" : "text-foreground"}`}>
+                          {actor.name}
+                        </span>
+                      </Link>
                     </td>
                     <td className="px-4 py-2.5 text-center">
                       <div className="flex gap-0.5">{Array.from({ length: 7 }).map((_, j) => (
@@ -427,7 +432,7 @@ export default function ActorPrioritisation() {
               <p className="text-xs text-muted-foreground mt-0.5">Sum of evaluated TTP risks</p>
             </div>
             <div className="p-4 space-y-3">
-              {(filteredRanking.length > 0 ? filteredRanking : actorRanking).slice(0, 15).map(a => (
+              {(filteredRanking.length > 0 ? filteredRanking : combinedRanking).slice(0, 15).map(a => (
                 <div key={a.name}>
                   <div className="flex justify-between mb-1">
                     <Link href={`/all-procedures?actor=${encodeURIComponent(a.name)}`}>
@@ -537,11 +542,10 @@ export default function ActorPrioritisation() {
                     <td className="px-4 py-2.5 text-xs">
                       <div className="flex items-center gap-1.5">
                         <Link href={`/all-procedures?actor=${encodeURIComponent(actor.name)}`}>
-                          <span className={`font-semibold hover:text-primary hover:underline cursor-pointer transition-colors ${actor.isCustom ? "text-chart-2" : hasOv ? "text-yellow-300" : "text-foreground"}`}>
+                          <span className={`font-semibold hover:text-primary hover:underline cursor-pointer transition-colors ${hasOv ? "text-yellow-300" : "text-foreground"}`}>
                             {actor.name}
                           </span>
                         </Link>
-                        {actor.isCustom && <span className="text-[10px] px-1.5 py-0.5 rounded bg-chart-2/15 text-chart-2 border border-chart-2/30 font-medium">custom</span>}
                         {hasOv && <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 font-medium">edited</span>}
                       </div>
                     </td>
