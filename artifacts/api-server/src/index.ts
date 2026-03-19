@@ -1,4 +1,5 @@
 import app from "./app";
+import { maybeAutoSync } from "./routes/crowdstrike";
 
 const rawPort = process.env["PORT"];
 
@@ -16,4 +17,11 @@ if (Number.isNaN(port) || port <= 0) {
 
 app.listen(port, () => {
   console.log(`Server listening on port ${port}`);
+
+  // ── Weekly CrowdStrike auto-sync ─────────────────────────────────────────────
+  // On startup: check if a sync is overdue (> 7 days since last) and run one.
+  // Then re-check every 6 hours so the weekly schedule is maintained even across
+  // server restarts without needing a persistent cron daemon.
+  maybeAutoSync().catch(console.error);
+  setInterval(() => maybeAutoSync().catch(console.error), 6 * 60 * 60 * 1000);
 });

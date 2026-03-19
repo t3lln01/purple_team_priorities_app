@@ -56,7 +56,8 @@ Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` 
 
 - Entry: `src/index.ts` — reads `PORT`, starts Express
 - App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
+- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`); `src/routes/crowdstrike.ts` exposes CrowdStrike Intel API proxy routes
+- **CrowdStrike routes** (`/api/cs/*`): `GET /cs/status`, `POST /cs/connect`, `POST /cs/sync`, `GET /cs/sync-result`; sync state persisted to `cs-sync-state.json` in the artifact root; weekly auto-sync triggered on startup if `CS_CLIENT_ID` + `CS_CLIENT_SECRET` secrets are configured and last sync > 7 days; proxied from the frontend via Vite dev server proxy (see `vite.config.ts` in purple-team-dashboard)
 - Depends on: `@workspace/db`, `@workspace/api-zod`
 - `pnpm --filter @workspace/api-server run dev` — run the dev server
 - `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
@@ -104,7 +105,7 @@ React + Vite SPA — Purple Team Adversary Prioritisation dashboard (dark navy/p
 - Tactic Scores — per-tactic CIA baseline cards
 - Risk Rate — likelihood × impact matrix
 - All Procedures — full 3608-row ATT&CK procedures table (filterable by `?mitre=` or `?tactic=` URL params)
-- Data Sources — CSV reports, Enterprise ATT&CK STIX bundle, actor mapping files; Generate & Save View
+- Data Sources — CSV reports, Enterprise ATT&CK STIX bundle, actor mapping files; Generate & Save View; **CrowdStrike Intel API connector** (weekly auto-sync of reports + actor MITRE ATT&CK data)
 
 **Formula (verified vs Excel):**
 - CIA Score = Conf(L=1,M=2,H=3) + Int(L=1,M=2.25,H=3.5) + Avail(L=1,M=2.5,H=4)

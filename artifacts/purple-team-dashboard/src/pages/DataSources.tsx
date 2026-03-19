@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import {
   Upload, Link2, CheckCircle2, XCircle, Loader2, Trash2,
   ChevronDown, ChevronUp, Plus, Layers, Eye,
+  RefreshCw, Shield, Clock, AlertCircle, Zap, WifiOff,
 } from "lucide-react";
 import {
   useViews, generateView, StoredActorFile, ReportsLookup,
@@ -15,6 +16,9 @@ const MITRE_DEFAULT_URL =
 
 const MITRE_DOWNLOAD_URL =
   "https://github.com/mitre-attack/attack-stix-data/raw/master/enterprise-attack/enterprise-attack.json";
+
+// CrowdStrike API proxy base — proxied by Vite dev server to the api-server
+const CS_API_BASE = "/api";
 
 function toBlobToRaw(url: string): string {
   // Convert github.com/.../blob/... → raw.githubusercontent.com/...
@@ -257,6 +261,24 @@ export default function DataSources() {
   // ── Actor files ──────────────────────────────────────────────────
   const [actorFiles, setActorFiles] = useState<StoredActorFile[]>(loadActorFiles);
   const [actorError, setActorError] = useState("");
+
+  // ── CrowdStrike connector ─────────────────────────────────────────
+  type CsSyncStatus = "never" | "running" | "done" | "error";
+  interface CsStatus {
+    hasCredentials: boolean;
+    status: CsSyncStatus;
+    lastSync: string | null;
+    nextSync: string | null;
+    syncStarted: string | null;
+    error: string | null;
+    meta: { reportCount: number; actorCount: number };
+  }
+  const [csStatus, setCsStatus] = useState<CsStatus | null>(null);
+  const [csConnectResult, setCsConnectResult] = useState<"idle" | "testing" | "ok" | "fail">("idle");
+  const [csConnectError, setCsConnectError] = useState("");
+  const [csSyncing, setCsSyncing] = useState(false);
+  const [csLoadMsg, setCsLoadMsg] = useState("");
+  const csPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const actorFileRef = useRef<HTMLInputElement>(null);
 
   // ── Generate modal ───────────────────────────────────────────────
@@ -362,6 +384,129 @@ export default function DataSources() {
   function updateActorName(filename: string, name: string) {
     const next = actorFiles.map(f => f.filename === filename ? { ...f, actor: name } : f);
     setActorFiles(next); saveActorFiles(next);
+  }
+
+  // ── CrowdStrike connector ─────────────────────────────────────────
+
+  const fetchCsStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`${CS_API_BASE}/cs/status`);
+      if (!res.ok) return;
+      const data = await res.json() as CsStatus;
+      setCsStatus(data);
+      if (data.status === "running") {
+        setCsSyncing(true);
+      } else if (csSyncing && data.status === "done") {
+        setCsSyncing(false);
+        loadCsResult(data.meta);
+      } else if (data.status !== "running") {
+        setCsSyncing(false);
+      }
+    } catch {}
+  }, [csSyncing]);
+
+  useEffect(() => {
+    fetchCsStatus();
+  }, []);
+
+  // Poll every 8 s while syncing
+  useEffect(() => {
+    if (csPollRef.current) clearInterval(csPollRef.current);
+    if (csSyncing) {
+      csPollRef.current = setInterval(fetchCsStatus, 8000);
+    }
+    return () => { if (csPollRef.current) clearInterval(csPollRef.current); };
+  }, [csSyncing, fetchCsStatus]);
+
+  async function handleCsConnect() {
+    setCsConnectResult("testing");
+    setCsConnectError("");
+    try {
+      const res = await fetch(`${CS_API_BASE}/cs/connect`, { method: "POST" });
+      const data = await res.json() as { ok: boolean; error?: string };
+      setCsConnectResult(data.ok ? "ok" : "fail");
+      if (!data.ok) setCsConnectError(data.error ?? "Connection failed");
+    } catch (e: any) {
+      setCsConnectResult("fail");
+      setCsConnectError(e.message ?? "Network error — is the API server running?");
+    }
+    setTimeout(() => setCsConnectResult("idle"), 5000);
+  }
+
+  async function handleCsSync() {
+    setCsLoadMsg("");
+    setCsSyncing(true);
+    try {
+      const res = await fetch(`${CS_API_BASE}/cs/sync`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Sync request failed" })) as { error: string };
+        throw new Error(err.error);
+      }
+      // Polling will pick up the result
+    } catch (e: any) {
+      setCsSyncing(false);
+      setCsLoadMsg(`Error: ${e.message}`);
+    }
+  }
+
+  async function loadCsResult(meta?: { reportCount: number; actorCount: number }) {
+    setCsLoadMsg("Loading sync result into dashboard…");
+    try {
+      const res = await fetch(`${CS_API_BASE}/cs/sync-result`);
+      if (!res.ok) throw new Error("Failed to fetch sync result");
+      const data = await res.json() as { reports: any[]; actors: Array<{ filename: string; actor: string; entries: any[] }>; meta: { reportCount: number; actorCount: number } };
+
+      // Load reports into localStorage (same as manual JSON upload)
+      if (data.reports && data.reports.length > 0) {
+        const { stats, lookup } = parseReportsJson({ resources: data.reports });
+        setReportsStats(stats); setReportsStatus("done");
+        lsSet("ds_reports_stats", stats);
+        saveReportsLookup(lookup);
+        setReportsLookup(lookup);
+      }
+
+      // Load actor MITRE files into localStorage (same as manual actor upload)
+      if (data.actors && data.actors.length > 0) {
+        const incoming: StoredActorFile[] = data.actors.map(a => ({
+          filename: a.filename,
+          actor: a.actor,
+          entries: Array.isArray(a.entries) ? a.entries.map((e: any) => ({
+            tactic_name: e.tactic_name ?? "",
+            technique_id: e.technique_id ?? "",
+            technique_name: e.technique_name ?? "",
+            reports: e.reports ?? [],
+            observables: e.observables ?? [],
+          })) : [],
+        }));
+        const merged = [...actorFiles.filter(f => !incoming.some(i => i.filename === f.filename)), ...incoming];
+        setActorFiles(merged);
+        saveActorFiles(merged);
+      }
+
+      const rCount = meta?.reportCount ?? data.reports?.length ?? 0;
+      const aCount = meta?.actorCount ?? data.actors?.length ?? 0;
+      setCsLoadMsg(`Loaded: ${rCount} reports · ${aCount} actor MITRE maps`);
+      await fetchCsStatus();
+    } catch (e: any) {
+      setCsLoadMsg(`Load error: ${e.message}`);
+    }
+  }
+
+  function fmtRelative(iso: string | null): string {
+    if (!iso) return "never";
+    const diff = Date.now() - new Date(iso).getTime();
+    const m = Math.floor(diff / 60000);
+    const h = Math.floor(diff / 3600000);
+    const d = Math.floor(diff / 86400000);
+    if (m < 1) return "just now";
+    if (m < 60) return `${m}m ago`;
+    if (h < 24) return `${h}h ago`;
+    return `${d}d ago`;
+  }
+
+  function fmtAbsolute(iso: string | null): string {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
   }
 
   // ── Generation ────────────────────────────────────────────────────
@@ -670,6 +815,166 @@ export default function DataSources() {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* ── CrowdStrike Intel API Connector ── */}
+      <div className="bg-card border border-card-border rounded-xl overflow-hidden">
+        {/* Header */}
+        <div className="p-5 border-b border-border flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-[#E1001A]/10 border border-[#E1001A]/30 flex items-center justify-center flex-shrink-0">
+              <Shield className="w-4.5 h-4.5 text-[#E1001A]" style={{ color: "#E1001A" }} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#E1001A" }}>CrowdStrike Intel API</span>
+                {csStatus === null ? (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />Connecting…</span>
+                ) : !csStatus.hasCredentials ? (
+                  <span className="flex items-center gap-1 text-xs text-yellow-400"><WifiOff className="w-3 h-3" />Not configured</span>
+                ) : csStatus.status === "running" ? (
+                  <span className="flex items-center gap-1 text-xs text-yellow-400"><Loader2 className="w-3 h-3 animate-spin" />Syncing…</span>
+                ) : csStatus.status === "done" ? (
+                  <span className="flex items-center gap-1 text-xs text-green-400"><CheckCircle2 className="w-3 h-3" />Synced</span>
+                ) : csStatus.status === "error" ? (
+                  <span className="flex items-center gap-1 text-xs text-red-400"><AlertCircle className="w-3 h-3" />Sync error</span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Never synced</span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Weekly auto-sync of intelligence reports &amp; actor MITRE ATT&amp;CK data via CrowdStrike Falcon API (US-2)
+              </p>
+            </div>
+          </div>
+          {/* Actions */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {csStatus?.hasCredentials && (
+              <>
+                <button
+                  onClick={handleCsConnect}
+                  disabled={csConnectResult === "testing"}
+                  title="Test OAuth connection"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs font-medium transition-colors whitespace-nowrap
+                    ${csConnectResult === "ok" ? "border-green-500/50 text-green-400 bg-green-500/10"
+                    : csConnectResult === "fail" ? "border-red-500/50 text-red-400 bg-red-500/10"
+                    : "border-border text-muted-foreground hover:text-foreground hover:border-primary/40"}`}
+                >
+                  {csConnectResult === "testing" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                  {csConnectResult === "testing" ? "Testing…" : csConnectResult === "ok" ? "Connected" : csConnectResult === "fail" ? "Failed" : "Test Connection"}
+                </button>
+                <button
+                  onClick={handleCsSync}
+                  disabled={csSyncing}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                >
+                  {csSyncing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                  {csSyncing ? "Syncing…" : "Sync Now"}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="p-5">
+          {/* Not configured */}
+          {csStatus !== null && !csStatus.hasCredentials && (
+            <div className="rounded-lg bg-yellow-500/5 border border-yellow-500/20 p-4 space-y-2">
+              <p className="text-sm font-semibold text-yellow-400 flex items-center gap-2"><AlertCircle className="w-4 h-4" />API credentials not configured</p>
+              <p className="text-xs text-muted-foreground">
+                Add your CrowdStrike Falcon API credentials as Replit Secrets to enable automatic weekly syncing.
+                Once set, syncs run automatically every 7 days — no manual action needed.
+              </p>
+              <div className="bg-muted/20 border border-border rounded-lg p-3 text-[10px] font-mono text-muted-foreground space-y-0.5">
+                <p><span className="text-primary">CS_CLIENT_ID</span>     — Falcon API client ID</p>
+                <p><span className="text-primary">CS_CLIENT_SECRET</span>  — Falcon API client secret</p>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Go to <strong className="text-foreground">Falcon Console → API Clients &amp; Keys</strong> to create a client with <em>Intel</em> read scope.
+                Then add both values in the Replit <strong className="text-foreground">Secrets</strong> tab and restart the API Server workflow.
+              </p>
+            </div>
+          )}
+
+          {/* Sync status dashboard */}
+          {csStatus?.hasCredentials && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-muted/20 border border-border rounded-lg p-3">
+                <div className="flex items-center gap-1.5 mb-1 text-muted-foreground"><Clock className="w-3 h-3" /><span className="text-[10px] uppercase tracking-wide font-semibold">Last Sync</span></div>
+                <p className="text-sm font-semibold text-foreground">{fmtRelative(csStatus.lastSync)}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{fmtAbsolute(csStatus.lastSync)}</p>
+              </div>
+              <div className="bg-muted/20 border border-border rounded-lg p-3">
+                <div className="flex items-center gap-1.5 mb-1 text-muted-foreground"><RefreshCw className="w-3 h-3" /><span className="text-[10px] uppercase tracking-wide font-semibold">Next Sync</span></div>
+                <p className="text-sm font-semibold text-foreground">{csStatus.nextSync ? fmtRelative(csStatus.nextSync) : "After first sync"}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{fmtAbsolute(csStatus.nextSync)}</p>
+              </div>
+              <div className="bg-muted/20 border border-border rounded-lg p-3">
+                <div className="flex items-center gap-1.5 mb-1 text-muted-foreground"><Layers className="w-3 h-3" /><span className="text-[10px] uppercase tracking-wide font-semibold">Reports</span></div>
+                <p className="text-2xl font-bold text-foreground">{csStatus.meta.reportCount.toLocaleString()}</p>
+              </div>
+              <div className="bg-muted/20 border border-border rounded-lg p-3">
+                <div className="flex items-center gap-1.5 mb-1 text-muted-foreground"><Shield className="w-3 h-3" /><span className="text-[10px] uppercase tracking-wide font-semibold">Actor Maps</span></div>
+                <p className="text-2xl font-bold text-foreground">{csStatus.meta.actorCount}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Connect error */}
+          {csConnectError && (
+            <div className="mt-3 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2">
+              <p className="text-xs text-red-400">{csConnectError}</p>
+            </div>
+          )}
+
+          {/* Sync error */}
+          {csStatus?.status === "error" && csStatus.error && (
+            <div className="mt-3 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 flex items-start gap-2">
+              <AlertCircle className="w-3.5 h-3.5 text-red-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-xs font-medium text-red-400">Last sync failed</p>
+                <p className="text-[10px] text-red-400/80 mt-0.5">{csStatus.error}</p>
+              </div>
+            </div>
+          )}
+
+          {/* In-progress indicator */}
+          {csSyncing && (
+            <div className="mt-3 rounded-lg bg-yellow-500/5 border border-yellow-500/20 px-4 py-3 flex items-center gap-3">
+              <Loader2 className="w-4 h-4 animate-spin text-yellow-400 flex-shrink-0" />
+              <div>
+                <p className="text-xs font-medium text-yellow-400">Sync in progress</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Fetching intelligence reports and actor MITRE ATT&amp;CK data from Falcon API…
+                  This can take a few minutes depending on the number of actors.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Load result button (done but not auto-loaded) */}
+          {csStatus?.status === "done" && !csSyncing && csStatus.meta.reportCount > 0 && (
+            <div className="mt-3 flex items-center gap-3">
+              <button
+                onClick={() => loadCsResult(csStatus?.meta)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/10 border border-green-500/30 text-green-400 rounded-lg text-xs font-medium hover:bg-green-500/20 transition-colors"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />Load sync result into dashboard
+              </button>
+              {csLoadMsg && <p className="text-xs text-muted-foreground">{csLoadMsg}</p>}
+            </div>
+          )}
+          {!csStatus?.hasCredentials && csStatus !== null && null}
+          {csLoadMsg && csStatus?.status !== "done" && (
+            <p className="mt-3 text-xs text-muted-foreground">{csLoadMsg}</p>
+          )}
+
+          {/* Schedule info */}
+          <p className="mt-4 text-[10px] text-muted-foreground">
+            Auto-sync runs every 7 days when credentials are configured. The API server checks on startup and every 6 hours.
+            Synced data is automatically merged into the Reports and Actor Mapping panels above.
+          </p>
         </div>
       </div>
 
