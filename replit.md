@@ -99,7 +99,7 @@ React + Vite SPA — Purple Team Adversary Prioritisation dashboard (dark navy/p
 - Actor Prioritisation — ranked threat actors by TTP risk score
 - Risk Calculation — 200 priority techniques with CIA, impact, likelihood, risk scores; overridable via Impact Table
 - **Impact Table** — all 656 ATT&CK techniques; editable CIA (Conf/Int/Avail) + 9 TTP extent factor scores; live formula recalculation; overrides saved to `pt_impact_overrides` localStorage; propagates to Risk Calculation; STIX bundle updates technique metadata (`pt_stix_techniques`)
-- High Value Assets — asset-technique risk matrix
+- **High Value Assets** — editable asset-TID risk matrix; add new assets/TID mappings; edit Risk/Likelihood/Impact per row; custom rows highlighted (NEW badge); baseline rows editable/resettable; HVSCORES recomputed live and stored to `pt_hva_scores` localStorage; propagates into Risk Calculation Impact Score and Likelihood Score
 - TID Priority — top-N technique frequency charts
 - Tactic Scores — per-tactic CIA baseline cards
 - Risk Rate — likelihood × impact matrix

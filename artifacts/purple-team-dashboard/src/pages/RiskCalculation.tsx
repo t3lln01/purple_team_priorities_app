@@ -14,6 +14,17 @@ function loadImpactTable(): Record<string, any> {
   return map;
 }
 
+/** Load per-TID HVA scores from the High Value Assets editable matrix */
+function loadHVAScores(): Record<string, { avgRisk: number; avgLikelihood: number }> {
+  try {
+    const arr: Array<{ tid: string; avgRisk: number; avgLikelihood: number }> =
+      JSON.parse(localStorage.getItem("pt_hva_scores") ?? "[]");
+    const map: Record<string, { avgRisk: number; avgLikelihood: number }> = {};
+    for (const s of arr) map[s.tid] = { avgRisk: s.avgRisk, avgLikelihood: s.avgLikelihood };
+    return map;
+  } catch { return {}; }
+}
+
 type RiskRow = {
   TID: string;
   "Technique Name": string;
@@ -46,41 +57,64 @@ const rawRiskCalc: RiskRow[] = (data as any).riskCalc;
 function applyImpactOverrides(rows: RiskRow[]): RiskRow[] {
   const overrides = loadImpactOverrides();
   const impactMap = loadImpactTable();
-  if (Object.keys(overrides).length === 0) return rows;
+  const hvaScores = loadHVAScores();
+  const hasOverrides = Object.keys(overrides).length > 0;
+  const hasHVA = Object.keys(hvaScores).length > 0;
+  if (!hasOverrides && !hasHVA) return rows;
+
   return rows.map(row => {
-    const ov = overrides[row.TID];
-    if (!ov) return row;
-    const base = impactMap[row.TID];
-    if (!base) return row;
-    const conf  = ov.confidentiality  ?? row.Confidentiality;
-    const int_  = ov.integrity        ?? row.Integrity;
-    const avail = ov.availability     ?? row.Availability;
-    const ttpRow = {
-      initialTTPExtent:    ov.initialTTPExtent    ?? base.initialTTPExtent,
-      adScore:             ov.adScore             ?? base.adScore,
-      containerScore:      ov.containerScore      ?? base.containerScore,
-      cloudScore:          ov.cloudScore          ?? base.cloudScore,
-      supportRemoteScore:  ov.supportRemoteScore  ?? base.supportRemoteScore,
-      systemReqScore:      ov.systemReqScore      ?? base.systemReqScore,
-      capecSeverityScore:  ov.capecSeverityScore  ?? base.capecSeverityScore,
-      permRequiredScore:   ov.permRequiredScore   ?? base.permRequiredScore,
-      effectivePermsScore: ov.effectivePermsScore ?? base.effectivePermsScore,
-    };
-    const newCIA = calcCIAScore(conf, int_, avail);
-    const newExt = calcTTPExtent(ttpRow);
-    const newImpact = calcImpactScore(newCIA, newExt, row["HIGH VALUE ASSSET RISK"] || "");
+    const ov      = overrides[row.TID];
+    const base    = impactMap[row.TID];
+    const hvaLive = hvaScores[row.TID];
+
+    // If no changes to this row at all, return as-is
+    if (!ov && !hvaLive) return row;
+
+    // CIA / TTP overrides (only if explicit override exists for this TID)
+    const conf  = ov?.confidentiality  ?? row.Confidentiality;
+    const int_  = ov?.integrity        ?? row.Integrity;
+    const avail = ov?.availability     ?? row.Availability;
+    const newCIA = (ov && base) ? calcCIAScore(conf, int_, avail) : row["CIA Score"];
+
+    const ttpRow = base ? {
+      initialTTPExtent:    ov?.initialTTPExtent    ?? base.initialTTPExtent,
+      adScore:             ov?.adScore             ?? base.adScore,
+      containerScore:      ov?.containerScore      ?? base.containerScore,
+      cloudScore:          ov?.cloudScore          ?? base.cloudScore,
+      supportRemoteScore:  ov?.supportRemoteScore  ?? base.supportRemoteScore,
+      systemReqScore:      ov?.systemReqScore      ?? base.systemReqScore,
+      capecSeverityScore:  ov?.capecSeverityScore  ?? base.capecSeverityScore,
+      permRequiredScore:   ov?.permRequiredScore   ?? base.permRequiredScore,
+      effectivePermsScore: ov?.effectivePermsScore ?? base.effectivePermsScore,
+    } : null;
+    const newExt = (ov && ttpRow) ? calcTTPExtent(ttpRow) : row["TTP Extent Score"];
+
+    // HVA Risk — use live avgRisk from the editable matrix if available
+    const hvaRisk = hvaLive ? hvaLive.avgRisk : (row["HIGH VALUE ASSSET RISK"] || 1);
+
+    const newImpact = calcImpactScore(newCIA, newExt, hvaRisk);
     const newRate   = calcImpactRate(newImpact);
+
+    // HVA Likelihood — use live avgLikelihood if available
+    const hvaLik = hvaLive ? hvaLive.avgLikelihood : 1;
+    const baseLikScore = row["Likelihood Score"] || 1;
+    // Re-scale: LikScore = TIDPriority × LastOcc × ConfScore × HVA_Lik
+    // We approximate by replacing HVA factor only: baseLikScore / old_hva_lik * new_hva_lik
+    // Since old hva lik was baked in, we keep baseLikScore if no HVA change
+    const newLikScore = hvaLive ? baseLikScore * hvaLik : baseLikScore;
+
     return {
       ...row,
-      Confidentiality:         conf,
-      "Confidentiality Score": newCIA > 0 ? (row["Confidentiality Score"] / (row["CIA Score"] || 1)) * newCIA : row["Confidentiality Score"],
-      Integrity:               int_,
-      Availability:            avail,
-      "CIA Score":             newCIA,
-      "TTP Extent Score":      newExt,
-      "Impact Score":          newImpact,
-      "Impact Rate":           newRate,
-      "Risk Scores":           newImpact * row["Likelihood Score"],
+      Confidentiality:    conf,
+      Integrity:          int_,
+      Availability:       avail,
+      "CIA Score":        newCIA,
+      "TTP Extent Score": newExt,
+      "HIGH VALUE ASSSET RISK": hvaRisk,
+      "Impact Score":     newImpact,
+      "Impact Rate":      newRate,
+      "Likelihood Score": newLikScore,
+      "Risk Scores":      newImpact * newLikScore,
     };
   });
 }
