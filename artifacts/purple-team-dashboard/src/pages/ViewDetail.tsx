@@ -222,15 +222,15 @@ export default function ViewDetail() {
               <thead>
                 <tr className="border-b border-border bg-muted/30">
                   <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">#</th>
-                  <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Actor</th>
-                  <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Score</th>
-                  <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Techs</th>
-                  <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Tactics</th>
-                  <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Reports</th>
+                  <SortableTh col="actor" sortKey={arSortKey} sortDir={arSortDir} toggle={toggleArSort}>Actor</SortableTh>
+                  <SortableTh col="score" sortKey={arSortKey} sortDir={arSortDir} toggle={toggleArSort}>Score</SortableTh>
+                  <SortableTh col="techniqueCount" sortKey={arSortKey} sortDir={arSortDir} toggle={toggleArSort}>Techs</SortableTh>
+                  <SortableTh col="tacticCount" sortKey={arSortKey} sortDir={arSortDir} toggle={toggleArSort}>Tactics</SortableTh>
+                  <SortableTh col="reportCount" sortKey={arSortKey} sortDir={arSortDir} toggle={toggleArSort}>Reports</SortableTh>
                 </tr>
               </thead>
               <tbody>
-                {actorRanking.map((a, i) => (
+                {sortedActorRanking.map((a, i) => (
                   <tr
                     key={a.actor}
                     className={`border-b border-border/50 hover:bg-accent/30 transition-colors cursor-pointer ${actorFilter === a.actor ? "bg-primary/10" : ""}`}
@@ -337,13 +337,13 @@ export default function ViewDetail() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Actor</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">MITRE ID</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Technique</th>
+                <SortableTh col="actor" sortKey={pSortKey} sortDir={pSortDir} toggle={togglePSort}>Actor</SortableTh>
+                <SortableTh col="mitreId" sortKey={pSortKey} sortDir={pSortDir} toggle={togglePSort}>MITRE ID</SortableTh>
+                <SortableTh col="techniqueName" sortKey={pSortKey} sortDir={pSortDir} toggle={togglePSort}>Technique</SortableTh>
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Observable / Procedure</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Date</th>
+                <SortableTh col="date" sortKey={pSortKey} sortDir={pSortDir} toggle={togglePSort}>Date</SortableTh>
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Report Ref</th>
-                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Risk</th>
+                <SortableTh col="risk" sortKey={pSortKey} sortDir={pSortDir} toggle={togglePSort}>Risk</SortableTh>
               </tr>
             </thead>
             <tbody>

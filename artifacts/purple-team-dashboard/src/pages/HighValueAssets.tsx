@@ -522,8 +522,8 @@ export default function HighValueAssets() {
                 <SortableTh col="target" sortKey={mainSk} sortDir={mainSd} toggle={mainToggle}>Target Asset</SortableTh>
                 <SortableTh col="tid" sortKey={mainSk} sortDir={mainSd} toggle={mainToggle}>TID</SortableTh>
                 <SortableTh col="tidName" sortKey={mainSk} sortDir={mainSd} toggle={mainToggle}>Technique</SortableTh>
-                <SortableTh col="riskScore" sortKey={mainSk} sortDir={mainSd} toggle={mainToggle} align="center" className="px-3">Risk</SortableTh>
-                <SortableTh col="likelihoodScore" sortKey={mainSk} sortDir={mainSd} toggle={mainToggle} align="center" className="px-3">Likelihood</SortableTh>
+                <th className="text-center px-3 py-2.5 text-xs text-muted-foreground font-medium">Risk</th>
+                <th className="text-center px-3 py-2.5 text-xs text-muted-foreground font-medium">Likelihood</th>
                 <SortableTh col="riskScore" sortKey={mainSk} sortDir={mainSd} toggle={mainToggle} align="center" className="px-3">Risk Score</SortableTh>
                 <SortableTh col="likelihoodScore" sortKey={mainSk} sortDir={mainSd} toggle={mainToggle} align="center" className="px-3">Lik. Score</SortableTh>
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Impact</th>
