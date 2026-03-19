@@ -26,10 +26,13 @@ const procedureActors: string[] = Array.from(
   new Set(allProcedures.map(r => r.actor).filter(Boolean))
 ).sort();
 
-// ttpRisk lookup by normalised actor name (for new custom actors)
-const ttpRiskLookup: Record<string, number> = Object.fromEntries(
-  actorRanking.map(a => [a.name.toUpperCase().trim(), a.riskSum])
-);
+// Build ttpRisk directly from ALL procedures (133 actors, not just the top ~19 in actorRanking)
+const baseTtpRiskMap: Record<string, number> = {};
+allProcedures.forEach(p => {
+  if (!p.actor) return;
+  const key = p.actor.toUpperCase().trim();
+  baseTtpRiskMap[key] = (baseTtpRiskMap[key] ?? 0) + (p.risk ?? 0);
+});
 
 // ──────────────────────────── persistence ────────────────────────────────────
 const LS_OV  = "pt_actor_overrides";
@@ -120,6 +123,21 @@ export default function ActorPrioritisation() {
   const [overrides, setOverrides]     = useState<Overrides>(loadOverrides);
   const [customActors, setCustomActors] = useState<CustomActor[]>(loadCustom);
 
+  // Include custom procedures (added in All Procedures page) in ttpRisk totals
+  const ttpRiskMap = useMemo(() => {
+    try {
+      const customProcs: Array<{ actor?: string; risk?: number }> =
+        JSON.parse(localStorage.getItem("pt_procedures_custom") ?? "[]");
+      const map = { ...baseTtpRiskMap };
+      customProcs.forEach(p => {
+        if (!p.actor) return;
+        const key = p.actor.toUpperCase().trim();
+        map[key] = (map[key] ?? 0) + (p.risk ?? 0);
+      });
+      return map;
+    } catch { return baseTtpRiskMap; }
+  }, []);
+
   const [editName, setEditName]       = useState<string | null>(null);
   const [editForm, setEditForm]       = useState<{ intent: number; capability: number }>({ intent: 4, capability: 4 });
 
@@ -148,7 +166,7 @@ export default function ActorPrioritisation() {
         name: c.name,
         intent: c.intent,
         capability: c.capability,
-        ttpRisk: ttpRiskLookup[c.name.toUpperCase().trim()] ?? 0,
+        ttpRisk: ttpRiskMap[c.name.toUpperCase().trim()] ?? 0,
         priority: 0,
         riskPct: 0,
         isCustom: true,

@@ -3,7 +3,9 @@ import { useSearch } from "wouter";
 import data from "@/data.json";
 import { useSortTable } from "@/hooks/useSortTable";
 import SortableTh from "@/components/SortableTh";
+import { Plus, Upload, Trash2, X, Check, FileJson, FileText, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 
+// ──────────────────────────── types ──────────────────────────────────────────
 type Procedure = {
   actor: string;
   mitreId: string;
@@ -11,37 +13,48 @@ type Procedure = {
   procedure: string;
   date: number | null;
   risk: number;
+  _id?: string;
+  _custom?: true;
 };
 
-const allProcedures: Procedure[] = (data as any).allProcedures;
+// ──────────────────────────── static data ────────────────────────────────────
+const baseProcedures: Procedure[] = (data as any).allProcedures;
 const techTacticMap: Record<string, string[]> = (data as any).techTacticMap ?? {};
 const techNameMap: Record<string, string> = (data as any).techNameMap ?? {};
 
-const procedureActors: string[] = Array.from(
-  new Set(allProcedures.map(r => r.actor).filter(Boolean))
+const baseProcedureActors: string[] = Array.from(
+  new Set(baseProcedures.map(r => r.actor).filter(Boolean))
 ).sort();
 
 const allMitreIds: string[] = Array.from(
-  new Set(allProcedures.map(r => r.mitreId).filter(Boolean))
+  new Set(baseProcedures.map(r => r.mitreId).filter(Boolean))
 ).sort();
 
 const allTactics: string[] = Array.from(
-  new Set(
-    allMitreIds.flatMap(id => techTacticMap[id] ?? [])
-  )
+  new Set(allMitreIds.flatMap(id => techTacticMap[id] ?? []))
 ).sort();
 
+// ──────────────────────────── persistence ────────────────────────────────────
+const LS_KEY = "pt_procedures_custom";
+
+function loadCustom(): Procedure[] {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "[]"); } catch { return []; }
+}
+function saveCustom(c: Procedure[]) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(c)); } catch {}
+}
+function uid() { return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`; }
+
+// ──────────────────────────── helpers ────────────────────────────────────────
 function matchActor(name: string): string {
   if (!name) return "";
   const lower = name.toLowerCase();
-  return procedureActors.find(a => a.toLowerCase() === lower) ?? "";
+  return baseProcedureActors.find(a => a.toLowerCase() === lower) ?? "";
 }
 
 function mitreIdsForTactic(tactic: string): Set<string> {
   if (!tactic) return new Set(allMitreIds);
-  return new Set(
-    allMitreIds.filter(id => (techTacticMap[id] ?? []).includes(tactic))
-  );
+  return new Set(allMitreIds.filter(id => (techTacticMap[id] ?? []).includes(tactic)));
 }
 
 const PAGE_SIZE = 30;
@@ -62,16 +75,89 @@ function parseExternalRef(ref: string): { label: string; url: string | null } {
 function riskColor(r: number) {
   if (r >= 1500) return "text-red-400 bg-red-400/10 border border-red-400/30";
   if (r >= 1000) return "text-orange-400 bg-orange-400/10 border border-orange-400/30";
-  if (r >= 500) return "text-yellow-400 bg-yellow-400/10 border border-yellow-400/30";
+  if (r >= 500)  return "text-yellow-400 bg-yellow-400/10 border border-yellow-400/30";
   return "text-green-400 bg-green-400/10 border border-green-400/30";
 }
 
-function ActorMultiSelect({
-  selected,
-  onChange,
-}: {
-  selected: Set<string>;
-  onChange: (next: Set<string>) => void;
+function parseDate(d: string): number | null {
+  if (!d) return null;
+  const n = Number(d);
+  if (!isNaN(n) && n > 1_000_000_000_000) return n;
+  const parsed = new Date(d).getTime();
+  return isNaN(parsed) ? null : parsed;
+}
+
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let i = 0;
+  while (i < line.length) {
+    if (line[i] === '"') {
+      i++;
+      let field = "";
+      while (i < line.length) {
+        if (line[i] === '"' && line[i + 1] === '"') { field += '"'; i += 2; }
+        else if (line[i] === '"') { i++; break; }
+        else field += line[i++];
+      }
+      if (line[i] === ",") i++;
+      result.push(field);
+    } else {
+      let field = "";
+      while (i < line.length && line[i] !== ",") field += line[i++];
+      if (line[i] === ",") i++;
+      result.push(field.trim());
+    }
+  }
+  return result;
+}
+
+function parseCSVImport(text: string): Procedure[] {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (lines.length < 2) throw new Error("CSV must have a header row + at least one data row.");
+  const raw = lines[0].split(",").map(h => h.trim().replace(/"/g, "").toLowerCase().replace(/[\s_-]+/g, ""));
+  const col = (names: string[]) => raw.findIndex(h => names.includes(h));
+  const actorCol    = col(["actor", "actorgroup", "group"]);
+  const mitreCol    = col(["mitreid", "technique", "techniqueid"]);
+  const procCol     = col(["procedure", "description", "detail"]);
+  const dateCol     = col(["date"]);
+  const refCol      = col(["externalref", "externalreference", "reference", "ref"]);
+  const riskCol     = col(["risk", "riskscore", "score"]);
+  if (actorCol < 0) throw new Error("CSV is missing an 'actor' column.");
+  if (mitreCol < 0) throw new Error("CSV is missing a 'mitreId' column.");
+
+  return lines.slice(1).map(line => {
+    const v = parseCSVLine(line);
+    return {
+      actor:       v[actorCol]  ?? "",
+      mitreId:     v[mitreCol]  ?? "",
+      procedure:   procCol >= 0 ? (v[procCol] ?? "") : "",
+      date:        dateCol >= 0 ? parseDate(v[dateCol] ?? "") : null,
+      externalRef: refCol  >= 0 ? (v[refCol]  ?? "") : "",
+      risk:        riskCol >= 0 ? (parseFloat(v[riskCol] ?? "") || 0) : 0,
+      _id: uid(),
+      _custom: true,
+    };
+  });
+}
+
+function parseJSONImport(text: string): Procedure[] {
+  const arr = JSON.parse(text);
+  if (!Array.isArray(arr)) throw new Error("JSON must be an array of procedure objects.");
+  return arr.map((r: any) => ({
+    actor:       String(r.actor ?? r.Actor ?? ""),
+    mitreId:     String(r.mitreId ?? r.mitre_id ?? r.technique ?? ""),
+    procedure:   String(r.procedure ?? r.description ?? r.detail ?? ""),
+    date:        r.date !== undefined ? parseDate(String(r.date)) : null,
+    externalRef: String(r.externalRef ?? r.external_ref ?? r.reference ?? ""),
+    risk:        parseFloat(r.risk ?? r.riskscore ?? r.score ?? "0") || 0,
+    _id: uid(),
+    _custom: true,
+  }));
+}
+
+// ──────────────────────────── sub-components ─────────────────────────────────
+function ActorMultiSelect({ selected, onChange, allActors }: {
+  selected: Set<string>; onChange: (next: Set<string>) => void; allActors: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [chipSearch, setChipSearch] = useState("");
@@ -86,44 +172,30 @@ function ActorMultiSelect({
   }, []);
 
   function toggle(actor: string) {
-    const next = new Set(selected);
-    next.has(actor) ? next.delete(actor) : next.add(actor);
-    onChange(next);
+    const next = new Set(selected); next.has(actor) ? next.delete(actor) : next.add(actor); onChange(next);
   }
 
-  const visible = chipSearch
-    ? procedureActors.filter(a => a.toLowerCase().includes(chipSearch.toLowerCase()))
-    : procedureActors;
-
-  const label =
-    selected.size === 0 ? "All actors" :
-    selected.size === 1 ? [...selected][0] :
-    `${selected.size} actors`;
+  const visible = chipSearch ? allActors.filter(a => a.toLowerCase().includes(chipSearch.toLowerCase())) : allActors;
+  const label = selected.size === 0 ? "All actors" : selected.size === 1 ? [...selected][0] : `${selected.size} actors`;
 
   return (
     <div className="flex flex-col gap-1 relative" ref={ref}>
       <label className="text-xs text-muted-foreground font-medium">Actor / Group</label>
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        className={`flex items-center justify-between gap-2 bg-input border rounded-lg px-2.5 py-1.5 text-xs text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${open ? "border-ring" : "border-border"} ${selected.size > 0 ? "text-primary" : "text-foreground"}`}
-      >
+      <button type="button" onClick={() => setOpen(v => !v)}
+        className={`flex items-center justify-between gap-2 bg-input border rounded-lg px-2.5 py-1.5 text-xs text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${open ? "border-ring" : "border-border"} ${selected.size > 0 ? "text-primary" : "text-foreground"}`}>
         <span className="truncate">{label}</span>
         <span className="text-muted-foreground flex-shrink-0">{open ? "▲" : "▼"}</span>
       </button>
-
       {selected.size > 0 && (
         <div className="flex flex-wrap gap-1 mt-0.5">
           {[...selected].map(a => (
             <span key={a} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary">
-              {a}
-              <button onClick={() => toggle(a)} className="hover:text-red-400 transition-colors leading-none" title="Remove">×</button>
+              {a}<button onClick={() => toggle(a)} className="hover:text-red-400 transition-colors leading-none" title="Remove">×</button>
             </span>
           ))}
           <button onClick={() => onChange(new Set())} className="text-[10px] text-muted-foreground hover:text-foreground underline transition-colors">Clear</button>
         </div>
       )}
-
       {open && (
         <div className="absolute top-full left-0 z-50 mt-1 w-64 bg-card border border-border rounded-xl shadow-xl overflow-hidden">
           <div className="p-2 border-b border-border">
@@ -138,9 +210,7 @@ function ActorMultiSelect({
               return (
                 <button key={actor} onClick={() => toggle(actor)}
                   className={`flex items-center gap-2 w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition-colors ${active ? "bg-primary/15 text-primary" : "text-foreground hover:bg-accent"}`}>
-                  <span className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center text-[9px] transition-colors ${active ? "bg-primary border-primary text-primary-foreground" : "border-border"}`}>
-                    {active ? "✓" : ""}
-                  </span>
+                  <span className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center text-[9px] transition-colors ${active ? "bg-primary border-primary text-primary-foreground" : "border-border"}`}>{active ? "✓" : ""}</span>
                   <span className="truncate">{actor}</span>
                 </button>
               );
@@ -148,9 +218,7 @@ function ActorMultiSelect({
           </div>
           {selected.size > 0 && (
             <div className="border-t border-border p-2">
-              <button onClick={() => onChange(new Set())} className="w-full text-xs text-muted-foreground hover:text-foreground text-center underline transition-colors">
-                Clear all ({selected.size})
-              </button>
+              <button onClick={() => onChange(new Set())} className="w-full text-xs text-muted-foreground hover:text-foreground text-center underline transition-colors">Clear all ({selected.size})</button>
             </div>
           )}
         </div>
@@ -159,12 +227,8 @@ function ActorMultiSelect({
   );
 }
 
-function MitreMultiSelect({
-  selected,
-  onChange,
-}: {
-  selected: Set<string>;
-  onChange: (next: Set<string>) => void;
+function MitreMultiSelect({ selected, onChange }: {
+  selected: Set<string>; onChange: (next: Set<string>) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [tacticFilter, setTacticFilter] = useState("");
@@ -180,122 +244,72 @@ function MitreMultiSelect({
   }, []);
 
   const tacticIds = useMemo(() => mitreIdsForTactic(tacticFilter), [tacticFilter]);
-
   const visible = useMemo(() => {
     let ids = [...tacticIds];
     if (idSearch) ids = ids.filter(id => id.toLowerCase().includes(idSearch.toLowerCase()));
     return ids;
   }, [tacticIds, idSearch]);
 
-  function toggle(id: string) {
-    const next = new Set(selected);
-    next.has(id) ? next.delete(id) : next.add(id);
-    onChange(next);
-  }
+  function toggle(id: string) { const next = new Set(selected); next.has(id) ? next.delete(id) : next.add(id); onChange(next); }
+  function selectAllVisible() { const next = new Set(selected); visible.forEach(id => next.add(id)); onChange(next); }
+  function clearVisible() { const next = new Set(selected); visible.forEach(id => next.delete(id)); onChange(next); }
 
-  function selectAllVisible() {
-    const next = new Set(selected);
-    visible.forEach(id => next.add(id));
-    onChange(next);
-  }
-
-  function clearVisible() {
-    const next = new Set(selected);
-    visible.forEach(id => next.delete(id));
-    onChange(next);
-  }
-
-  const label =
-    selected.size === 0 ? "All IDs" :
-    selected.size === 1 ? [...selected][0] :
-    `${selected.size} techniques`;
+  const label = selected.size === 0 ? "All IDs" : selected.size === 1 ? [...selected][0] : `${selected.size} techniques`;
 
   return (
     <div className="flex flex-col gap-1 relative" ref={ref}>
       <label className="text-xs text-muted-foreground font-medium">MITRE ID / Tactic</label>
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        className={`flex items-center justify-between gap-2 bg-input border rounded-lg px-2.5 py-1.5 text-xs text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${open ? "border-ring" : "border-border"} ${selected.size > 0 ? "text-primary" : "text-foreground"}`}
-      >
+      <button type="button" onClick={() => setOpen(v => !v)}
+        className={`flex items-center justify-between gap-2 bg-input border rounded-lg px-2.5 py-1.5 text-xs text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${open ? "border-ring" : "border-border"} ${selected.size > 0 ? "text-primary" : "text-foreground"}`}>
         <span className="truncate">{label}</span>
         <span className="text-muted-foreground flex-shrink-0">{open ? "▲" : "▼"}</span>
       </button>
-
       {selected.size > 0 && (
         <div className="flex flex-wrap gap-1 mt-0.5">
           {[...selected].slice(0, 8).map(id => (
             <span key={id} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary font-mono">
-              {id}
-              <button onClick={() => toggle(id)} className="hover:text-red-400 transition-colors leading-none" title="Remove">×</button>
+              {id}<button onClick={() => toggle(id)} className="hover:text-red-400 transition-colors leading-none" title="Remove">×</button>
             </span>
           ))}
-          {selected.size > 8 && (
-            <span className="text-[10px] text-muted-foreground">+{selected.size - 8} more</span>
-          )}
+          {selected.size > 8 && <span className="text-[10px] text-muted-foreground">+{selected.size - 8} more</span>}
           <button onClick={() => onChange(new Set())} className="text-[10px] text-muted-foreground hover:text-foreground underline transition-colors">Clear</button>
         </div>
       )}
-
       {open && (
         <div className="absolute top-full left-0 z-50 mt-1 w-72 bg-card border border-border rounded-xl shadow-xl overflow-hidden">
           <div className="p-2 border-b border-border space-y-2">
-            <select
-              value={tacticFilter}
-              onChange={e => setTacticFilter(e.target.value)}
-              className="w-full bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            >
+            <select value={tacticFilter} onChange={e => setTacticFilter(e.target.value)}
+              className="w-full bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
               <option value="">All tactics ({allMitreIds.length} IDs)</option>
-              {allTactics.map(t => (
-                <option key={t} value={t}>{t} ({[...mitreIdsForTactic(t)].length} IDs)</option>
-              ))}
+              {allTactics.map(t => <option key={t} value={t}>{t} ({[...mitreIdsForTactic(t)].length} IDs)</option>)}
             </select>
-            <input
-              type="search"
-              autoFocus
-              placeholder="Search technique ID…"
-              value={idSearch}
-              onChange={e => setIdSearch(e.target.value)}
-              className="w-full bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            />
+            <input type="search" autoFocus placeholder="Search technique ID…" value={idSearch} onChange={e => setIdSearch(e.target.value)}
+              className="w-full bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
             <div className="flex gap-2">
-              <button onClick={selectAllVisible} className="flex-1 text-[10px] text-muted-foreground hover:text-foreground border border-border rounded px-1.5 py-0.5 hover:bg-accent transition-colors">
-                Select all ({visible.length})
-              </button>
-              <button onClick={clearVisible} className="flex-1 text-[10px] text-muted-foreground hover:text-foreground border border-border rounded px-1.5 py-0.5 hover:bg-accent transition-colors">
-                Clear visible
-              </button>
+              <button onClick={selectAllVisible} className="flex-1 text-[10px] text-muted-foreground hover:text-foreground border border-border rounded px-1.5 py-0.5 hover:bg-accent transition-colors">Select all ({visible.length})</button>
+              <button onClick={clearVisible} className="flex-1 text-[10px] text-muted-foreground hover:text-foreground border border-border rounded px-1.5 py-0.5 hover:bg-accent transition-colors">Clear visible</button>
             </div>
           </div>
-
           <div className="max-h-56 overflow-y-auto p-2 flex flex-col gap-0.5">
             {visible.length === 0 ? (
               <span className="text-xs text-muted-foreground px-2 py-1">No techniques found.</span>
             ) : visible.map(id => {
               const active = selected.has(id);
-              const tactics = techTacticMap[id] ?? [];
               return (
                 <button key={id} onClick={() => toggle(id)}
                   className={`flex items-start gap-2 w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition-colors ${active ? "bg-primary/15 text-primary" : "text-foreground hover:bg-accent"}`}>
-                  <span className={`mt-0.5 w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center text-[9px] transition-colors ${active ? "bg-primary border-primary text-primary-foreground" : "border-border"}`}>
-                    {active ? "✓" : ""}
-                  </span>
+                  <span className={`mt-0.5 w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center text-[9px] transition-colors ${active ? "bg-primary border-primary text-primary-foreground" : "border-border"}`}>{active ? "✓" : ""}</span>
                   <span className="flex flex-col min-w-0">
                     <span className="font-mono font-semibold">{id}</span>
-                    {tactics.length > 0 && (
-                      <span className="text-[10px] text-muted-foreground truncate">{tactics.join(", ")}</span>
-                    )}
+                    {(techTacticMap[id] ?? []).length > 0 && <span className="text-[10px] text-muted-foreground truncate">{(techTacticMap[id] ?? []).join(", ")}</span>}
                   </span>
                 </button>
               );
             })}
           </div>
-
           {selected.size > 0 && (
             <div className="border-t border-border p-2">
-              <button onClick={() => onChange(new Set())} className="w-full text-xs text-muted-foreground hover:text-foreground text-center underline transition-colors">
-                Clear all ({selected.size})
-              </button>
+              <button onClick={() => onChange(new Set())} className="w-full text-xs text-muted-foreground hover:text-foreground text-center underline transition-colors">Clear all ({selected.size})</button>
             </div>
           )}
         </div>
@@ -304,8 +318,263 @@ function MitreMultiSelect({
   );
 }
 
+// ──────────────────────────── import modal ───────────────────────────────────
+function ImportModal({ onImport, onClose }: {
+  onImport: (rows: Procedure[]) => void;
+  onClose: () => void;
+}) {
+  const [tab, setTab] = useState<"csv" | "json">("csv");
+  const [text, setText] = useState("");
+  const [preview, setPreview] = useState<Procedure[] | null>(null);
+  const [error, setError] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function parse(raw: string, fmt: "csv" | "json"): Procedure[] {
+    return fmt === "csv" ? parseCSVImport(raw) : parseJSONImport(raw);
+  }
+
+  function handleText(v: string) {
+    setText(v);
+    setPreview(null);
+    setError("");
+  }
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const raw = ev.target?.result as string;
+      const detectedTab = f.name.endsWith(".json") ? "json" : "csv";
+      setTab(detectedTab);
+      setText(raw);
+      setPreview(null);
+      setError("");
+    };
+    reader.readAsText(f);
+  }
+
+  function handlePreview() {
+    try {
+      const rows = parse(text, tab);
+      if (!rows.length) { setError("No valid rows found."); return; }
+      setPreview(rows);
+      setError("");
+    } catch (e: any) { setError(e.message ?? "Parse error"); setPreview(null); }
+  }
+
+  function handleImport() {
+    try {
+      const rows = preview ?? parse(text, tab);
+      onImport(rows);
+    } catch (e: any) { setError(e.message ?? "Import failed"); }
+  }
+
+  const csvTemplate = `actor,mitreId,procedure,date,externalRef,risk\nFamous Chollima,T1190,Exploited public-facing application,2025-01-15,Reference - https://example.com,1500`;
+  const jsonTemplate = `[\n  {\n    "actor": "Famous Chollima",\n    "mitreId": "T1190",\n    "procedure": "Exploited public-facing application",\n    "date": "2025-01-15",\n    "externalRef": "Reference - https://example.com",\n    "risk": 1500\n  }\n]`;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden flex flex-col max-h-[90vh]">
+        {/* header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
+          <div>
+            <h3 className="font-semibold text-foreground">Import Procedures</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Upload a CSV or JSON file, or paste content directly</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+        </div>
+
+        {/* tabs */}
+        <div className="flex gap-1 px-5 pt-4 flex-shrink-0">
+          {(["csv", "json"] as const).map(t => (
+            <button key={t} onClick={() => { setTab(t); setPreview(null); setError(""); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${tab === t ? "bg-primary/15 text-primary border-primary/40" : "border-border text-muted-foreground hover:bg-accent"}`}>
+              {t === "csv" ? <FileText className="w-3.5 h-3.5" /> : <FileJson className="w-3.5 h-3.5" />}
+              {t.toUpperCase()}
+            </button>
+          ))}
+          <div className="flex-1" />
+          <button onClick={() => fileRef.current?.click()}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border border-dashed border-border text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors">
+            <Upload className="w-3.5 h-3.5" /> Choose file
+          </button>
+          <input ref={fileRef} type="file" accept=".csv,.json,.txt" className="hidden" onChange={handleFile} />
+        </div>
+
+        {/* editor */}
+        <div className="px-5 pt-3 flex-1 overflow-hidden flex flex-col min-h-0">
+          <div className="text-[10px] text-muted-foreground mb-1 flex items-center justify-between">
+            <span>Paste {tab.toUpperCase()} content below — required columns: <span className="font-mono text-foreground">actor, mitreId</span></span>
+            <button onClick={() => { setText(tab === "csv" ? csvTemplate : jsonTemplate); setPreview(null); setError(""); }}
+              className="text-primary hover:underline">Use template</button>
+          </div>
+          <textarea
+            value={text}
+            onChange={e => handleText(e.target.value)}
+            placeholder={tab === "csv" ? csvTemplate : jsonTemplate}
+            spellCheck={false}
+            className="flex-1 min-h-[180px] max-h-[260px] w-full bg-input border border-border rounded-lg px-3 py-2 text-xs font-mono text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+          />
+        </div>
+
+        {/* error */}
+        {error && (
+          <div className="mx-5 mt-3 flex items-center gap-2 text-xs text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />{error}
+          </div>
+        )}
+
+        {/* preview */}
+        {preview && (
+          <div className="mx-5 mt-3 rounded-lg border border-border overflow-hidden flex-shrink-0">
+            <div className="px-3 py-2 bg-muted/30 border-b border-border text-xs font-medium text-foreground">
+              Preview — {preview.length} row{preview.length !== 1 ? "s" : ""} parsed
+            </div>
+            <div className="overflow-x-auto max-h-40">
+              <table className="w-full text-xs">
+                <thead><tr className="border-b border-border">
+                  {["Actor", "MITRE ID", "Procedure", "Date", "Risk"].map(h => (
+                    <th key={h} className="px-3 py-1.5 text-left text-muted-foreground font-medium">{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {preview.slice(0, 5).map((r, i) => (
+                    <tr key={i} className="border-b border-border/40 hover:bg-accent/20">
+                      <td className="px-3 py-1.5 font-medium max-w-[100px] truncate">{r.actor || "—"}</td>
+                      <td className="px-3 py-1.5 font-mono text-primary">{r.mitreId || "—"}</td>
+                      <td className="px-3 py-1.5 max-w-[200px] truncate text-muted-foreground">{r.procedure || "—"}</td>
+                      <td className="px-3 py-1.5 text-muted-foreground whitespace-nowrap">{formatDate(r.date)}</td>
+                      <td className="px-3 py-1.5 text-muted-foreground">{r.risk || 0}</td>
+                    </tr>
+                  ))}
+                  {preview.length > 5 && (
+                    <tr><td colSpan={5} className="px-3 py-1.5 text-muted-foreground/60 italic">… and {preview.length - 5} more rows</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* footer */}
+        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border flex-shrink-0 mt-3">
+          <button onClick={onClose} className="px-3 py-1.5 text-xs rounded-lg border border-border text-muted-foreground hover:bg-accent transition-colors">Cancel</button>
+          {!preview ? (
+            <button onClick={handlePreview} disabled={!text.trim()}
+              className="px-3 py-1.5 text-xs rounded-lg bg-primary/15 text-primary border border-primary/40 hover:bg-primary/25 transition-colors disabled:opacity-40 font-medium">
+              Preview
+            </button>
+          ) : (
+            <button onClick={handleImport}
+              className="px-4 py-1.5 text-xs rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium">
+              Import {preview.length} row{preview.length !== 1 ? "s" : ""}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────── add procedure form ─────────────────────────────
+const BLANK_FORM = { actor: "", mitreId: "", procedure: "", date: "", externalRef: "", risk: "" };
+
+function AddForm({ allActors, onSave, onCancel }: {
+  allActors: string[];
+  onSave: (p: Procedure) => void;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState(BLANK_FORM);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  function validate() {
+    const errs: Record<string, string> = {};
+    if (!form.actor.trim())   errs.actor   = "Required";
+    if (!form.mitreId.trim()) errs.mitreId = "Required";
+    return errs;
+  }
+
+  function handleSave() {
+    const errs = validate();
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+    onSave({
+      actor:       form.actor.trim(),
+      mitreId:     form.mitreId.trim().toUpperCase(),
+      procedure:   form.procedure.trim(),
+      date:        form.date ? parseDate(form.date) : null,
+      externalRef: form.externalRef.trim(),
+      risk:        parseFloat(form.risk) || 0,
+      _id: uid(),
+      _custom: true,
+    });
+  }
+
+  const f = (field: keyof typeof form) => ({
+    value: form[field],
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+      setForm(prev => ({ ...prev, [field]: e.target.value }));
+      if (errors[field]) setErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
+    },
+  });
+
+  const inputCls = (err?: string) =>
+    `bg-input border rounded-lg px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring w-full ${err ? "border-red-500" : "border-border"}`;
+
+  return (
+    <tr className="border-b border-border/50 bg-primary/5">
+      <td className="px-4 py-3 text-muted-foreground font-mono text-xs">+</td>
+      <td className="px-2 py-3">
+        <div>
+          <input list="actor-list" placeholder="Actor name" {...f("actor")} className={inputCls(errors.actor)} />
+          <datalist id="actor-list">{allActors.map(a => <option key={a} value={a} />)}</datalist>
+          {errors.actor && <p className="text-[10px] text-red-400 mt-0.5">{errors.actor}</p>}
+        </div>
+      </td>
+      <td className="px-2 py-3">
+        <div>
+          <input list="mitre-list" placeholder="T1190" {...f("mitreId")} className={inputCls(errors.mitreId)} />
+          <datalist id="mitre-list">{allMitreIds.map(id => <option key={id} value={id} />)}</datalist>
+          {errors.mitreId && <p className="text-[10px] text-red-400 mt-0.5">{errors.mitreId}</p>}
+        </div>
+      </td>
+      <td className="px-2 py-3" colSpan={1}>
+        <textarea placeholder="Procedure description…" {...f("procedure")} rows={2}
+          className="bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring w-full resize-none" />
+      </td>
+      <td className="px-2 py-3">
+        <input type="date" {...f("date")} className={`${inputCls()} [color-scheme:dark]`} />
+      </td>
+      <td className="px-2 py-3">
+        <input placeholder="Title - https://..." {...f("externalRef")} className={inputCls()} />
+      </td>
+      <td className="px-2 py-3">
+        <input type="number" placeholder="0" {...f("risk")} className={inputCls()} />
+      </td>
+      <td className="px-3 py-3">
+        <div className="flex items-center justify-end gap-1">
+          <button onClick={handleSave} className="p-1 rounded text-green-400 hover:bg-green-400/10 transition-colors" title="Save"><Check className="w-3.5 h-3.5" /></button>
+          <button onClick={onCancel} className="p-1 rounded text-muted-foreground hover:bg-accent transition-colors" title="Cancel"><X className="w-3.5 h-3.5" /></button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+// ──────────────────────────── main component ─────────────────────────────────
 export default function AllProcedures() {
   const search = useSearch();
+
+  const [customProcs, setCustomProcs] = useState<Procedure[]>(loadCustom);
+
+  const allProcedures = useMemo(
+    () => [...baseProcedures, ...customProcs],
+    [customProcs]
+  );
+
+  const allActors = useMemo(() => Array.from(
+    new Set(allProcedures.map(r => r.actor).filter(Boolean))
+  ).sort(), [allProcedures]);
 
   const [selectedActors, setSelectedActors] = useState<Set<string>>(() => {
     const params = new URLSearchParams(search);
@@ -329,28 +598,54 @@ export default function AllProcedures() {
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
 
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [showCustomOnly, setShowCustomOnly] = useState(false);
+
   useEffect(() => {
     const params = new URLSearchParams(search);
     const actor = matchActor(params.get("actor") ?? "");
     setSelectedActors(actor ? new Set([actor]) : new Set());
     const mitre = params.get("mitre") ?? "";
     const tactic = params.get("tactic") ?? "";
-    if (mitre && allMitreIds.includes(mitre)) {
-      setSelectedMitreIds(new Set([mitre]));
-    } else if (tactic) {
-      setSelectedMitreIds(mitreIdsForTactic(tactic));
-    } else {
-      setSelectedMitreIds(new Set());
-    }
+    if (mitre && allMitreIds.includes(mitre)) setSelectedMitreIds(new Set([mitre]));
+    else if (tactic) setSelectedMitreIds(mitreIdsForTactic(tactic));
+    else setSelectedMitreIds(new Set());
     setPage(1);
   }, [search]);
+
+  function addCustom(p: Procedure) {
+    const next = [...customProcs, p];
+    setCustomProcs(next);
+    saveCustom(next);
+    setShowAddForm(false);
+  }
+
+  function importRows(rows: Procedure[]) {
+    const next = [...customProcs, ...rows];
+    setCustomProcs(next);
+    saveCustom(next);
+    setShowImport(false);
+  }
+
+  function deleteCustom(id: string) {
+    const next = customProcs.filter(p => p._id !== id);
+    setCustomProcs(next);
+    saveCustom(next);
+  }
+
+  function clearAllCustom() {
+    setCustomProcs([]);
+    saveCustom([]);
+  }
 
   const filtered = useMemo(() => {
     const lo = minRisk !== "" ? Number(minRisk) : -Infinity;
     const hi = maxRisk !== "" ? Number(maxRisk) : Infinity;
     const fromMs = dateFrom ? new Date(dateFrom).getTime() : -Infinity;
-    const toMs = dateTo ? new Date(dateTo).getTime() + 86400000 - 1 : Infinity;
+    const toMs   = dateTo   ? new Date(dateTo).getTime() + 86400000 - 1 : Infinity;
     return allProcedures.filter(row => {
+      if (showCustomOnly && !row._custom) return false;
       if (selectedActors.size > 0 && !selectedActors.has(row.actor)) return false;
       if (selectedMitreIds.size > 0 && !selectedMitreIds.has(row.mitreId)) return false;
       if (procedureSearch && !row.procedure.toLowerCase().includes(procedureSearch.toLowerCase())) return false;
@@ -358,72 +653,98 @@ export default function AllProcedures() {
       if (row.date !== null && (row.date < fromMs || row.date > toMs)) return false;
       return true;
     });
-  }, [selectedActors, selectedMitreIds, procedureSearch, minRisk, maxRisk, dateFrom, dateTo]);
+  }, [allProcedures, showCustomOnly, selectedActors, selectedMitreIds, procedureSearch, minRisk, maxRisk, dateFrom, dateTo]);
 
   const { sortKey, sortDir, toggle, sorted: sortedFiltered } = useSortTable(filtered);
 
   const totalPages = Math.max(1, Math.ceil(sortedFiltered.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const pageRows = sortedFiltered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const safePage   = Math.min(page, totalPages);
+  const pageRows   = sortedFiltered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   function handleFilterChange(fn: () => void) { fn(); setPage(1); }
-
   function clearAll() {
-    setSelectedActors(new Set());
-    setSelectedMitreIds(new Set());
-    setProcedureSearch("");
-    setMinRisk("");
-    setMaxRisk("");
-    setDateFrom("");
-    setDateTo("");
-    setPage(1);
+    setSelectedActors(new Set()); setSelectedMitreIds(new Set());
+    setProcedureSearch(""); setMinRisk(""); setMaxRisk("");
+    setDateFrom(""); setDateTo(""); setShowCustomOnly(false); setPage(1);
   }
 
-  const hasFilters = selectedActors.size > 0 || selectedMitreIds.size > 0 || procedureSearch || minRisk || maxRisk || dateFrom || dateTo;
+  const hasFilters = selectedActors.size > 0 || selectedMitreIds.size > 0 || procedureSearch || minRisk || maxRisk || dateFrom || dateTo || showCustomOnly;
 
   return (
     <div className="p-6 space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">All Procedures</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Full procedure list from MITRE ATT&amp;CK — {allProcedures.length.toLocaleString()} entries
-        </p>
+      {showImport && <ImportModal onImport={importRows} onClose={() => setShowImport(false)} />}
+
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">All Procedures</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Full procedure list from MITRE ATT&amp;CK —{" "}
+            <span className="text-foreground font-medium">{baseProcedures.length.toLocaleString()}</span> base
+            {customProcs.length > 0 && (
+              <span className="text-chart-2"> + {customProcs.length.toLocaleString()} custom</span>
+            )}
+            {" "}= <span className="text-foreground font-medium">{allProcedures.length.toLocaleString()}</span> entries
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={() => { setShowAddForm(v => !v); setShowImport(false); }}
+            className={`flex items-center gap-1.5 text-xs font-medium border rounded-lg px-3 py-1.5 transition-colors ${showAddForm ? "bg-primary text-primary-foreground border-primary" : "text-primary border-primary/40 bg-primary/10 hover:bg-primary/20"}`}
+          >
+            {showAddForm ? <ChevronUp className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+            Add Procedure
+          </button>
+          <button
+            onClick={() => setShowImport(true)}
+            className="flex items-center gap-1.5 text-xs font-medium border border-border text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg px-3 py-1.5 transition-colors"
+          >
+            <Upload className="w-3.5 h-3.5" /> Import CSV / JSON
+          </button>
+          {customProcs.length > 0 && (
+            <button onClick={clearAllCustom}
+              className="flex items-center gap-1.5 text-xs text-red-400/70 hover:text-red-400 border border-red-400/20 hover:border-red-400/40 rounded-lg px-2.5 py-1.5 transition-colors">
+              <Trash2 className="w-3.5 h-3.5" /> Clear custom ({customProcs.length})
+            </button>
+          )}
+        </div>
       </div>
 
+      {/* filters */}
       <div className="bg-card border border-card-border rounded-xl p-4 space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Filters</span>
-          {hasFilters && (
-            <button onClick={clearAll} className="text-xs text-muted-foreground hover:text-foreground underline transition-colors">Clear all</button>
-          )}
+          <div className="flex items-center gap-3">
+            {customProcs.length > 0 && (
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                <input type="checkbox" checked={showCustomOnly} onChange={e => { setShowCustomOnly(e.target.checked); setPage(1); }}
+                  className="w-3 h-3 rounded border-border accent-primary" />
+                Custom only
+              </label>
+            )}
+            {hasFilters && <button onClick={clearAll} className="text-xs text-muted-foreground hover:text-foreground underline transition-colors">Clear all</button>}
+          </div>
         </div>
-
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-start">
-          <ActorMultiSelect selected={selectedActors} onChange={next => { setSelectedActors(next); setPage(1); }} />
-
+          <ActorMultiSelect selected={selectedActors} onChange={next => { setSelectedActors(next); setPage(1); }} allActors={allActors} />
           <MitreMultiSelect selected={selectedMitreIds} onChange={next => { setSelectedMitreIds(next); setPage(1); }} />
-
           <div className="flex flex-col gap-1">
             <label className="text-xs text-muted-foreground font-medium">Procedure Search</label>
             <input type="search" placeholder="Search text…" value={procedureSearch}
               onChange={e => handleFilterChange(() => setProcedureSearch(e.target.value))}
               className="bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
           </div>
-
           <div className="flex flex-col gap-1">
             <label className="text-xs text-muted-foreground font-medium">Risk Min</label>
             <input type="number" placeholder="e.g. 500" value={minRisk}
               onChange={e => handleFilterChange(() => setMinRisk(e.target.value))}
               className="bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
           </div>
-
           <div className="flex flex-col gap-1">
             <label className="text-xs text-muted-foreground font-medium">Risk Max</label>
             <input type="number" placeholder="e.g. 1800" value={maxRisk}
               onChange={e => handleFilterChange(() => setMaxRisk(e.target.value))}
               className="bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
           </div>
-
           <div className="flex flex-col gap-2">
             <div className="flex flex-col gap-1">
               <label className="text-xs text-muted-foreground font-medium">Date From</label>
@@ -437,7 +758,6 @@ export default function AllProcedures() {
             </div>
           </div>
         </div>
-
         <div className="flex items-center gap-2 pt-1">
           <span className="text-xs text-muted-foreground">
             Showing <span className="text-foreground font-semibold">{filtered.length.toLocaleString()}</span> of {allProcedures.length.toLocaleString()} procedures
@@ -445,79 +765,93 @@ export default function AllProcedures() {
         </div>
       </div>
 
+      {/* table */}
       <div className="bg-card border border-card-border rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                <SortableTh col="actor" sortKey={sortKey} sortDir={sortDir} toggle={toggle}>Actor / Group</SortableTh>
+                <SortableTh col="actor"   sortKey={sortKey} sortDir={sortDir} toggle={toggle}>Actor / Group</SortableTh>
                 <SortableTh col="mitreId" sortKey={sortKey} sortDir={sortDir} toggle={toggle}>MITRE ID</SortableTh>
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">Technique Name</th>
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">Procedure</th>
                 <SortableTh col="date" sortKey={sortKey} sortDir={sortDir} toggle={toggle}>Date</SortableTh>
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">External Reference</th>
                 <SortableTh col="risk" sortKey={sortKey} sortDir={sortDir} toggle={toggle} align="left">Risk Score</SortableTh>
+                <th className="w-10 px-3 py-2.5" />
               </tr>
             </thead>
             <tbody>
-              {pageRows.length === 0 ? (
+              {/* inline add form */}
+              {showAddForm && (
+                <AddForm
+                  allActors={allActors}
+                  onSave={addCustom}
+                  onCancel={() => setShowAddForm(false)}
+                />
+              )}
+
+              {pageRows.length === 0 && !showAddForm ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                  <td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground">
                     No procedures match the current filters.
                   </td>
                 </tr>
-              ) : (
-                pageRows.map((row, i) => (
-                  <tr key={i} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
-                    <td className="px-4 py-2.5 text-xs font-medium text-foreground whitespace-nowrap max-w-[160px] truncate" title={row.actor}>
+              ) : pageRows.map((row, i) => (
+                <tr key={row._id ?? i}
+                  className={`border-b border-border/50 transition-colors ${row._custom ? "bg-chart-2/5 hover:bg-chart-2/10" : "hover:bg-accent/30"}`}>
+                  <td className="px-4 py-2.5 text-xs font-medium text-foreground whitespace-nowrap max-w-[160px] truncate" title={row.actor}>
+                    <div className="flex items-center gap-1.5">
                       {row.actor}
-                    </td>
-                    <td className="px-4 py-2.5 whitespace-nowrap">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-xs font-mono bg-primary/10 text-primary px-2 py-0.5 rounded border border-primary/20 w-fit">
-                          {row.mitreId}
-                        </span>
-                        {(techTacticMap[row.mitreId] ?? []).length > 0 && (
-                          <span className="text-[10px] text-muted-foreground leading-tight">
-                            {(techTacticMap[row.mitreId] ?? []).join(", ")}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-foreground whitespace-nowrap max-w-[200px]">
-                      <span className="truncate block" title={techNameMap[row.mitreId] ?? ""}>
-                        {techNameMap[row.mitreId] ?? "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-[420px]">
-                      <p className="line-clamp-2" title={row.procedure}>{row.procedure}</p>
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
-                      {formatDate(row.date)}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs max-w-[260px]">
-                      {(() => {
-                        const { label, url } = parseExternalRef(row.externalRef);
-                        return (
-                          <div className="space-y-0.5">
-                            <p className="text-muted-foreground line-clamp-2" title={label}>{label || "—"}</p>
-                            {url && (
-                              <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate block max-w-full text-[10px]" title={url}>
-                                ↗ {url.replace(/^https?:\/\//, "").substring(0, 45)}{url.length > 53 ? "…" : ""}
-                              </a>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${riskColor(row.risk)}`}>
-                        {row.risk.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
+                      {row._custom && <span className="text-[9px] px-1 py-0.5 rounded bg-chart-2/20 text-chart-2 border border-chart-2/30 font-medium flex-shrink-0">custom</span>}
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5 whitespace-nowrap">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs font-mono bg-primary/10 text-primary px-2 py-0.5 rounded border border-primary/20 w-fit">{row.mitreId}</span>
+                      {(techTacticMap[row.mitreId] ?? []).length > 0 && (
+                        <span className="text-[10px] text-muted-foreground leading-tight">{(techTacticMap[row.mitreId] ?? []).join(", ")}</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-foreground whitespace-nowrap max-w-[200px]">
+                    <span className="truncate block" title={techNameMap[row.mitreId] ?? ""}>{techNameMap[row.mitreId] ?? "—"}</span>
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-[420px]">
+                    <p className="line-clamp-2" title={row.procedure}>{row.procedure}</p>
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{formatDate(row.date)}</td>
+                  <td className="px-4 py-2.5 text-xs max-w-[260px]">
+                    {(() => {
+                      const { label, url } = parseExternalRef(row.externalRef);
+                      return (
+                        <div className="space-y-0.5">
+                          <p className="text-muted-foreground line-clamp-2" title={label}>{label || "—"}</p>
+                          {url && (
+                            <a href={url} target="_blank" rel="noopener noreferrer"
+                              className="text-primary hover:underline truncate block max-w-full text-[10px]" title={url}>
+                              ↗ {url.replace(/^https?:\/\//, "").substring(0, 45)}{url.length > 53 ? "…" : ""}
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${riskColor(row.risk)}`}>
+                      {row.risk.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {row._custom && (
+                      <button onClick={() => deleteCustom(row._id!)}
+                        className="p-1 rounded text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-colors" title="Delete this procedure">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
