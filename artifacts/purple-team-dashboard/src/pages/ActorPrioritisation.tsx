@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import data from "@/data.json";
 import { useSortTable } from "@/hooks/useSortTable";
 import SortableTh from "@/components/SortableTh";
+import { Pencil, Check, X, RotateCcw } from "lucide-react";
 
 type Actor = {
   name: string;
@@ -20,13 +21,25 @@ type ActorRanking = {
 
 type Procedure = { actor: string; [key: string]: any };
 
-const actors: Actor[] = (data as any).actors;
+const baseActors: Actor[] = (data as any).actors;
 const actorRanking: ActorRanking[] = (data as any).actorRanking;
 const allProcedures: Procedure[] = (data as any).allProcedures;
 
 const procedureActors: string[] = Array.from(
   new Set(allProcedures.map(r => r.actor).filter(Boolean))
 ).sort();
+
+const LS_KEY = "pt_actor_overrides";
+
+type Overrides = Record<string, { intent?: number; capability?: number }>;
+
+function loadOverrides(): Overrides {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "{}"); }
+  catch { return {}; }
+}
+function saveOverrides(ov: Overrides) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(ov)); } catch {}
+}
 
 function riskColor(pct: number) {
   if (pct >= 0.8) return "text-red-400 bg-red-400/10 border border-red-400/30";
@@ -56,6 +69,28 @@ function BarChart({ value, max }: { value: number; max: number }) {
   );
 }
 
+function ScoreSelect({
+  value,
+  onChange,
+  color = "text-chart-2",
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  color?: string;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(Number(e.target.value))}
+      className={`bg-input border border-ring rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-ring w-16 ${color}`}
+    >
+      {[1, 2, 3, 4, 5, 6, 7].map(n => (
+        <option key={n} value={n}>{n}</option>
+      ))}
+    </select>
+  );
+}
+
 const RISK_LEVELS = ["All", "Critical", "High", "Medium", "Low"] as const;
 type RiskLevel = typeof RISK_LEVELS[number];
 
@@ -65,7 +100,49 @@ export default function ActorPrioritisation() {
   const [selectedActors, setSelectedActors] = useState<Set<string>>(new Set());
   const [chipSearch, setChipSearch] = useState("");
 
+  const [overrides, setOverrides] = useState<Overrides>(loadOverrides);
+  const [editName, setEditName] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<{ intent: number; capability: number }>({ intent: 1, capability: 1 });
+
   const maxRisk = Math.max(...actorRanking.map(a => a.riskSum));
+
+  const actors: Actor[] = useMemo(() => {
+    const merged = baseActors.map(a => {
+      const ov = overrides[a.name] ?? {};
+      const intent = ov.intent ?? a.intent;
+      const capability = ov.capability ?? a.capability;
+      const priority = intent * capability * a.ttpRisk;
+      return { ...a, intent, capability, priority };
+    });
+    const maxP = Math.max(...merged.map(a => a.priority), 1);
+    return merged.map(a => ({ ...a, riskPct: a.priority / maxP }));
+  }, [overrides]);
+
+  function startEdit(actor: Actor) {
+    setEditName(actor.name);
+    setEditForm({ intent: actor.intent, capability: actor.capability });
+  }
+
+  function commitEdit() {
+    if (!editName) return;
+    const next: Overrides = { ...overrides, [editName]: editForm };
+    setOverrides(next);
+    saveOverrides(next);
+    setEditName(null);
+  }
+
+  function cancelEdit() { setEditName(null); }
+
+  function resetActor(name: string) {
+    const next = { ...overrides };
+    delete next[name];
+    setOverrides(next);
+    saveOverrides(next);
+  }
+
+  function hasOverride(name: string) {
+    return !!overrides[name];
+  }
 
   function toggleActor(name: string) {
     setSelectedActors(prev => {
@@ -85,7 +162,7 @@ export default function ActorPrioritisation() {
     const matchChips = selectedActors.size === 0 ||
       [...selectedActors].some(s => s.toLowerCase() === actor.name.toLowerCase());
     return matchSearch && matchRisk && matchChips;
-  }), [search, riskFilter, selectedActors]);
+  }), [actors, search, riskFilter, selectedActors]);
 
   const filteredRanking = useMemo(() => {
     if (selectedActors.size > 0) {
@@ -98,14 +175,14 @@ export default function ActorPrioritisation() {
     );
   }, [filtered, selectedActors]);
 
-  const topActors = filtered.slice(0, 10);
-
   const { sortKey: sk1, sortDir: sd1, toggle: tog1, sorted: sortedActors } = useSortTable(filtered);
-  const { sortKey: sk2, sortDir: sd2, toggle: tog2, sorted: sortedTopActors } = useSortTable(topActors);
+  const { sortKey: sk2, sortDir: sd2, toggle: tog2, sorted: sortedAll } = useSortTable(actors);
 
   const visibleChips = chipSearch
     ? procedureActors.filter(a => a.toLowerCase().includes(chipSearch.toLowerCase()))
     : procedureActors;
+
+  const overrideCount = Object.keys(overrides).length;
 
   return (
     <div className="p-6 space-y-6">
@@ -206,7 +283,7 @@ export default function ActorPrioritisation() {
                       <td className="px-4 py-2.5 text-muted-foreground font-mono text-xs">{i + 1}</td>
                       <td className="px-4 py-2.5 text-xs">
                         <Link href={`/all-procedures?actor=${encodeURIComponent(actor.name)}`}>
-                          <span className="font-medium text-foreground hover:text-primary hover:underline cursor-pointer transition-colors" title="View procedures for this actor">
+                          <span className={`font-medium hover:text-primary hover:underline cursor-pointer transition-colors ${hasOverride(actor.name) ? "text-primary" : "text-foreground"}`} title="View procedures for this actor">
                             {actor.name}
                           </span>
                         </Link>
@@ -317,48 +394,187 @@ export default function ActorPrioritisation() {
         </div>
       </div>
 
+      {/* ── Editable Full Detail Table ───────────────────────────────────────── */}
       <div className="bg-card border border-card-border rounded-xl overflow-hidden">
-        <div className="p-4 border-b border-border">
-          <h2 className="font-semibold text-foreground">Top 10 Actors — Full Detail</h2>
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold text-foreground">All Actors — Full Detail</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Click <Pencil className="inline w-3 h-3 mx-0.5" /> to edit Intent (1–7) or Capability (1–7) per actor.
+              Derived columns recalculate automatically using{" "}
+              <span className="font-mono text-[11px] text-primary">Priority = Intent × Capability × TTP Risk</span>
+            </p>
+          </div>
+          {overrideCount > 0 && (
+            <button
+              onClick={() => { setOverrides({}); saveOverrides({}); }}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-lg px-2.5 py-1.5 hover:bg-accent transition-colors flex-shrink-0"
+            >
+              <RotateCcw className="w-3 h-3" /> Reset all ({overrideCount})
+            </button>
+          )}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30">
+                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium">#</th>
                 <SortableTh col="name" sortKey={sk2} sortDir={sd2} toggle={tog2}>Actor</SortableTh>
                 <SortableTh col="intent" sortKey={sk2} sortDir={sd2} toggle={tog2}>Intent Score</SortableTh>
                 <SortableTh col="capability" sortKey={sk2} sortDir={sd2} toggle={tog2}>Capability Score</SortableTh>
                 <SortableTh col="ttpRisk" sortKey={sk2} sortDir={sd2} toggle={tog2}>TTP Risk Score</SortableTh>
                 <SortableTh col="priority" sortKey={sk2} sortDir={sd2} toggle={tog2}>Priority Value</SortableTh>
                 <SortableTh col="riskPct" sortKey={sk2} sortDir={sd2} toggle={tog2}>Risk %</SortableTh>
+                <th className="w-20 px-3 py-2.5 text-xs text-muted-foreground font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {sortedTopActors.map(actor => (
-                <tr key={actor.name} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
-                  <td className="px-4 py-3">
-                    <Link href={`/all-procedures?actor=${encodeURIComponent(actor.name)}`}>
-                      <span className="font-semibold text-foreground hover:text-primary hover:underline cursor-pointer transition-colors" title="View procedures for this actor">
-                        {actor.name}
-                      </span>
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-chart-2">{actor.intent}</td>
-                  <td className="px-4 py-3 text-chart-3">{actor.capability}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{actor.ttpRisk.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
-                  <td className="px-4 py-3 font-mono text-foreground">{actor.priority.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 w-24 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full bg-primary rounded-full" style={{ width: `${actor.riskPct * 100}%` }} />
+              {sortedAll.map((actor, i) => {
+                const isEditing = editName === actor.name;
+                const edited = hasOverride(actor.name);
+                return (
+                  <tr
+                    key={actor.name}
+                    className={`border-b border-border/50 transition-colors ${isEditing ? "bg-primary/5" : edited ? "bg-yellow-500/5 hover:bg-yellow-500/10" : "hover:bg-accent/30"}`}
+                  >
+                    <td className="px-4 py-2.5 text-muted-foreground font-mono text-xs">{i + 1}</td>
+
+                    {/* Actor name */}
+                    <td className="px-4 py-2.5 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <Link href={`/all-procedures?actor=${encodeURIComponent(actor.name)}`}>
+                          <span className={`font-semibold hover:text-primary hover:underline cursor-pointer transition-colors ${edited ? "text-primary" : "text-foreground"}`}>
+                            {actor.name}
+                          </span>
+                        </Link>
+                        {edited && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 font-medium">
+                            edited
+                          </span>
+                        )}
                       </div>
-                      <span className="text-xs text-muted-foreground">{(actor.riskPct * 100).toFixed(1)}%</span>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+
+                    {/* Intent Score */}
+                    <td className="px-4 py-2.5">
+                      {isEditing ? (
+                        <ScoreSelect
+                          value={editForm.intent}
+                          onChange={v => setEditForm(f => ({ ...f, intent: v }))}
+                          color="text-chart-2"
+                        />
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <div className="flex gap-0.5">
+                            {Array.from({ length: 7 }).map((_, j) => (
+                              <div key={j} className={`w-2.5 h-2.5 rounded-sm ${j < actor.intent ? "bg-chart-2" : "bg-muted"}`} />
+                            ))}
+                          </div>
+                          <span className="text-xs font-semibold text-chart-2">{actor.intent}</span>
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Capability Score */}
+                    <td className="px-4 py-2.5">
+                      {isEditing ? (
+                        <ScoreSelect
+                          value={editForm.capability}
+                          onChange={v => setEditForm(f => ({ ...f, capability: v }))}
+                          color="text-chart-3"
+                        />
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <div className="flex gap-0.5">
+                            {Array.from({ length: 7 }).map((_, j) => (
+                              <div key={j} className={`w-2.5 h-2.5 rounded-sm ${j < actor.capability ? "bg-chart-3" : "bg-muted"}`} />
+                            ))}
+                          </div>
+                          <span className="text-xs font-semibold text-chart-3">{actor.capability}</span>
+                        </div>
+                      )}
+                    </td>
+
+                    {/* TTP Risk Score — read-only */}
+                    <td className="px-4 py-2.5 text-xs text-muted-foreground font-mono">
+                      {actor.ttpRisk.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </td>
+
+                    {/* Priority Value — derived */}
+                    <td className="px-4 py-2.5 font-mono text-xs text-foreground font-semibold">
+                      {actor.priority.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </td>
+
+                    {/* Risk % — derived */}
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 w-20 bg-muted rounded-full overflow-hidden flex-shrink-0">
+                          <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${actor.riskPct * 100}%` }} />
+                        </div>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${riskColor(actor.riskPct)}`}>
+                          {(actor.riskPct * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Actions */}
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center justify-end gap-1">
+                        {isEditing ? (
+                          <>
+                            <button
+                              onClick={commitEdit}
+                              className="p-1 rounded text-green-400 hover:bg-green-400/10 transition-colors"
+                              title="Save"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={cancelEdit}
+                              className="p-1 rounded text-muted-foreground hover:bg-accent transition-colors"
+                              title="Cancel"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => startEdit(actor)}
+                              className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                              title="Edit intent & capability"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            {edited && (
+                              <button
+                                onClick={() => resetActor(actor.name)}
+                                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                                title="Reset to original"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
+        </div>
+        <div className="px-4 py-3 border-t border-border bg-muted/10 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">{actors.length}</span> actors total
+          {overrideCount > 0 && (
+            <span className="ml-3 text-yellow-400">
+              {overrideCount} override{overrideCount !== 1 ? "s" : ""} applied
+            </span>
+          )}
+          <span className="ml-3 text-muted-foreground/60">
+            TTP Risk Score is read-only (derived from procedure data) · Priority = Intent × Capability × TTP Risk · Risk % = Priority / max(Priority)
+          </span>
         </div>
       </div>
     </div>
