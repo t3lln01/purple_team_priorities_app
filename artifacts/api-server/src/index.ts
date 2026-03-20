@@ -8,7 +8,7 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, async () => {
+app.listen(port, "0.0.0.0", async () => {
   console.log(`Server listening on port ${port}`);
 
   // Load any file-stored credentials into memory before running sync checks

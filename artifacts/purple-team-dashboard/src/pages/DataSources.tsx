@@ -1035,13 +1035,24 @@ export default function DataSources() {
         <div className="p-5">
           {/* Credential form — shown when not configured OR when user opens it */}
           {csStatus?.error === "API server unreachable" && (
-            <div className="mb-4 flex items-start gap-2 px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400">
+            <div className="mb-4 flex items-start gap-3 px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400">
               <WifiOff className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-              <div>
-                <span className="font-semibold">API server is not reachable.</span>
-                {" "}Start it with <span className="font-mono bg-red-500/10 px-1 rounded">pnpm run dev</span> from the repo root, then refresh this page.
-                Sync and test features require the API server, but you can still configure credentials below so they are ready when it starts.
+              <div className="flex-1 space-y-1">
+                <p>
+                  <span className="font-semibold">API server is not reachable.</span>
+                  {" "}Make sure it is running — from the repo root:
+                  <span className="font-mono bg-red-500/10 px-1.5 py-0.5 rounded ml-1">pnpm run dev</span>
+                </p>
+                <p className="text-red-400/70">
+                  Sync and Test Connection require the API server. You can still enter credentials below so they are saved when it starts.
+                </p>
               </div>
+              <button
+                onClick={() => { setCsStatus(null); fetchCsStatus(); fetchCsCredentials(); }}
+                className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-400/30 text-red-400 hover:bg-red-400/10 transition-colors font-medium whitespace-nowrap"
+              >
+                <RefreshCw className="w-3 h-3" />Retry
+              </button>
             </div>
           )}
           {csStatus !== null && (csCredsOpen || !csStatus.hasCredentials) && (
