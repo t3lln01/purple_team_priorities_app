@@ -1,14 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useLocation } from "wouter";
 import {
   Upload, Link2, CheckCircle2, XCircle, Loader2, Trash2,
-  ChevronDown, ChevronUp, Plus, Layers, Eye,
+  ChevronDown, ChevronUp, Plus, Layers,
   RefreshCw, Shield, Clock, AlertCircle, Zap, WifiOff,
 } from "lucide-react";
 import {
-  useViews, generateView, StoredActorFile, ReportsLookup,
+  generateView, StoredActorFile, ReportsLookup,
   loadActorFiles, saveActorFiles, loadReportsLookup, saveReportsLookup,
-  SavedView,
 } from "@/context/ViewContext";
 import { useAppData, buildMitreVersionData, type LiveActorData } from "@/context/AppDataContext";
 
@@ -241,8 +239,6 @@ function SH({ children }: { children: React.ReactNode }) {
 }
 
 export default function DataSources() {
-  const { saveView, savedViews } = useViews();
-  const [, navigate] = useLocation();
   const {
     liveActorData, setLiveActorData,
     mitreVersions, activeMitreVersionId, setActiveMitreVersionId,
@@ -286,12 +282,6 @@ export default function DataSources() {
   const [csLoadMsg, setCsLoadMsg] = useState("");
   const csPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const actorFileRef = useRef<HTMLInputElement>(null);
-
-  // ── Generate modal ───────────────────────────────────────────────
-  const [showGenerate, setShowGenerate] = useState(false);
-  const [viewName, setViewName] = useState("");
-  const [generating, setGenerating] = useState(false);
-  const [genPreview, setGenPreview] = useState<{ procedures: number; actors: number; actorNames: string[] } | null>(null);
 
   // ── Push-to-app state ────────────────────────────────────────────
   const [pushMsg, setPushMsg] = useState("");
@@ -572,46 +562,6 @@ export default function DataSources() {
     setTimeout(() => setPushMsg(""), 4000);
   }
 
-  // ── Generation ────────────────────────────────────────────────────
-  function openGenerate() {
-    if (actorFiles.length === 0) return;
-    const { procedures, actorRanking } = generateView(actorFiles, reportsLookup);
-    setGenPreview({
-      procedures: procedures.length,
-      actors: actorRanking.length,
-      actorNames: actorRanking.map(a => a.actor),
-    });
-    setViewName(`View ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`);
-    setShowGenerate(true);
-  }
-
-  function saveNewView() {
-    if (!viewName.trim() || !genPreview) return;
-    setGenerating(true);
-    setTimeout(() => {
-      const { procedures, actorRanking } = generateView(actorFiles, reportsLookup);
-      const view: SavedView = {
-        id: `view_${Date.now()}`,
-        name: viewName.trim(),
-        createdAt: new Date().toISOString(),
-        procedures,
-        actorRanking,
-        meta: {
-          actorFiles: actorFiles.map(f => f.actor),
-          hasReports: Object.keys(reportsLookup).length > 0,
-          totalProcedures: procedures.length,
-          totalActors: actorRanking.length,
-        },
-      };
-      saveView(view);
-      setGenerating(false);
-      setShowGenerate(false);
-      navigate(`/view/${view.id}`);
-    }, 0);
-  }
-
-  const canGenerate = actorFiles.length > 0;
-
   return (
     <div className="p-6 space-y-6">
       <div>
@@ -620,24 +570,6 @@ export default function DataSources() {
           Load external intelligence data via URL or JSON file upload. Parsed results persist across sessions.
         </p>
       </div>
-
-      {/* Saved views quick-access */}
-      {savedViews.length > 0 && (
-        <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold text-foreground">{savedViews.length} saved view{savedViews.length !== 1 ? "s" : ""}</p>
-            <p className="text-xs text-muted-foreground">{savedViews.map(v => v.name).join(" · ")}</p>
-          </div>
-          <div className="flex gap-2 flex-shrink-0">
-            {savedViews.slice(-3).map(v => (
-              <a key={v.id} href={`/view/${v.id}`} onClick={e => { e.preventDefault(); navigate(`/view/${v.id}`); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 border border-primary/30 text-primary rounded-lg text-xs font-medium hover:bg-primary/20 transition-colors">
-                <Eye className="w-3 h-3" />{v.name}
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
 
@@ -1100,100 +1032,14 @@ export default function DataSources() {
         </div>
       </div>
 
-      {/* ── Generate New View ── */}
-      <div className={`border rounded-xl p-5 transition-colors ${canGenerate ? "bg-card border-primary/30" : "bg-card border-border opacity-60"}`}>
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center flex-shrink-0">
-              <Layers className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h2 className="font-semibold text-foreground">Generate New View</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {canGenerate
-                  ? `Combine ${actorFiles.length} actor file${actorFiles.length !== 1 ? "s" : ""}${reportsStats ? " + reports" : ""} into a Purple Team Prioritisation view`
-                  : "Load at least one actor mapping file to enable view generation"}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={openGenerate}
-            disabled={!canGenerate}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap flex-shrink-0"
-          >
-            <Layers className="w-4 h-4" />Generate &amp; Save View
-          </button>
-        </div>
-      </div>
-
       {/* How to use */}
       <div className="bg-muted/20 border border-border rounded-xl p-4 text-xs text-muted-foreground space-y-1">
         <p className="font-semibold text-foreground text-sm mb-2">How to use</p>
-        <p><span className="text-primary font-medium">MITRE ATT&amp;CK</span> — Optional. Fetch from GitHub or upload a local STIX bundle. Enriches technique descriptions.</p>
-        <p><span className="text-chart-2 font-medium">Reports</span> — Optional but recommended. Upload a CrowdStrike reports export to resolve report slugs into dates and URLs in the generated view.</p>
-        <p><span className="text-chart-4 font-medium">Actor Mapping</span> — Required for generation. Upload one JSON file per actor (e.g. SCATTERED_SPIDER.json). You can rename actors by clicking their name. Upload multiple files in one go.</p>
-        <p className="pt-1 border-t border-border">Click <strong className="text-foreground">Generate &amp; Save View</strong> to build a Purple Team Prioritisation Layer from your uploaded data. Views are saved to your browser and never overwrite the default dashboard data.</p>
+        <p><span className="text-primary font-medium">MITRE ATT&amp;CK</span> — Optional. Fetch from GitHub or upload a local STIX bundle. Enriches technique descriptions and unlocks version switching on the Actor Prioritisation page.</p>
+        <p><span className="text-chart-2 font-medium">Reports</span> — Optional but recommended. Upload a CrowdStrike reports export to resolve report slugs into dates and URLs.</p>
+        <p><span className="text-chart-4 font-medium">Actor Mapping</span> — Upload one JSON file per actor (e.g. SCATTERED_SPIDER.json). You can rename actors by clicking their name. Once loaded, click <strong className="text-foreground">Push to Actor Prioritisation</strong> to update the dashboard directly.</p>
+        <p className="pt-1 border-t border-border">The <strong className="text-foreground">CrowdStrike Intel API</strong> connector syncs automatically every 7 days when credentials are configured, pushing results straight into Actor Prioritisation.</p>
       </div>
-
-      {/* ── Save modal ── */}
-      {showGenerate && genPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 space-y-5">
-            <div>
-              <h2 className="text-lg font-bold text-foreground">Save New View</h2>
-              <p className="text-xs text-muted-foreground mt-1">This view will be saved to your browser and accessible from the sidebar.</p>
-            </div>
-
-            <div className="bg-muted/20 border border-border rounded-xl p-4 grid grid-cols-3 gap-3">
-              {[
-                { label: "Actors", value: genPreview.actors },
-                { label: "Procedures", value: genPreview.procedures.toLocaleString() },
-                { label: "Sources", value: `${actorFiles.length} file${actorFiles.length !== 1 ? "s" : ""}` },
-              ].map(s => (
-                <div key={s.label} className="text-center">
-                  <div className="text-xl font-bold text-foreground">{s.value}</div>
-                  <div className="text-[10px] text-muted-foreground mt-0.5">{s.label}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap gap-1.5">
-              {genPreview.actorNames.map(a => (
-                <span key={a} className="text-[10px] px-2 py-0.5 rounded-full bg-chart-4/10 border border-chart-4/30 text-chart-4">{a}</span>
-              ))}
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">View Name</label>
-              <input
-                autoFocus
-                value={viewName}
-                onChange={e => setViewName(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") saveNewView(); if (e.key === "Escape") setShowGenerate(false); }}
-                placeholder="e.g. Scattered Spider — Q1 2025"
-                className="w-full bg-input border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowGenerate(false)}
-                className="flex-1 px-4 py-2 border border-border rounded-lg text-sm text-muted-foreground hover:bg-accent transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={saveNewView}
-                disabled={!viewName.trim() || generating}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
-                {generating ? "Generating…" : "Save & Open View"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

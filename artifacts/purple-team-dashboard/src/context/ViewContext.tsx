@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+// ── Pure generation utilities — no saved-view state ───────────────────────────
 
 export type ViewProcedure = {
   actor: string;
@@ -19,74 +19,6 @@ export type ViewActorRank = {
   tacticCount: number;
   reportCount: number;
 };
-
-export type SavedView = {
-  id: string;
-  name: string;
-  createdAt: string;
-  procedures: ViewProcedure[];
-  actorRanking: ViewActorRank[];
-  meta: {
-    actorFiles: string[];
-    hasReports: boolean;
-    totalProcedures: number;
-    totalActors: number;
-  };
-};
-
-type ViewCtx = {
-  savedViews: SavedView[];
-  saveView: (view: SavedView) => void;
-  deleteView: (id: string) => void;
-  renameView: (id: string, name: string) => void;
-};
-
-const ViewContext = createContext<ViewCtx | null>(null);
-
-function loadViews(): SavedView[] {
-  try { return JSON.parse(localStorage.getItem("pt_saved_views") ?? "[]"); }
-  catch { return []; }
-}
-
-function persistViews(views: SavedView[]) {
-  try { localStorage.setItem("pt_saved_views", JSON.stringify(views)); } catch {}
-}
-
-export function ViewProvider({ children }: { children: ReactNode }) {
-  const [savedViews, setSavedViews] = useState<SavedView[]>(loadViews);
-
-  function saveView(view: SavedView) {
-    const next = [...savedViews.filter(v => v.id !== view.id), view];
-    setSavedViews(next);
-    persistViews(next);
-  }
-
-  function deleteView(id: string) {
-    const next = savedViews.filter(v => v.id !== id);
-    setSavedViews(next);
-    persistViews(next);
-  }
-
-  function renameView(id: string, name: string) {
-    const next = savedViews.map(v => v.id === id ? { ...v, name } : v);
-    setSavedViews(next);
-    persistViews(next);
-  }
-
-  return (
-    <ViewContext.Provider value={{ savedViews, saveView, deleteView, renameView }}>
-      {children}
-    </ViewContext.Provider>
-  );
-}
-
-export function useViews() {
-  const ctx = useContext(ViewContext);
-  if (!ctx) throw new Error("useViews must be inside ViewProvider");
-  return ctx;
-}
-
-// ── Generation logic ──────────────────────────────────────────────────────────
 
 export type StoredActorFile = {
   filename: string;
@@ -109,10 +41,10 @@ function toMs(val: any): number {
 }
 
 export type ReportsLookup = Record<string, {
-  reportId: string;   // slug uppercased (e.g. "CSA-240217")
+  reportId: string;
   name: string;
   url: string;
-  last_updated: number; // ms timestamp — normalised from last_modified_date
+  last_updated: number;
 }>;
 
 export function generateView(
@@ -129,7 +61,6 @@ export function generateView(
       const reports = entry.reports ?? [];
       const observables = entry.observables ?? [];
 
-      // Match slugs → lookup (keys are uppercase, match Python: rep_id.strip().upper())
       let bestReport: ReportsLookup[string] | null = null;
       let bestDate = 0;
 
@@ -143,18 +74,11 @@ export function generateView(
         }
       }
 
-      // Python script: skip entry entirely if no matching report found
       if (!bestReport) continue;
 
-      // Date from the best (newest) report
       const latestDate = bestDate > 0 ? bestDate : null;
-
-      // External ref mirrors Python: f'{threat_actor.upper()} {best_report["name"]} - {best_report["url"]}'
       const externalRef = `${actorName.toUpperCase()} ${bestReport.name} - ${bestReport.url}`;
-
       const risk = Math.round(reports.length * 100 + observables.length * 50);
-
-      // Python: one row per TTP entry; description = '[Actor] - {all observables joined by space}'
       const observablesText = observables.join(" ").trim();
       const procedure = observablesText
         ? `[${actorName}] - ${observablesText}`
@@ -174,7 +98,6 @@ export function generateView(
     }
   }
 
-  // Build actor ranking
   const byActor: Record<string, ViewProcedure[]> = {};
   for (const p of procedures) {
     (byActor[p.actor] ??= []).push(p);

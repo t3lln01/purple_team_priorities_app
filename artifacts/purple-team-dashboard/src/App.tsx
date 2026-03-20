@@ -11,11 +11,9 @@ import TacticsScores from "@/pages/TacticsScores";
 import RiskRate from "@/pages/RiskRate";
 import AllProcedures from "@/pages/AllProcedures";
 import DataSources from "@/pages/DataSources";
-import ViewDetail from "@/pages/ViewDetail";
-import { ViewProvider, useViews } from "@/context/ViewContext";
 import { TacticScoresProvider } from "@/context/TacticScoresContext";
 import { AppDataProvider } from "@/context/AppDataContext";
-import { Shield, Users, Activity, Target, ChartBar, AlertTriangle, List, Database, Layers, Trash2, Table2 } from "lucide-react";
+import { Shield, Users, Activity, Target, ChartBar, AlertTriangle, List, Database, Table2 } from "lucide-react";
 import ImpactTable from "@/pages/ImpactTable";
 
 const queryClient = new QueryClient();
@@ -34,7 +32,6 @@ const navItems = [
 
 function Sidebar() {
   const [location] = useLocation();
-  const { savedViews, deleteView } = useViews();
 
   return (
     <aside className="w-64 min-h-screen bg-sidebar border-r border-sidebar-border flex flex-col">
@@ -66,39 +63,6 @@ function Sidebar() {
             </Link>
           );
         })}
-
-        {savedViews.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-sidebar-border">
-            <div className="px-3 mb-1.5 flex items-center gap-2">
-              <Layers className="w-3 h-3 text-muted-foreground" />
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Saved Views</span>
-            </div>
-            {savedViews.map(view => {
-              const isActive = location === `/view/${view.id}`;
-              return (
-                <div key={view.id} className="group flex items-center">
-                  <Link href={`/view/${view.id}`} className="flex-1 min-w-0">
-                    <div className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-                      isActive
-                        ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
-                        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                    }`}>
-                      <Layers className="w-3.5 h-3.5 flex-shrink-0 text-chart-4" />
-                      <span className="text-sm truncate">{view.name}</span>
-                    </div>
-                  </Link>
-                  <button
-                    onClick={() => deleteView(view.id)}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 mr-1 text-muted-foreground hover:text-red-400 transition-all rounded"
-                    title="Delete view"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </nav>
 
       <div className="p-4 border-t border-sidebar-border">
@@ -133,7 +97,6 @@ function Router() {
         <Route path="/risk-rate" component={RiskRate} />
         <Route path="/all-procedures" component={AllProcedures} />
         <Route path="/data-sources" component={DataSources} />
-        <Route path="/view/:id" component={ViewDetail} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
@@ -146,11 +109,9 @@ function App() {
       <TooltipProvider>
         <TacticScoresProvider>
           <AppDataProvider>
-            <ViewProvider>
-              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-                <Router />
-              </WouterRouter>
-            </ViewProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <Router />
+            </WouterRouter>
           </AppDataProvider>
         </TacticScoresProvider>
         <Toaster />
