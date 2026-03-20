@@ -83,8 +83,10 @@ async function fetchReportIds(token: string, since?: number): Promise<string[]> 
   while (true) {
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset), sort: "created_date|desc" });
     if (since) {
-      // FQL filter: created_date >= since (epoch seconds)
-      params.set("filter", `created_date:>=${Math.floor(since / 1000)}`);
+      // Apply a 48-hour lookback buffer so reports published just before the
+      // previous sync window boundary are never silently missed.
+      const cutoffSec = Math.floor((since - 48 * 60 * 60 * 1000) / 1000);
+      params.set("filter", `created_date:>=${cutoffSec}`);
     }
 
     const res = await fetch(`${CS_BASE}/intel/queries/reports/v1?${params}`, {
@@ -259,22 +261,38 @@ export async function runSync(options: { since?: number } = {}): Promise<void> {
       syncActorsMitre(token),
     ]);
 
-    const finalReports = reports.status === "fulfilled" ? reports.value : state.reports;
+    const newReports   = reports.status === "fulfilled" ? reports.value : [];
     const finalActors  = actors.status  === "fulfilled" ? actors.value  : state.actors;
 
     if (reports.status === "rejected") console.error("[CS] Reports sync failed:", reports.reason);
     if (actors.status  === "rejected") console.error("[CS] Actors sync failed:",  actors.reason);
+
+    // Merge incoming reports with previously accumulated ones — deduplicate by
+    // slug (preferred) or id so re-fetched reports from the 48-hour buffer
+    // window don't create duplicates, and older reports are never lost.
+    const existingById = new Map<string, any>(
+      state.reports.map((r: any) => [String(r.slug ?? r.id ?? ""), r])
+    );
+    for (const r of newReports) {
+      const key = String(r.slug ?? r.id ?? "");
+      if (key) existingById.set(key, r); // newer fetch wins
+    }
+    const mergedReports = Array.from(existingById.values());
+    const newCount = newReports.filter((r: any) => {
+      const key = String(r.slug ?? r.id ?? "");
+      return key && !state.reports.some((s: any) => String(s.slug ?? s.id ?? "") === key);
+    }).length;
 
     await saveState({
       status: "done",
       lastSync: new Date().toISOString(),
       syncStarted: state.syncStarted,
       error: null,
-      meta: { reportCount: finalReports.length, actorCount: finalActors.length },
-      reports: finalReports,
+      meta: { reportCount: mergedReports.length, actorCount: finalActors.length },
+      reports: mergedReports,
       actors: finalActors,
     });
-    console.log(`[CS] Sync complete — ${finalReports.length} reports, ${finalActors.length} actors`);
+    console.log(`[CS] Sync complete — ${newCount} new reports (${mergedReports.length} total), ${finalActors.length} actors`);
   } catch (err: any) {
     console.error("[CS] Sync failed:", err.message);
     await saveState({ ...state, status: "error", error: err.message });

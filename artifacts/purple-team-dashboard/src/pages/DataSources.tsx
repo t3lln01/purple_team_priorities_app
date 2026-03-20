@@ -467,14 +467,16 @@ export default function DataSources() {
       if (!res.ok) throw new Error("Failed to fetch sync result");
       const data = await res.json() as { reports: any[]; actors: Array<{ filename: string; actor: string; entries: any[] }>; meta: { reportCount: number; actorCount: number } };
 
-      // Load reports into localStorage (same as manual JSON upload)
+      // Load reports into localStorage — merge with existing so previously
+      // synced reports are never lost when a new incremental sync returns fewer.
       let newLookup: ReportsLookup = loadReportsLookup();
       if (data.reports && data.reports.length > 0) {
         const { stats, lookup } = parseReportsJson({ resources: data.reports });
         setReportsStats(stats); setReportsStatus("done");
         lsSet("ds_reports_stats", stats);
-        saveReportsLookup(lookup);
-        newLookup = lookup;
+        const mergedLookup: ReportsLookup = { ...newLookup, ...lookup };
+        saveReportsLookup(mergedLookup);
+        newLookup = mergedLookup;
       }
 
       // Load actor MITRE files into localStorage (same as manual actor upload)
