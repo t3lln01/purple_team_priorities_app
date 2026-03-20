@@ -411,10 +411,23 @@ export default function DataSources() {
 
   // ── CrowdStrike connector ─────────────────────────────────────────
 
+  const CS_OFFLINE_STATUS: CsStatus = {
+    hasCredentials: false,
+    status: "error",
+    lastSync: null,
+    nextSync: null,
+    syncStarted: null,
+    error: "API server unreachable",
+    meta: { reportCount: 0, actorCount: 0 },
+  };
+
   const fetchCsStatus = useCallback(async () => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
     try {
-      const res = await fetch(`${CS_API_BASE}/cs/status`);
-      if (!res.ok) return;
+      const res = await fetch(`${CS_API_BASE}/cs/status`, { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!res.ok) { setCsStatus(CS_OFFLINE_STATUS); return; }
       const data = await res.json() as CsStatus;
       setCsStatus(data);
       if (data.status === "running") {
@@ -425,17 +438,25 @@ export default function DataSources() {
       } else if (data.status !== "running") {
         setCsSyncing(false);
       }
-    } catch {}
+    } catch {
+      clearTimeout(timer);
+      setCsStatus(CS_OFFLINE_STATUS);
+    }
   }, [csSyncing]);
 
   const fetchCsCredentials = useCallback(async () => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
     try {
-      const res = await fetch(`${CS_API_BASE}/cs/credentials`);
+      const res = await fetch(`${CS_API_BASE}/cs/credentials`, { signal: ctrl.signal });
+      clearTimeout(timer);
       if (!res.ok) return;
       const data = await res.json() as { configured: boolean; source: "env" | "stored" | "none"; clientIdHint: string | null };
       setCsCredSource(data.source);
       setCsCredHint(data.clientIdHint);
-    } catch {}
+    } catch {
+      clearTimeout(timer);
+    }
   }, []);
 
   async function saveCsCredentials() {
@@ -949,6 +970,8 @@ export default function DataSources() {
                 <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#E1001A" }}>CrowdStrike Intel API</span>
                 {csStatus === null ? (
                   <span className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />Connecting…</span>
+                ) : csStatus.error === "API server unreachable" ? (
+                  <span className="flex items-center gap-1 text-xs text-red-400"><WifiOff className="w-3 h-3" />API server offline</span>
                 ) : !csStatus.hasCredentials ? (
                   <span className="flex items-center gap-1 text-xs text-yellow-400"><WifiOff className="w-3 h-3" />Not configured</span>
                 ) : csStatus.status === "running" ? (
@@ -1011,6 +1034,16 @@ export default function DataSources() {
 
         <div className="p-5">
           {/* Credential form — shown when not configured OR when user opens it */}
+          {csStatus?.error === "API server unreachable" && (
+            <div className="mb-4 flex items-start gap-2 px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400">
+              <WifiOff className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold">API server is not reachable.</span>
+                {" "}Start it with <span className="font-mono bg-red-500/10 px-1 rounded">pnpm run dev</span> from the repo root, then refresh this page.
+                Sync and test features require the API server, but you can still configure credentials below so they are ready when it starts.
+              </div>
+            </div>
+          )}
           {csStatus !== null && (csCredsOpen || !csStatus.hasCredentials) && (
             <div className={`rounded-xl border p-4 space-y-4 ${csStatus.hasCredentials ? "bg-muted/10 border-border" : "bg-yellow-500/5 border-yellow-500/20"}`}>
               {/* Header row */}
