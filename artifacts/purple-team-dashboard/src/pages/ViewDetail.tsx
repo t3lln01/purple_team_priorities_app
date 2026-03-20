@@ -362,24 +362,24 @@ export default function ViewDetail() {
                       <span className="text-[10px] text-muted-foreground">{row.tacticName}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 text-xs text-foreground max-w-[160px]">
-                    <div className="truncate" title={row.techniqueName}>{row.techniqueName}</div>
+                  <td className="px-4 py-2.5 text-xs text-foreground">
+                    {row.techniqueName}
                   </td>
-                  <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-[300px]">
-                    <p className="line-clamp-2" title={row.procedure}>{row.procedure}</p>
+                  <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                    <p>{row.procedure}</p>
                   </td>
                   <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{formatDate(row.date)}</td>
-                  <td className="px-4 py-2.5 text-xs max-w-[220px]">
+                  <td className="px-4 py-2.5 text-xs">
                     {(() => {
                       const urlMatch = row.externalRef.match(/https?:\/\/\S+/);
                       const url = urlMatch?.[0] ?? null;
                       const label = url ? row.externalRef.replace(url, "").replace(/\s*-\s*$/, "").trim() : row.externalRef;
                       return (
                         <div className="space-y-0.5">
-                          <p className="text-muted-foreground line-clamp-1" title={label}>{label || "—"}</p>
+                          <p className="text-muted-foreground">{label || "—"}</p>
                           {url && (
-                            <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-[10px] block truncate" title={url}>
-                              ↗ {url.replace(/^https?:\/\//, "").substring(0, 40)}{url.length > 48 ? "…" : ""}
+                            <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-[10px] block" title={url}>
+                              ↗ {url}
                             </a>
                           )}
                         </div>

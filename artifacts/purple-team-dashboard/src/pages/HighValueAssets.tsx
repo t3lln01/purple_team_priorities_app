@@ -359,7 +359,7 @@ export default function HighValueAssets() {
               return (
                 <div key={target}>
                   <div className="flex justify-between text-xs mb-1">
-                    <span className="text-foreground font-medium truncate max-w-48">{target}</span>
+                    <span className="text-foreground font-medium">{target}</span>
                     <span className="text-muted-foreground flex-shrink-0 ml-2">{highC}/{entries.length} High/Crit</span>
                   </div>
                   <div className="h-1.5 bg-muted rounded-full overflow-hidden">
@@ -622,11 +622,11 @@ export default function HighValueAssets() {
                       <tr className={`border-b border-border/40 hover:bg-accent/20 transition-colors ${
                         row._isCustom ? "bg-blue-500/5" : row._isEdited ? "bg-yellow-500/5" : ""
                       }`}>
-                        <td className="px-4 py-2.5 text-xs font-medium text-foreground max-w-xs">
-                          <div className="flex items-center gap-1.5">
-                            {row._isCustom && <span className="text-[10px] text-blue-400 border border-blue-400/30 bg-blue-400/10 px-1 rounded">NEW</span>}
-                            {row._isEdited && <span className="text-[10px] text-yellow-400 border border-yellow-400/30 bg-yellow-400/10 px-1 rounded">EDITED</span>}
-                            <span className="truncate">{row.target}</span>
+                        <td className="px-4 py-2.5 text-xs font-medium text-foreground">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {row._isCustom && <span className="text-[10px] text-blue-400 border border-blue-400/30 bg-blue-400/10 px-1 rounded flex-shrink-0">NEW</span>}
+                            {row._isEdited && <span className="text-[10px] text-yellow-400 border border-yellow-400/30 bg-yellow-400/10 px-1 rounded flex-shrink-0">EDITED</span>}
+                            <span>{row.target}</span>
                           </div>
                         </td>
                         <td className="px-4 py-2.5">
@@ -636,9 +636,9 @@ export default function HighValueAssets() {
                             </span>
                           </Link>
                         </td>
-                        <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-xs">
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground">
                           <Link href={`/all-procedures?mitre=${encodeURIComponent(row.tid)}`}>
-                            <div className="truncate hover:text-primary cursor-pointer transition-colors">{row.tidName}</div>
+                            <div className="hover:text-primary cursor-pointer transition-colors">{row.tidName}</div>
                           </Link>
                         </td>
                         <td className="px-3 py-2.5 text-center">
@@ -657,8 +657,8 @@ export default function HighValueAssets() {
                         <td className="px-3 py-2.5 text-center text-xs font-mono text-muted-foreground">
                           {Number(row.likelihoodScore).toFixed(2)}
                         </td>
-                        <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-xs">
-                          <div className="truncate" title={row.impact}>{row.impact || "—"}</div>
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                          <div>{row.impact || "—"}</div>
                         </td>
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-1 justify-end">

@@ -844,7 +844,7 @@ export default function AllProcedures() {
               ) : pageRows.map((row, i) => (
                 <tr key={row._id ?? i}
                   className={`border-b border-border/50 transition-colors ${row._custom ? "bg-chart-2/5 hover:bg-chart-2/10" : "hover:bg-accent/30"}`}>
-                  <td className="px-4 py-2.5 text-xs font-medium text-foreground whitespace-nowrap max-w-[160px] truncate" title={row.actor}>
+                  <td className="px-4 py-2.5 text-xs font-medium text-foreground">
                     <div className="flex items-center gap-1.5">
                       {row.actor}
                       {row._custom && <span className="text-[9px] px-1 py-0.5 rounded bg-chart-2/20 text-chart-2 border border-chart-2/30 font-medium flex-shrink-0">custom</span>}
@@ -858,23 +858,23 @@ export default function AllProcedures() {
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 text-xs text-foreground whitespace-nowrap max-w-[200px]">
-                    <span className="truncate block" title={techNameMap[row.mitreId] ?? ""}>{techNameMap[row.mitreId] ?? "—"}</span>
+                  <td className="px-4 py-2.5 text-xs text-foreground">
+                    {techNameMap[row.mitreId] ?? "—"}
                   </td>
-                  <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-[420px]">
-                    <p className="line-clamp-2" title={row.procedure}>{row.procedure}</p>
+                  <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                    <p>{row.procedure}</p>
                   </td>
                   <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{formatDate(row.date)}</td>
-                  <td className="px-4 py-2.5 text-xs max-w-[260px]">
+                  <td className="px-4 py-2.5 text-xs">
                     {(() => {
                       const { label, url } = parseExternalRef(row.externalRef);
                       return (
                         <div className="space-y-0.5">
-                          <p className="text-muted-foreground line-clamp-2" title={label}>{label || "—"}</p>
+                          <p className="text-muted-foreground">{label || "—"}</p>
                           {url && (
                             <a href={url} target="_blank" rel="noopener noreferrer"
-                              className="text-primary hover:underline truncate block max-w-full text-[10px]" title={url}>
-                              ↗ {url.replace(/^https?:\/\//, "").substring(0, 45)}{url.length > 53 ? "…" : ""}
+                              className="text-primary hover:underline block text-[10px]" title={url}>
+                              ↗ {url}
                             </a>
                           )}
                         </div>
