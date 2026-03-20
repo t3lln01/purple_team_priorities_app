@@ -19,7 +19,9 @@ type Procedure = {
 };
 
 // ──────────────────────────── static data ────────────────────────────────────
-const baseProcedures: Procedure[] = (data as any).allProcedures;
+const baseProcedures: Procedure[] = ((data as any).allProcedures as Procedure[]).filter(
+  p => { const t = (p.procedure ?? "").trim(); return t !== "" && !/^\[.+\]\s*-\s*$/.test(t); }
+);
 const techTacticMap: Record<string, string[]> = (data as any).techTacticMap ?? {};
 const techNameMap: Record<string, string> = (data as any).techNameMap ?? {};
 
