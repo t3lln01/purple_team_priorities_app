@@ -3,7 +3,7 @@ import { useSearch } from "wouter";
 import data from "@/data.json";
 import { useSortTable } from "@/hooks/useSortTable";
 import SortableTh from "@/components/SortableTh";
-import { Plus, Upload, Trash2, X, Check, FileJson, FileText, AlertCircle, ChevronDown, ChevronUp, Activity, XCircle } from "lucide-react";
+import { Plus, Upload, Trash2, X, Check, FileJson, FileText, AlertCircle, ChevronDown, ChevronUp, Activity, XCircle, Download } from "lucide-react";
 import { useAppData } from "@/context/AppDataContext";
 
 // ──────────────────────────── types ──────────────────────────────────────────
@@ -47,6 +47,51 @@ function saveCustom(c: Procedure[]) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(c)); } catch {}
 }
 function uid() { return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`; }
+
+// ──────────────────────────── export helpers ──────────────────────────────────
+function escapeCsvField(v: string | number | null | undefined): string {
+  const s = v === null || v === undefined ? "" : String(v);
+  if (s.includes(",") || s.includes('"') || s.includes("\n")) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function exportCsv(rows: Procedure[], filename: string) {
+  const header = ["actor", "mitreId", "techniqueName", "procedure", "date", "externalRef", "risk"];
+  const lines = [
+    header.join(","),
+    ...rows.map(r => [
+      escapeCsvField(r.actor),
+      escapeCsvField(r.mitreId),
+      escapeCsvField(techNameMap[r.mitreId] ?? ""),
+      escapeCsvField(r.procedure),
+      escapeCsvField(r.date ? new Date(r.date).toLocaleDateString("en-GB") : ""),
+      escapeCsvField(r.externalRef),
+      escapeCsvField(r.risk),
+    ].join(",")),
+  ];
+  triggerDownload(lines.join("\r\n"), filename, "text/csv");
+}
+
+function exportJson(rows: Procedure[], filename: string) {
+  const out = rows.map(r => ({
+    actor:         r.actor,
+    mitreId:       r.mitreId,
+    techniqueName: techNameMap[r.mitreId] ?? "",
+    procedure:     r.procedure,
+    date:          r.date ? new Date(r.date).toLocaleDateString("en-GB") : null,
+    externalRef:   r.externalRef,
+    risk:          r.risk,
+  }));
+  triggerDownload(JSON.stringify(out, null, 2), filename, "application/json");
+}
+
+function triggerDownload(content: string, filename: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
 
 // ──────────────────────────── helpers ────────────────────────────────────────
 function matchActor(name: string): string {
@@ -620,6 +665,17 @@ export default function AllProcedures() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showCustomOnly, setShowCustomOnly] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onOut(e: MouseEvent) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node))
+        setShowExportMenu(false);
+    }
+    document.addEventListener("mousedown", onOut);
+    return () => document.removeEventListener("mousedown", onOut);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(search);
@@ -722,6 +778,46 @@ export default function AllProcedures() {
           >
             <Upload className="w-3.5 h-3.5" /> Import CSV / JSON
           </button>
+          <div className="relative" ref={exportMenuRef}>
+            <button
+              onClick={() => setShowExportMenu(v => !v)}
+              className="flex items-center gap-1.5 text-xs font-medium border border-border text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg px-3 py-1.5 transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" /> Export
+              <ChevronDown className={`w-3 h-3 transition-transform ${showExportMenu ? "rotate-180" : ""}`} />
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 top-full mt-1 z-50 w-52 bg-card border border-border rounded-xl shadow-xl overflow-hidden">
+                <div className="px-3 py-2 border-b border-border">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold">
+                    Export {sortedFiltered.length.toLocaleString()} filtered row{sortedFiltered.length !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                <div className="p-1.5 flex flex-col gap-0.5">
+                  <button
+                    onClick={() => { exportCsv(sortedFiltered, "procedures.csv"); setShowExportMenu(false); }}
+                    className="flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg text-xs text-foreground hover:bg-accent transition-colors"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                    <div>
+                      <div className="font-medium">Download CSV</div>
+                      <div className="text-[10px] text-muted-foreground">Spreadsheet-compatible</div>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => { exportJson(sortedFiltered, "procedures.json"); setShowExportMenu(false); }}
+                    className="flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg text-xs text-foreground hover:bg-accent transition-colors"
+                  >
+                    <FileJson className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                    <div>
+                      <div className="font-medium">Download JSON</div>
+                      <div className="text-[10px] text-muted-foreground">Machine-readable array</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
           {customProcs.length > 0 && (
             <button onClick={clearAllCustom}
               className="flex items-center gap-1.5 text-xs text-red-400/70 hover:text-red-400 border border-red-400/20 hover:border-red-400/40 rounded-lg px-2.5 py-1.5 transition-colors">
