@@ -162,7 +162,7 @@ function parseReportsJson(json: any): { stats: ReportsStats; lookup: ReportsLook
   const lookup: ReportsLookup = {};
   const mapped = resources.map((r: any) => {
     const id = (r.slug ?? r.id ?? "").toString().toUpperCase();
-    const dateMs = toMs(r.last_modified_date) || toMs(r.created_date);
+    const dateMs = toMs(r.last_modified_date) || toMs(r.last_updated) || toMs(r.created_date);
     if (id) lookup[id] = { reportId: id, name: r.name ?? "", url: r.url ?? "", last_updated: dateMs };
     return { id, name: r.name ?? "", url: r.url ?? "", date: fmtDate(dateMs), dateTs: dateMs, type: r.type?.name ?? "Unknown" };
   });

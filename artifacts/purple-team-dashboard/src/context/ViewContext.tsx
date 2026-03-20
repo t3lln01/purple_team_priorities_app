@@ -45,6 +45,7 @@ export type ReportsLookup = Record<string, {
   name: string;
   url: string;
   last_updated: number;
+  created_date?: number;
 }>;
 
 export function generateView(
@@ -61,6 +62,9 @@ export function generateView(
       const reports = entry.reports ?? [];
       const observables = entry.observables ?? [];
 
+      // Skip entries with no observable text — they produce empty "[ACTOR] -" rows
+      if (observables.length === 0) continue;
+
       let bestReport: ReportsLookup[string] | null = null;
       let bestDate = 0;
 
@@ -68,27 +72,24 @@ export function generateView(
         const key = slug.trim().toUpperCase();
         const rep = reportsLookup[key];
         if (!rep) continue;
-        if (rep.last_updated > bestDate) {
-          bestDate = rep.last_updated;
+        // Prefer last_updated; fall back to created_date if last_updated is 0
+        const repDate = rep.last_updated || rep.created_date || 0;
+        if (repDate > bestDate) {
+          bestDate = repDate;
           bestReport = rep;
         }
       }
 
-      // Report matching is optional — include every procedure regardless of
-      // whether its report slugs are in the lookup.  When a match is found we
-      // enrich with the report date and URL; when not, we still keep the entry
-      // so that TTP Risk counts are never silently dropped.
-      const latestDate = bestDate > 0 ? bestDate : null;
-      const externalRef = bestReport
-        ? `${actorName.toUpperCase()} ${bestReport.name} - ${bestReport.url}`
-        : reports.length > 0
-          ? `${actorName.toUpperCase()} — ${reports.join(", ")}`
-          : `${actorName.toUpperCase()}`;
+      // Require a matched report — no report means no reliable attribution context
+      if (!bestReport) continue;
+
+      // Require a resolvable date — skip if neither last_updated nor created_date is set
+      if (bestDate === 0) continue;
+
+      const externalRef = `${actorName.toUpperCase()} ${bestReport.name} - ${bestReport.url}`;
       const risk = Math.round(reports.length * 100 + observables.length * 50);
       const observablesText = observables.join(" ").trim();
-      const procedure = observablesText
-        ? `[${actorName}] - ${observablesText}`
-        : `[${actorName}] -`;
+      const procedure = `[${actorName}] - ${observablesText}`;
 
       procedures.push({
         actor: actorName,
@@ -96,7 +97,7 @@ export function generateView(
         tacticName: entry.tactic_name,
         techniqueName: entry.technique_name,
         procedure,
-        date: latestDate,
+        date: bestDate,
         externalRef,
         risk,
         reportRefs: reports,
