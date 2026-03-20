@@ -162,34 +162,21 @@ export default function ActorPrioritisation() {
     return { fromMs: -Infinity, toMs: Infinity };
   }, [dateRange, customFrom, customTo]);
 
-  // Source procedures: use live actor data when active, else base data.json
+  // Source procedures: MERGE live CrowdStrike procedures with base data.json procedures.
+  // The actor list (Active Monitoring) is always from data.json — never replaced by live data.
+  // CrowdStrike procedures are ADDITIVE: they increase TTP Risk for existing actors.
   const sourceProcedures = useMemo(() => {
-    if (liveActorData) return liveActorData.procedures;
+    if (liveActorData && liveActorData.procedures.length > 0) {
+      return [...allProcedures, ...liveActorData.procedures];
+    }
     return allProcedures;
   }, [liveActorData]);
 
-  // Source base actors: use live actor data when active, else base data.json actors
-  const sourceBaseActors: Actor[] = useMemo(() => {
-    if (liveActorData) {
-      return liveActorData.actorRanking.map(rank => ({
-        name: rank.actor.toUpperCase().trim(),
-        intent: 4,
-        capability: 4,
-        ttpRisk: 0,
-        priority: 0,
-        riskPct: 0,
-      }));
-    }
-    return baseActors;
-  }, [liveActorData]);
-
-  // Source procedure actors for chips (for the actor filter pills)
-  const sourceProcedureActors = useMemo(() => {
-    if (liveActorData) {
-      return Array.from(new Set(liveActorData.procedures.map(p => p.actor).filter(Boolean))).sort();
-    }
-    return procedureActors;
-  }, [liveActorData]);
+  // Source procedure actors for chips — derived from the merged procedure set
+  const sourceProcedureActors = useMemo(() =>
+    Array.from(new Set(sourceProcedures.map(p => p.actor).filter(Boolean))).sort(),
+    [sourceProcedures]
+  );
 
   // TTP risk map — filtered by date, covers source procedures + custom procedures
   const ttpRiskMap = useMemo(() => {
@@ -231,8 +218,8 @@ export default function ActorPrioritisation() {
   // calculation (Priority, Risk %) reacts instantly to the date window change.
   const actors: Actor[] = useMemo(() => {
     const merged: Actor[] = [
-      // Base/live actors (with overrides, skip deleted)
-      ...sourceBaseActors
+      // Base actors from data.json (Active Monitoring — intent/capability never overwritten by live sync)
+      ...baseActors
         .filter(a => !overrides[a.name]?.deleted)
         .map(a => {
           const ov = overrides[a.name] ?? {};
@@ -255,12 +242,12 @@ export default function ActorPrioritisation() {
 
     const maxP = Math.max(...merged.map(a => a.priority), 1);
     return merged.map(a => ({ ...a, riskPct: a.priority / maxP }));
-  }, [sourceBaseActors, overrides, customActors, ttpRiskMap]);
+  }, [overrides, customActors, ttpRiskMap]);
 
-  // Deleted actors list (for restore panel) — reflects live or base source
+  // Deleted actors list (for restore panel) — always from data.json base list
   const deletedActors = useMemo(() =>
-    sourceBaseActors.filter(a => overrides[a.name]?.deleted),
-    [sourceBaseActors, overrides]
+    baseActors.filter(a => overrides[a.name]?.deleted),
+    [overrides]
   );
 
   // ── edit helpers ────────────────────────────────────────────────────────────
@@ -483,17 +470,17 @@ export default function ActorPrioritisation() {
         <div className="flex items-center gap-3 px-4 py-2.5 bg-chart-4/10 border border-chart-4/30 rounded-xl">
           <Activity className="w-4 h-4 text-chart-4 flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <span className="text-xs font-semibold text-chart-4">Live Data Active</span>
+            <span className="text-xs font-semibold text-chart-4">Live Procedures Merged</span>
             <span className="text-xs text-muted-foreground ml-2">{liveActorData.label}</span>
             <span className="text-xs text-muted-foreground ml-2">·</span>
             <span className="text-xs text-muted-foreground ml-2">
-              {liveActorData.actorRanking.length} actors · {liveActorData.procedures.length.toLocaleString()} procedures
+              +{liveActorData.procedures.length.toLocaleString()} procedures added to TTP Risk calculations
             </span>
           </div>
           <button
             onClick={clearLiveActorData}
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-red-400 transition-colors flex-shrink-0"
-            title="Clear live data and revert to base dataset"
+            title="Clear live procedures and revert to base dataset"
           >
             <XCircle className="w-3.5 h-3.5" />Clear
           </button>

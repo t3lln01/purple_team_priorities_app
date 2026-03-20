@@ -3,7 +3,8 @@ import { useSearch } from "wouter";
 import data from "@/data.json";
 import { useSortTable } from "@/hooks/useSortTable";
 import SortableTh from "@/components/SortableTh";
-import { Plus, Upload, Trash2, X, Check, FileJson, FileText, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Upload, Trash2, X, Check, FileJson, FileText, AlertCircle, ChevronDown, ChevronUp, Activity, XCircle } from "lucide-react";
+import { useAppData } from "@/context/AppDataContext";
 
 // ──────────────────────────── types ──────────────────────────────────────────
 type Procedure = {
@@ -564,12 +565,28 @@ function AddForm({ allActors, onSave, onCancel }: {
 // ──────────────────────────── main component ─────────────────────────────────
 export default function AllProcedures() {
   const search = useSearch();
+  const { liveActorData, clearLiveActorData } = useAppData();
 
   const [customProcs, setCustomProcs] = useState<Procedure[]>(loadCustom);
 
+  // Live procedures from CrowdStrike sync — mapped to the local Procedure type
+  const liveProcs = useMemo<Procedure[]>(() => {
+    if (!liveActorData || liveActorData.procedures.length === 0) return [];
+    return liveActorData.procedures.map((p, i) => ({
+      actor:       p.actor,
+      mitreId:     p.mitreId,
+      externalRef: p.externalRef ?? "",
+      procedure:   p.procedure ?? "",
+      date:        p.date,
+      risk:        p.risk,
+      _id:         `live_${i}`,
+    }));
+  }, [liveActorData]);
+
+  // All procedures: base data.json + manually added custom + live CrowdStrike procedures
   const allProcedures = useMemo(
-    () => [...baseProcedures, ...customProcs],
-    [customProcs]
+    () => [...baseProcedures, ...customProcs, ...liveProcs],
+    [customProcs, liveProcs]
   );
 
   const allActors = useMemo(() => Array.from(
@@ -683,6 +700,9 @@ export default function AllProcedures() {
             {customProcs.length > 0 && (
               <span className="text-chart-2"> + {customProcs.length.toLocaleString()} custom</span>
             )}
+            {liveProcs.length > 0 && (
+              <span className="text-chart-4"> + {liveProcs.length.toLocaleString()} live</span>
+            )}
             {" "}= <span className="text-foreground font-medium">{allProcedures.length.toLocaleString()}</span> entries
           </p>
         </div>
@@ -708,6 +728,28 @@ export default function AllProcedures() {
           )}
         </div>
       </div>
+
+      {/* ── Live data indicator ──────────────────────────────────────────── */}
+      {liveActorData && liveProcs.length > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-chart-4/10 border border-chart-4/30 rounded-xl">
+          <Activity className="w-4 h-4 text-chart-4 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <span className="text-xs font-semibold text-chart-4">Live Procedures Merged</span>
+            <span className="text-xs text-muted-foreground ml-2">{liveActorData.label}</span>
+            <span className="text-xs text-muted-foreground ml-2">·</span>
+            <span className="text-xs text-muted-foreground ml-2">
+              +{liveProcs.length.toLocaleString()} procedures from CrowdStrike sync
+            </span>
+          </div>
+          <button
+            onClick={clearLiveActorData}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-red-400 transition-colors flex-shrink-0"
+            title="Clear live procedures"
+          >
+            <XCircle className="w-3.5 h-3.5" />Clear
+          </button>
+        </div>
+      )}
 
       {/* filters */}
       <div className="bg-card border border-card-border rounded-xl p-4 space-y-3">
