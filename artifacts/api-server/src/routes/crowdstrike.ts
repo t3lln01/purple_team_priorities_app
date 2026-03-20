@@ -7,6 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 const ROOT       = path.resolve(__dirname, "../..");
 const SYNC_FILE  = path.join(ROOT, "cs-sync-state.json");
+const CREDS_FILE = path.join(ROOT, "cs-credentials.json");
 
 const CS_BASE = "https://api.us-2.crowdstrike.com";
 
@@ -26,7 +27,62 @@ export interface SyncState {
   actors: Array<{ filename: string; actor: string; entries: any[] }>;
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+interface StoredCreds {
+  clientId: string;
+  clientSecret: string;
+}
+
+// ── Credentials (env vars + file-based fallback) ───────────────────────────────
+
+// In-memory cache of file-based credentials — populated at startup and on update
+let cachedStoredCreds: StoredCreds | null = null;
+
+/** Load credentials from disk and populate the in-memory cache. Call once at startup. */
+export async function initStoredCreds(): Promise<void> {
+  try {
+    const raw = await fs.readFile(CREDS_FILE, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (parsed.clientId && parsed.clientSecret) {
+      cachedStoredCreds = { clientId: parsed.clientId, clientSecret: parsed.clientSecret };
+    }
+  } catch {
+    cachedStoredCreds = null;
+  }
+}
+
+function hasCredentials(): boolean {
+  return !!(process.env.CS_CLIENT_ID && process.env.CS_CLIENT_SECRET) || cachedStoredCreds !== null;
+}
+
+/** Returns the active credentials and their source (env takes precedence over stored). */
+function getActiveCredentials(): { clientId: string; clientSecret: string; source: "env" | "stored" } | null {
+  if (process.env.CS_CLIENT_ID && process.env.CS_CLIENT_SECRET) {
+    return { clientId: process.env.CS_CLIENT_ID, clientSecret: process.env.CS_CLIENT_SECRET, source: "env" };
+  }
+  if (cachedStoredCreds) {
+    return { ...cachedStoredCreds, source: "stored" };
+  }
+  return null;
+}
+
+async function getToken(): Promise<string> {
+  const creds = getActiveCredentials();
+  if (!creds) throw new Error("CrowdStrike credentials are not configured. Enter them in Data Sources → CrowdStrike Intel API.");
+
+  const res = await fetch(`${CS_BASE}/oauth2/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `client_id=${encodeURIComponent(creds.clientId)}&client_secret=${encodeURIComponent(creds.clientSecret)}`,
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`OAuth token request failed (${res.status}): ${body.slice(0, 200)}`);
+  }
+  const data = await res.json() as any;
+  return data.access_token as string;
+}
+
+// ── Sync state ─────────────────────────────────────────────────────────────────
 
 const defaultState = (): SyncState => ({
   status: "never",
@@ -49,28 +105,6 @@ async function loadState(): Promise<SyncState> {
 
 async function saveState(state: SyncState): Promise<void> {
   await fs.writeFile(SYNC_FILE, JSON.stringify(state, null, 2));
-}
-
-function hasCredentials(): boolean {
-  return !!(process.env.CS_CLIENT_ID && process.env.CS_CLIENT_SECRET);
-}
-
-async function getToken(): Promise<string> {
-  const id  = process.env.CS_CLIENT_ID;
-  const sec = process.env.CS_CLIENT_SECRET;
-  if (!id || !sec) throw new Error("CS_CLIENT_ID and CS_CLIENT_SECRET secrets are not configured");
-
-  const res = await fetch(`${CS_BASE}/oauth2/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `client_id=${encodeURIComponent(id)}&client_secret=${encodeURIComponent(sec)}`,
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`OAuth token request failed (${res.status}): ${body.slice(0, 200)}`);
-  }
-  const data = await res.json() as any;
-  return data.access_token as string;
 }
 
 // ── Reports ────────────────────────────────────────────────────────────────────
@@ -325,6 +359,44 @@ export async function maybeAutoSync(): Promise<void> {
 }
 
 // ── Routes ─────────────────────────────────────────────────────────────────────
+
+/** GET /api/cs/credentials — credential source info (never returns actual secrets) */
+csRouter.get("/cs/credentials", (_req, res) => {
+  const creds = getActiveCredentials();
+  const source = creds?.source ?? "none";
+  let clientIdHint: string | null = null;
+  if (creds) {
+    const id = creds.clientId;
+    clientIdHint = id.length > 6 ? `${id.slice(0, 3)}…${id.slice(-3)}` : "•••";
+  }
+  res.json({ configured: hasCredentials(), source, clientIdHint });
+});
+
+/** POST /api/cs/credentials — save credentials to disk */
+csRouter.post("/cs/credentials", async (req, res) => {
+  const { clientId, clientSecret } = req.body ?? {};
+  if (!clientId?.trim() || !clientSecret?.trim()) {
+    res.status(400).json({ ok: false, error: "clientId and clientSecret are required" });
+    return;
+  }
+  const creds: StoredCreds = { clientId: clientId.trim(), clientSecret: clientSecret.trim() };
+  try {
+    await fs.writeFile(CREDS_FILE, JSON.stringify(creds, null, 2));
+    cachedStoredCreds = creds;
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/** DELETE /api/cs/credentials — remove stored credentials */
+csRouter.delete("/cs/credentials", async (_req, res) => {
+  try {
+    await fs.unlink(CREDS_FILE);
+  } catch { /* already gone */ }
+  cachedStoredCreds = null;
+  res.json({ ok: true });
+});
 
 /** GET /api/cs/status — connection status + last sync info */
 csRouter.get("/cs/status", async (_req, res) => {

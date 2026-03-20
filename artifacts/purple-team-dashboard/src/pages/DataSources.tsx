@@ -3,6 +3,7 @@ import {
   Upload, Link2, CheckCircle2, XCircle, Loader2, Trash2,
   ChevronDown, ChevronUp, Plus, Layers,
   RefreshCw, Shield, Clock, AlertCircle, Zap, WifiOff,
+  Eye, EyeOff, KeyRound,
 } from "lucide-react";
 import {
   generateView, StoredActorFile, ReportsLookup,
@@ -283,6 +284,17 @@ export default function DataSources() {
   const csPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const actorFileRef = useRef<HTMLInputElement>(null);
 
+  // ── Credential form state ─────────────────────────────────────────
+  const [csCredSource, setCsCredSource] = useState<"env" | "stored" | "none" | null>(null);
+  const [csCredHint, setCsCredHint]     = useState<string | null>(null);
+  const [csCredsOpen, setCsCredsOpen]   = useState(false);
+  const [csClientId, setCsClientId]     = useState("");
+  const [csClientSecret, setCsClientSecret] = useState("");
+  const [showClientId, setShowClientId]     = useState(false);
+  const [showClientSecret, setShowClientSecret] = useState(false);
+  const [csCredsSaving, setCsCredsSaving] = useState(false);
+  const [csCredsMsg, setCsCredsMsg]       = useState("");
+
   // ── Push-to-app state ────────────────────────────────────────────
   const [pushMsg, setPushMsg] = useState("");
 
@@ -416,8 +428,58 @@ export default function DataSources() {
     } catch {}
   }, [csSyncing]);
 
+  const fetchCsCredentials = useCallback(async () => {
+    try {
+      const res = await fetch(`${CS_API_BASE}/cs/credentials`);
+      if (!res.ok) return;
+      const data = await res.json() as { configured: boolean; source: "env" | "stored" | "none"; clientIdHint: string | null };
+      setCsCredSource(data.source);
+      setCsCredHint(data.clientIdHint);
+    } catch {}
+  }, []);
+
+  async function saveCsCredentials() {
+    if (!csClientId.trim() || !csClientSecret.trim()) {
+      setCsCredsMsg("Both Client ID and Client Secret are required.");
+      return;
+    }
+    setCsCredsSaving(true);
+    setCsCredsMsg("");
+    try {
+      const res = await fetch(`${CS_API_BASE}/cs/credentials`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId: csClientId.trim(), clientSecret: csClientSecret.trim() }),
+      });
+      const data = await res.json() as { ok: boolean; error?: string };
+      if (data.ok) {
+        setCsClientId("");
+        setCsClientSecret("");
+        setCsCredsOpen(false);
+        setCsCredsMsg("");
+        await Promise.all([fetchCsStatus(), fetchCsCredentials()]);
+      } else {
+        setCsCredsMsg(`Error: ${data.error}`);
+      }
+    } catch (e: any) {
+      setCsCredsMsg(`Error: ${e.message}`);
+    } finally {
+      setCsCredsSaving(false);
+    }
+  }
+
+  async function clearCsCredentials() {
+    try {
+      await fetch(`${CS_API_BASE}/cs/credentials`, { method: "DELETE" });
+      setCsCredsMsg("");
+      setCsCredsOpen(false);
+      await Promise.all([fetchCsStatus(), fetchCsCredentials()]);
+    } catch {}
+  }
+
   useEffect(() => {
     fetchCsStatus();
+    fetchCsCredentials();
   }, []);
 
   // Poll every 8 s while syncing
@@ -906,8 +968,15 @@ export default function DataSources() {
           </div>
           {/* Actions */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            {csStatus?.hasCredentials && (
+            {csStatus?.hasCredentials ? (
               <>
+                <button
+                  onClick={() => { setCsCredsOpen(o => !o); setCsCredsMsg(""); }}
+                  title="Manage API credentials"
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-border text-muted-foreground hover:text-foreground hover:border-primary/40 rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
+                >
+                  <KeyRound className="w-3 h-3" />Credentials
+                </button>
                 <button
                   onClick={handleCsConnect}
                   disabled={csConnectResult === "testing"}
@@ -929,26 +998,122 @@ export default function DataSources() {
                   {csSyncing ? "Syncing…" : "Sync Now"}
                 </button>
               </>
+            ) : csStatus !== null && (
+              <button
+                onClick={() => { setCsCredsOpen(true); setCsCredsMsg(""); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/90 transition-colors whitespace-nowrap"
+              >
+                <KeyRound className="w-3 h-3" />Configure Credentials
+              </button>
             )}
           </div>
         </div>
 
         <div className="p-5">
-          {/* Not configured */}
-          {csStatus !== null && !csStatus.hasCredentials && (
-            <div className="rounded-lg bg-yellow-500/5 border border-yellow-500/20 p-4 space-y-2">
-              <p className="text-sm font-semibold text-yellow-400 flex items-center gap-2"><AlertCircle className="w-4 h-4" />API credentials not configured</p>
-              <p className="text-xs text-muted-foreground">
-                Add your CrowdStrike Falcon API credentials as Replit Secrets to enable automatic weekly syncing.
-                Once set, syncs run automatically every 7 days — no manual action needed.
-              </p>
-              <div className="bg-muted/20 border border-border rounded-lg p-3 text-[10px] font-mono text-muted-foreground space-y-0.5">
-                <p><span className="text-primary">CS_CLIENT_ID</span>     — Falcon API client ID</p>
-                <p><span className="text-primary">CS_CLIENT_SECRET</span>  — Falcon API client secret</p>
+          {/* Credential form — shown when not configured OR when user opens it */}
+          {csStatus !== null && (csCredsOpen || !csStatus.hasCredentials) && (
+            <div className={`rounded-xl border p-4 space-y-4 ${csStatus.hasCredentials ? "bg-muted/10 border-border" : "bg-yellow-500/5 border-yellow-500/20"}`}>
+              {/* Header row */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <KeyRound className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-semibold text-foreground">
+                    {csStatus.hasCredentials ? "Update API Credentials" : "Configure API Credentials"}
+                  </span>
+                  {csCredSource === "env" && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 font-medium">ENV VARS ACTIVE</span>
+                  )}
+                  {csCredSource === "stored" && csCredHint && (
+                    <span className="text-[10px] text-muted-foreground font-mono">Client ID: {csCredHint}</span>
+                  )}
+                </div>
+                {csStatus.hasCredentials && (
+                  <button onClick={() => { setCsCredsOpen(false); setCsCredsMsg(""); }} className="text-muted-foreground hover:text-foreground transition-colors">
+                    <XCircle className="w-4 h-4" />
+                  </button>
+                )}
               </div>
-              <p className="text-[10px] text-muted-foreground">
+
+              {/* Env var notice */}
+              {csCredSource === "env" && (
+                <p className="text-xs text-muted-foreground">
+                  Credentials are currently loaded from environment variables (<code className="text-primary text-[10px]">CS_CLIENT_ID</code> / <code className="text-primary text-[10px]">CS_CLIENT_SECRET</code>).
+                  Entering values below will save them to disk and override the env vars.
+                </p>
+              )}
+
+              {/* Inputs */}
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Client ID</label>
+                  <div className="relative">
+                    <input
+                      type={showClientId ? "text" : "password"}
+                      value={csClientId}
+                      onChange={e => setCsClientId(e.target.value)}
+                      placeholder="e.g. abc123def456…"
+                      autoComplete="off"
+                      className="w-full bg-muted/20 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowClientId(v => !v)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showClientId ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Client Secret</label>
+                  <div className="relative">
+                    <input
+                      type={showClientSecret ? "text" : "password"}
+                      value={csClientSecret}
+                      onChange={e => setCsClientSecret(e.target.value)}
+                      placeholder="Falcon API client secret"
+                      autoComplete="off"
+                      className="w-full bg-muted/20 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowClientSecret(v => !v)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showClientSecret ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions row */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  onClick={saveCsCredentials}
+                  disabled={csCredsSaving || !csClientId.trim() || !csClientSecret.trim()}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {csCredsSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                  {csCredsSaving ? "Saving…" : "Save & Connect"}
+                </button>
+                {csCredSource === "stored" && (
+                  <button
+                    onClick={clearCsCredentials}
+                    className="flex items-center gap-1.5 px-3 py-2 border border-red-500/30 text-red-400 hover:bg-red-500/10 rounded-lg text-xs font-medium transition-colors"
+                  >
+                    <Trash2 className="w-3 h-3" />Remove saved credentials
+                  </button>
+                )}
+                {csCredsMsg && (
+                  <p className={`text-xs ${csCredsMsg.startsWith("Error") ? "text-red-400" : "text-muted-foreground"}`}>{csCredsMsg}</p>
+                )}
+              </div>
+
+              {/* Help text */}
+              <p className="text-[10px] text-muted-foreground border-t border-border pt-3">
                 Go to <strong className="text-foreground">Falcon Console → API Clients &amp; Keys</strong> to create a client with <em>Intel</em> read scope.
-                Then add both values in the Replit <strong className="text-foreground">Secrets</strong> tab and restart the API Server workflow.
+                Credentials are saved to the server and never sent to the browser after submission.
               </p>
             </div>
           )}
