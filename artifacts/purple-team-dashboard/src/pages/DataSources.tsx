@@ -1008,7 +1008,7 @@ export default function DataSources() {
           )}
 
           {/* Load result button (done but not auto-loaded) */}
-          {csStatus?.status === "done" && !csSyncing && csStatus.meta.reportCount > 0 && (
+          {csStatus?.status === "done" && !csSyncing && csStatus.meta.actorCount > 0 && (
             <div className="mt-3 flex items-center gap-3">
               <button
                 onClick={() => loadCsResult(csStatus?.meta)}

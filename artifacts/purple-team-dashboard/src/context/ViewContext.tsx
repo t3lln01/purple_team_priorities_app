@@ -74,10 +74,16 @@ export function generateView(
         }
       }
 
-      if (!bestReport) continue;
-
+      // Report matching is optional — include every procedure regardless of
+      // whether its report slugs are in the lookup.  When a match is found we
+      // enrich with the report date and URL; when not, we still keep the entry
+      // so that TTP Risk counts are never silently dropped.
       const latestDate = bestDate > 0 ? bestDate : null;
-      const externalRef = `${actorName.toUpperCase()} ${bestReport.name} - ${bestReport.url}`;
+      const externalRef = bestReport
+        ? `${actorName.toUpperCase()} ${bestReport.name} - ${bestReport.url}`
+        : reports.length > 0
+          ? `${actorName.toUpperCase()} — ${reports.join(", ")}`
+          : `${actorName.toUpperCase()}`;
       const risk = Math.round(reports.length * 100 + observables.length * 50);
       const observablesText = observables.join(" ").trim();
       const procedure = observablesText
