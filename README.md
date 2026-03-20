@@ -1,6 +1,6 @@
 # Purple Team Adversary Prioritisation Dashboard
 
-A dark-themed React dashboard for visualising Purple Team adversary prioritisation data mapped to the MITRE ATT&CK framework. Data is embedded statically (no backend required) and augmented via browser-side file uploads.
+A dark-themed React dashboard for visualising Purple Team adversary prioritisation data mapped to the MITRE ATT&CK framework. Backed by a lightweight Node.js API server that handles CrowdStrike Intel API syncing.
 
 ---
 
@@ -29,27 +29,85 @@ cd purple_team_priorities_app
 # 2. Install all workspace dependencies
 pnpm install
 
-# 3. Start the dev server
-pnpm --filter @workspace/purple-team-dashboard run dev
+# 3. Start both the API server and dashboard together
+pnpm run dev
 ```
 
-Open http://localhost:5173 in your browser.
+| Service | Default URL |
+|---------|-------------|
+| Dashboard | http://localhost:5173 |
+| API server | http://localhost:8080 |
+
+The dashboard proxies all `/api` requests to the API server automatically, so no additional configuration is needed for local development.
 
 ---
 
-## Changing port or base path (optional)
+## CrowdStrike Intel API
 
-By default the dev server runs on port **5173** at path **`/`**. Override with environment variables if needed:
+The API server integrates with the CrowdStrike Falcon Intel API to automatically sync intelligence reports and actor MITRE ATT&CK data on a weekly schedule.
+
+### Configuring credentials
+
+You have two options:
+
+**Option A — Environment variables** (recommended for production / Replit Secrets):
 
 ```bash
-PORT=8080 BASE_PATH=/dashboard/ pnpm --filter @workspace/purple-team-dashboard run dev
+CS_CLIENT_ID=your_client_id
+CS_CLIENT_SECRET=your_client_secret
+```
+
+**Option B — Dashboard UI** (convenient for local deployment):
+
+1. Go to **Data Sources** → **CrowdStrike Intel API**
+2. Click **Configure Credentials**
+3. Enter your Client ID and Client Secret
+4. Click **Save & Connect**
+
+Credentials entered via the UI are saved to `artifacts/api-server/cs-credentials.json` on disk and are excluded from git. Environment variables always take precedence over UI-saved credentials.
+
+To create a CrowdStrike API client: **Falcon Console → API Clients & Keys** — create a client with **Intel** read scope.
+
+### Sync behaviour
+
+- Syncs run automatically once a week
+- The **Sync Now** button triggers an immediate sync
+- Each sync fetches reports from the last 48 hours before the previous sync cutoff (prevents missing reports published near the window boundary)
+- Reports accumulate across syncs — no historical data is lost when a newer sync returns fewer reports
+- After a sync completes, click **Load sync result into dashboard** to merge the new procedures into Actor Prioritisation and All Procedures
+
+### Additive merge
+
+The sync never replaces your actor list. The 34 prioritised actors (with their intent/capability scores) always come from `data.json`. CrowdStrike procedures are **merged on top**, increasing TTP Risk scores without overwriting the base actor table.
+
+---
+
+## Ports and environment variables
+
+| Variable | Service | Default | Description |
+|----------|---------|---------|-------------|
+| `PORT` | API server | `8080` | Port the Express server listens on |
+| `PORT` | Dashboard | `5173` | Port Vite dev server listens on |
+| `API_SERVER_PORT` | Dashboard | `8080` | Port the Vite proxy forwards `/api` requests to |
+| `BASE_PATH` | Dashboard | `/` | URL base path (for subdirectory deployments) |
+| `CS_CLIENT_ID` | API server | — | CrowdStrike Falcon API client ID |
+| `CS_CLIENT_SECRET` | API server | — | CrowdStrike Falcon API client secret |
+
+To run on custom ports:
+
+```bash
+# Start API server on port 9000
+PORT=9000 pnpm --filter @workspace/api-server run dev
+
+# Start dashboard pointing at port 9000
+API_SERVER_PORT=9000 pnpm --filter @workspace/purple-team-dashboard run dev
 ```
 
 Or create `artifacts/purple-team-dashboard/.env`:
 
 ```env
-PORT=8080
-BASE_PATH=/
+PORT=5173
+API_SERVER_PORT=8080
 ```
 
 ---
@@ -57,19 +115,25 @@ BASE_PATH=/
 ## Production build
 
 ```bash
-# Build the app
+# Build the dashboard
 pnpm --filter @workspace/purple-team-dashboard run build
+# Output: artifacts/purple-team-dashboard/dist/public/
 
-# The compiled output lands in:
-# artifacts/purple-team-dashboard/dist/public/
+# Build the API server
+pnpm --filter @workspace/api-server run build
+# Output: artifacts/api-server/dist/
 
-# Serve the build locally to verify
+# Serve the dashboard build locally
 pnpm --filter @workspace/purple-team-dashboard run serve
 ```
 
-The `dist/public/` folder is a standard static-site bundle — deploy it to any web server, S3 bucket, Nginx, GitHub Pages, Netlify, Cloudflare Pages, etc.
+The dashboard `dist/public/` folder is a standard static-site bundle. The API server must be running alongside it in production to serve the `/api/cs/*` routes.
 
-For GitHub Pages or a subdirectory deployment, set `BASE_PATH` to match your repo path before building, e.g. `BASE_PATH=/purple_team_priorities_app/ pnpm --filter @workspace/purple-team-dashboard run build`.
+For a subdirectory deployment set `BASE_PATH` before building:
+
+```bash
+BASE_PATH=/purple-team/ pnpm --filter @workspace/purple-team-dashboard run build
+```
 
 ---
 
@@ -78,19 +142,29 @@ For GitHub Pages or a subdirectory deployment, set `BASE_PATH` to match your rep
 ```
 /
 ├── artifacts/
-│   └── purple-team-dashboard/     # The React app
+│   ├── api-server/                    # Express API server
+│   │   ├── src/
+│   │   │   ├── index.ts               # Entry point (PORT defaults to 8080)
+│   │   │   ├── app.ts                 # Express app + middleware
+│   │   │   └── routes/
+│   │   │       └── crowdstrike.ts     # CS Intel API sync + credential routes
+│   │   ├── cs-sync-state.json         # Persisted sync state (reports + actor MITRE data)
+│   │   └── cs-credentials.json        # UI-saved credentials (gitignored)
+│   │
+│   └── purple-team-dashboard/         # React + Vite dashboard
 │       ├── src/
-│       │   ├── data.json          # Static MITRE ATT&CK v16 seed data
+│       │   ├── data.json              # Static MITRE ATT&CK v16 seed data + actor list
 │       │   ├── context/
-│       │   │   └── ViewContext.tsx  # Saved-view state + generation logic
+│       │   │   ├── AppDataContext.tsx  # Global state (live actor data, MITRE versions)
+│       │   │   └── ViewContext.tsx     # Procedure generation logic + localStorage helpers
 │       │   └── pages/
 │       │       ├── ActorPrioritisation.tsx
 │       │       ├── RiskCalculation.tsx
+│       │       ├── ImpactTable.tsx
 │       │       ├── AllProcedures.tsx
-│       │       ├── DataSources.tsx
-│       │       └── ViewDetail.tsx
-│       └── vite.config.ts
-├── package.json                   # Workspace root
+│       │       └── DataSources.tsx
+│       └── vite.config.ts             # Proxies /api → API server
+├── package.json                       # Workspace root — `pnpm run dev` starts everything
 └── pnpm-workspace.yaml
 ```
 
@@ -100,45 +174,42 @@ For GitHub Pages or a subdirectory deployment, set `BASE_PATH` to match your rep
 
 | Page | Route | Description |
 |------|-------|-------------|
-| Actor Prioritisation | `/` | Ranked actor table, TTP risk chart, active-monitoring chips |
-| Risk Calculation | `/risk-calculation` | Per-technique risk scores from embedded data |
+| Actor Prioritisation | `/` | Ranked actor table, TTP risk chart, intent/capability scoring |
+| Risk Calculation | `/risk-calculation` | Per-technique risk scores |
+| Impact Table | `/impact-table` | CIA impact matrix |
 | High Value Assets | `/high-value-assets` | HVA matrix |
 | TID Priority | `/tid-priority` | Threat intelligence directive scoring |
 | Tactic Scores | `/tactics-scores` | MITRE tactic-level coverage breakdown |
 | Risk Rate | `/risk-rate` | Risk rate heatmap |
 | All Procedures | `/all-procedures` | Full searchable/filterable procedure table |
-| Data Sources | `/data-sources` | Upload external data and generate new views |
-| Saved View | `/view/:id` | Generated view with actor ranking + procedures |
+| Data Sources | `/data-sources` | Upload external data and sync CrowdStrike |
 
 ---
 
 ## Data Sources — uploading external intelligence
 
-The **Data Sources** page lets you layer real-world threat intelligence on top of the embedded data and generate a new saved view. All uploaded data is stored in your browser's `localStorage` and survives page refreshes.
+### 1. Reports (CSV or JSON)
 
-### 1. Reports CSV (required for view generation)
-
-Upload your CrowdStrike reports export as a **CSV file** with the following columns:
+**CSV format** (preferred):
 
 | Column | Description | Example |
 |--------|-------------|---------|
-| `id` | Report identifier (uppercased for matching) | `CSA-240217` |
+| `id` | Report identifier (case-insensitive match) | `CSA-240217` |
 | `name` | Report title | `2024 Threat Intelligence Report` |
 | `url` | Full URL to the report | `https://falcon.crowdstrike.com/...` |
 | `date` | Publication date — **DD/MM/YYYY** | `17/02/2024` |
 
-The `date` column uses the same format as the reference Python script (`%d/%m/%Y`).
+**JSON format** (`api_object.resources[]` or `resources[]`):
 
-A JSON fallback is also accepted (`api_object.resources[]` format with `slug`, `name`, `url`, `last_modified_date` or `created_date`).
+Fields used: `slug` (or `id`), `name`, `url`, `last_modified_date` → `last_updated` → `created_date` (tried in that order for the date).
 
-### 2. Actor Mapping JSON (required for view generation)
+### 2. Actor Mapping JSON
 
-Upload one JSON file per threat actor (e.g. `SCATTERED_SPIDER.json`). Each file is an array of TTP entries:
+One JSON file per threat actor (e.g. `SCATTERED_SPIDER.json`). Each file is an array of TTP entries:
 
 ```json
 [
   {
-    "tactic_id": "TA0001",
     "tactic_name": "Initial Access",
     "technique_id": "T1078",
     "technique_name": "Valid Accounts",
@@ -149,66 +220,45 @@ Upload one JSON file per threat actor (e.g. `SCATTERED_SPIDER.json`). Each file 
 ```
 
 - Multiple files can be uploaded simultaneously — each becomes one actor.
-- Actor name is inferred from the filename (e.g. `SCATTERED_SPIDER.json` → *Scattered Spider*) and can be renamed inline.
-- The `reports` array contains IDs that are matched (case-insensitively) against the Reports CSV `id` column.
+- Actor name is inferred from the filename and can be renamed inline.
+- `reports` entries are matched case-insensitively against the reports lookup.
 
-### 3. MITRE ATT&CK (optional)
+### 3. Push to Actor Prioritisation
 
-Fetch the Enterprise ATT&CK STIX bundle directly in-browser or upload a local copy. Provides technique descriptions for enrichment.
+Once actor mapping files are loaded, click **Push to Actor Prioritisation** to merge the procedures into the live dashboard. This adds to TTP Risk scores without replacing the base actor list or intent/capability values.
 
-Default URL (auto-populated):
-```
-https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json
-```
+### 4. MITRE ATT&CK (optional)
 
-> The file is ~75 MB. If the fetch times out, use the **download link** shown in the error state and upload the file manually.
-
-### Generating a view
-
-Once at least one actor mapping file is loaded:
-
-1. Click **Generate & Save View** at the bottom of the Data Sources page.
-2. A modal shows a preview (actor count, procedure count).
-3. Name the view and click **Save & Open View**.
-4. The new view appears in the sidebar under **Saved Views** and at `/view/:id`.
-
-Views never overwrite the built-in dashboard data. Each view shows:
-- Actor ranking table (sorted by TTP risk score)
-- TTP Risk by Actor bar chart
-- Tactic coverage breakdown
-- Filterable, paginated procedures table with report ID, title, URL, and date
+Fetch the Enterprise ATT&CK STIX bundle directly in-browser to enrich the dashboard with the latest technique data. The file is ~75 MB — if the fetch times out, download it manually and upload via the file picker.
 
 ---
 
-## Report-matching logic
+## Procedure extraction rules
 
-The generation logic mirrors the reference Python script:
+A procedure entry is included only when **all** of the following are true:
 
-```
-For each actor file:
-  For each TTP entry:
-    Resolve all report IDs → look up in Reports CSV by id.upper()
-    Pick the report with the latest date (best_report)
-    If no match → skip this entry entirely
-    
-    Procedure  = '[Actor] - {observables joined by space}'
-    Date       = best_report['date']
-    Report Ref = '{ACTOR_UPPER} {report_name} - {report_url}'
-```
+| Rule | Detail |
+|------|--------|
+| Non-empty observables | Entries where `observables` is empty are skipped — they produce no meaningful procedure text |
+| Matched report | At least one report slug in the entry must resolve to a known report in the lookup |
+| Resolvable date | The matched report must have a non-zero date (`last_modified_date` → `last_updated` → `created_date`) |
 
 ---
 
-## Saved views storage
+## localStorage keys
 
-| localStorage key | Contents |
-|-----------------|----------|
-| `pt_saved_views` | Array of generated view objects |
-| `ds_actormap_files` | Uploaded actor mapping entries (persisted for re-generation) |
+| Key | Contents |
+|-----|----------|
+| `pt_live_actor_data` | Merged live procedures from the last sync or manual push |
+| `pt_actor_overrides` | Inline edits to actor intent/capability/label in the prioritisation table |
+| `pt_actor_custom` | Custom actors added via the UI |
+| `pt_procedures_custom` | Manually added procedures |
+| `pt_mitre_versions_meta` | Loaded MITRE ATT&CK version metadata |
+| `pt_active_mitre_version` | Currently selected MITRE version ID |
+| `ds_actormap_files` | Uploaded actor mapping files (persisted for re-use) |
 | `ds_reports_lookup` | Parsed reports lookup (keyed by uppercased report ID) |
-| `ds_reports_stats` | Reports summary stats (for the UI panel) |
+| `ds_reports_stats` | Reports summary stats for the UI panel |
 | `ds_mitre_stats` | MITRE ATT&CK parse summary |
-
-Clear any of these with the trash icon on the relevant Data Sources panel, or via the browser's DevTools → Application → Local Storage.
 
 ---
 
@@ -216,38 +266,42 @@ Clear any of these with the trash icon on the relevant Data Sources panel, or vi
 
 | Layer | Library |
 |-------|---------|
-| Framework | React 19 + TypeScript |
+| Frontend framework | React 19 + TypeScript |
 | Build tool | Vite 7 |
 | Styling | Tailwind CSS v4 |
 | Routing | Wouter |
-| UI components | Radix UI + shadcn/ui |
 | Charts | Recharts |
 | Icons | Lucide React |
+| API server | Express + tsx |
 | Package manager | pnpm (workspace monorepo) |
 
 ---
 
 ## Troubleshooting
 
-**`ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL` / Exit status 1**
+**`ECONNREFUSED` on `/api/cs/status`**
 
-Run the command with output redirected so you can see the actual Vite error:
+The dashboard can't reach the API server. Make sure it's running:
 
 ```bash
-pnpm --filter @workspace/purple-team-dashboard run dev 2>&1 | head -50
+pnpm --filter @workspace/api-server run dev
 ```
 
-Common causes and fixes:
+Or use `pnpm run dev` from the repo root to start both together.
 
-| Symptom | Fix |
-|---------|-----|
-| You ran `sudo pnpm …` | Never use `sudo` with pnpm — it changes the home directory and breaks the pnpm store. Run without sudo. |
-| Node.js < 18 | This project requires Node.js 18 or later. Check with `node --version`. |
-| Conda `(base)` environment | The conda Node.js may be outdated. Install Node.js via [nvm](https://github.com/nvm-sh/nvm) instead and run outside conda. |
+**CrowdStrike sync returns 0 reports**
+
+This is normal on incremental syncs when no new reports have been published since the last run. Previously synced reports are preserved in `cs-sync-state.json` and remain available via **Load sync result into dashboard**.
+
+**Procedures not appearing after sync**
+
+All three extraction rules must be satisfied: non-empty observables, a matched report, and a resolvable date. Check that your reports lookup contains the report IDs referenced in the actor mapping files.
+
+**MITRE ATT&CK fetch fails**
+
+The raw GitHub file is ~75 MB. Download it manually from the link shown on the error panel and upload it via the file picker.
 
 **Node.js version**
-
-Check your version:
 
 ```bash
 node --version   # needs to be v18 or higher
@@ -260,14 +314,3 @@ Install the latest Node.js LTS via [nvm](https://github.com/nvm-sh/nvm):
 nvm install --lts
 nvm use --lts
 ```
-
----
-
-**MITRE ATT&CK fetch fails**
-The raw GitHub file is ~75 MB. Download it manually from the link shown on the error panel and upload it via the file picker.
-
-**Generated view has no procedures**
-This means none of the report IDs in your actor mapping files matched any `id` in your Reports CSV. Check that the `id` column values match the strings in the actor mapping `reports` arrays (comparison is case-insensitive).
-
-**Saved views disappeared**
-Views are stored in `localStorage`. Clearing browser data or using private/incognito mode will remove them.
