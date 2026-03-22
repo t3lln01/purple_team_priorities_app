@@ -133,7 +133,10 @@ const LS_ACTOR_FILES = "ds_actormap_files";
 const LS_REPORTS_LOOKUP = "ds_reports_lookup";
 
 export function loadActorFiles(): StoredActorFile[] {
-  try { return JSON.parse(localStorage.getItem(LS_ACTOR_FILES) ?? "[]"); } catch { return []; }
+  try {
+    const files: StoredActorFile[] = JSON.parse(localStorage.getItem(LS_ACTOR_FILES) ?? "[]");
+    return files.map(f => ({ ...f, actor: typeof f.actor === "string" ? f.actor.toUpperCase() : f.actor }));
+  } catch { return []; }
 }
 export function saveActorFiles(files: StoredActorFile[]) {
   try { localStorage.setItem(LS_ACTOR_FILES, JSON.stringify(files)); } catch {}

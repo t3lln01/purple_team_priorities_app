@@ -567,7 +567,7 @@ export default function DataSources() {
       if (data.actors && data.actors.length > 0) {
         const incoming: StoredActorFile[] = data.actors.map((a: any) => ({
           filename: a.filename,
-          actor: a.actor,
+          actor: typeof a.actor === "string" ? a.actor.toUpperCase() : a.actor,
           entries: Array.isArray(a.entries) ? a.entries.map((e: any) => ({
             tactic_name: e.tactic_name ?? "",
             technique_id: e.technique_id ?? "",

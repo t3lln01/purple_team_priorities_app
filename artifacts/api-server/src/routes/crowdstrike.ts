@@ -252,7 +252,8 @@ async function syncActorsMitre(token: string): Promise<SyncState["actors"]> {
         const raw = await res.json() as any;
         const entries = normalizeMitreEntries(raw);
         if (entries.length > 0) {
-          const name: string = actor.name ?? actor.slug ?? String(actor.id);
+          const rawName: string = actor.name ?? actor.slug ?? String(actor.id);
+          const name = rawName.toUpperCase();
           result.push({ filename: `${name}.json`, actor: name, entries });
         }
       }
