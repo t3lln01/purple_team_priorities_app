@@ -5,6 +5,7 @@ import { useSortTable } from "@/hooks/useSortTable";
 import SortableTh from "@/components/SortableTh";
 import { Pencil, Check, X, RotateCcw, Trash2, Plus, Undo2, ChevronDown, ChevronUp, CalendarRange, Shield, Activity, XCircle } from "lucide-react";
 import { useAppData } from "@/context/AppDataContext";
+import { toTitleCase } from "@/context/ViewContext";
 
 type Actor = {
   name: string;
@@ -309,10 +310,10 @@ export default function ActorPrioritisation() {
 
   // ── add new actor ────────────────────────────────────────────────────────────
   function commitAdd() {
-    const name = newForm.name.trim().toUpperCase();
+    const name = toTitleCase(newForm.name.trim());
     if (!name) { setNewNameError("Name is required"); return; }
     const allNames = actors.map(a => a.name.toUpperCase());
-    if (allNames.includes(name)) { setNewNameError("Actor already exists"); return; }
+    if (allNames.includes(name.toUpperCase())) { setNewNameError("Actor already exists"); return; }
     const next = [...customActors, { name, intent: newForm.intent, capability: newForm.capability }];
     setCustomActors(next);
     saveCustom(next);

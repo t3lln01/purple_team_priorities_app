@@ -1,5 +1,11 @@
 // ── Pure generation utilities — no saved-view state ───────────────────────────
 
+/** Converts any actor-name casing to canonical Title Case.
+ *  "ALPHA SPIDER" → "Alpha Spider", "alpha spider" → "Alpha Spider" */
+export function toTitleCase(str: string): string {
+  return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+
 export type ViewProcedure = {
   actor: string;
   mitreId: string;
@@ -54,8 +60,13 @@ export function generateView(
 ): { procedures: ViewProcedure[]; actorRanking: ViewActorRank[] } {
   const procedures: ViewProcedure[] = [];
 
+  // Deduplicate by actor (normalised) + technique + observables so the same
+  // entry stored under two different casings collapses to one row.
+  const seen = new Set<string>();
+
   for (const file of actorFiles) {
-    const actorName = file.actor;
+    // Normalise to canonical Title Case regardless of source casing
+    const actorName = toTitleCase(file.actor);
 
     for (const entry of file.entries) {
       const mitreId = entry.technique_id.toUpperCase().replace(/^T(?=\d)/, "T");
@@ -86,9 +97,15 @@ export function generateView(
       // Require a resolvable date — skip if neither last_updated nor created_date is set
       if (bestDate === 0) continue;
 
-      const externalRef = `${actorName.toUpperCase()} ${bestReport.name} - ${bestReport.url}`;
-      const risk = Math.round(reports.length * 100 + observables.length * 50);
       const observablesText = observables.join(" ").trim();
+
+      // Collapse duplicates produced by same entry stored under different actor casings
+      const dedupKey = `${actorName}||${mitreId}||${observablesText}`;
+      if (seen.has(dedupKey)) continue;
+      seen.add(dedupKey);
+
+      const externalRef = `${actorName} ${bestReport.name} - ${bestReport.url}`;
+      const risk = Math.round(reports.length * 100 + observables.length * 50);
       const procedure = `[${actorName}] - ${observablesText}`;
 
       procedures.push({
@@ -105,6 +122,7 @@ export function generateView(
     }
   }
 
+  // Group by normalised actor name (already title-cased above)
   const byActor: Record<string, ViewProcedure[]> = {};
   for (const p of procedures) {
     (byActor[p.actor] ??= []).push(p);
@@ -135,7 +153,7 @@ const LS_REPORTS_LOOKUP = "ds_reports_lookup";
 export function loadActorFiles(): StoredActorFile[] {
   try {
     const files: StoredActorFile[] = JSON.parse(localStorage.getItem(LS_ACTOR_FILES) ?? "[]");
-    return files.map(f => ({ ...f, actor: typeof f.actor === "string" ? f.actor.toUpperCase() : f.actor }));
+    return files.map(f => ({ ...f, actor: typeof f.actor === "string" ? toTitleCase(f.actor) : f.actor }));
   } catch { return []; }
 }
 export function saveActorFiles(files: StoredActorFile[]) {

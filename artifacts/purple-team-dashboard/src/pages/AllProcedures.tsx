@@ -5,6 +5,7 @@ import { useSortTable } from "@/hooks/useSortTable";
 import SortableTh from "@/components/SortableTh";
 import { Plus, Upload, Trash2, X, Check, FileJson, FileText, AlertCircle, ChevronDown, ChevronUp, Activity, XCircle, Download } from "lucide-react";
 import { useAppData } from "@/context/AppDataContext";
+import { toTitleCase } from "@/context/ViewContext";
 
 // ──────────────────────────── types ──────────────────────────────────────────
 type Procedure = {
@@ -19,9 +20,9 @@ type Procedure = {
 };
 
 // ──────────────────────────── static data ────────────────────────────────────
-const baseProcedures: Procedure[] = ((data as any).allProcedures as Procedure[]).filter(
-  p => { const t = (p.procedure ?? "").trim(); return t !== "" && !/^\[.+\]\s*-\s*$/.test(t); }
-);
+const baseProcedures: Procedure[] = ((data as any).allProcedures as Procedure[])
+  .filter(p => { const t = (p.procedure ?? "").trim(); return t !== "" && !/^\[.+\]\s*-\s*$/.test(t); })
+  .map(p => ({ ...p, actor: typeof p.actor === "string" ? toTitleCase(p.actor) : p.actor }));
 const techTacticMap: Record<string, string[]> = (data as any).techTacticMap ?? {};
 const techNameMap: Record<string, string> = (data as any).techNameMap ?? {};
 
@@ -547,7 +548,7 @@ function AddForm({ allActors, onSave, onCancel }: {
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
     onSave({
-      actor:       form.actor.trim(),
+      actor:       toTitleCase(form.actor.trim()),
       mitreId:     form.mitreId.trim().toUpperCase(),
       procedure:   form.procedure.trim(),
       date:        form.date ? parseDate(form.date) : null,

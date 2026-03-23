@@ -253,7 +253,7 @@ async function syncActorsMitre(token: string): Promise<SyncState["actors"]> {
         const entries = normalizeMitreEntries(raw);
         if (entries.length > 0) {
           const rawName: string = actor.name ?? actor.slug ?? String(actor.id);
-          const name = rawName.toUpperCase();
+          const name = rawName.toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase());
           result.push({ filename: `${name}.json`, actor: name, entries });
         }
       }

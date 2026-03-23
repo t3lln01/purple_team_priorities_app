@@ -8,6 +8,7 @@ import {
 import {
   generateView, StoredActorFile, ReportsLookup,
   loadActorFiles, saveActorFiles, loadReportsLookup, saveReportsLookup,
+  toTitleCase,
 } from "@/context/ViewContext";
 import { useAppData, buildMitreVersionData, type LiveActorData } from "@/context/AppDataContext";
 
@@ -567,7 +568,7 @@ export default function DataSources() {
       if (data.actors && data.actors.length > 0) {
         const incoming: StoredActorFile[] = data.actors.map((a: any) => ({
           filename: a.filename,
-          actor: typeof a.actor === "string" ? a.actor.toUpperCase() : a.actor,
+          actor: typeof a.actor === "string" ? toTitleCase(a.actor) : a.actor,
           entries: Array.isArray(a.entries) ? a.entries.map((e: any) => ({
             tactic_name: e.tactic_name ?? "",
             technique_id: e.technique_id ?? "",
