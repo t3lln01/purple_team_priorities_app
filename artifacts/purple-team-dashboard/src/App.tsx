@@ -13,7 +13,7 @@ import AllProcedures from "@/pages/AllProcedures";
 import DataSources from "@/pages/DataSources";
 import { TacticScoresProvider }    from "@/context/TacticScoresContext";
 import { LikelihoodProvider }       from "@/context/LikelihoodContext";
-import { AppDataProvider }          from "@/context/AppDataContext";
+import { AppDataProvider, useAppData } from "@/context/AppDataContext";
 import { ImpactOverridesProvider }  from "@/context/ImpactOverridesContext";
 import { HVAScoresProvider }        from "@/context/HVAScoresContext";
 import { Shield, Users, Activity, Target, ChartBar, AlertTriangle, List, Database, Table2, TrendingUp } from "lucide-react";
@@ -37,6 +37,11 @@ const navItems = [
 
 function Sidebar() {
   const [location] = useLocation();
+  const { mitreVersions, activeMitreVersionId } = useAppData();
+  const activeVersion = activeMitreVersionId
+    ? mitreVersions.find(v => v.id === activeMitreVersionId)
+    : null;
+  const mitreLabel = activeVersion?.label ?? "MITRE ATT&CK v16";
 
   return (
     <aside className="w-64 min-h-screen bg-sidebar border-r border-sidebar-border flex flex-col">
@@ -71,7 +76,7 @@ function Sidebar() {
       </nav>
 
       <div className="p-4 border-t border-sidebar-border">
-        <div className="text-xs text-muted-foreground">MITRE ATT&CK v16</div>
+        <div className="text-xs text-muted-foreground">{mitreLabel}</div>
         <div className="text-xs text-muted-foreground">Purple Team Framework</div>
       </div>
     </aside>
