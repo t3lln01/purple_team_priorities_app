@@ -113,19 +113,19 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <TacticScoresProvider>
-          <LikelihoodProvider>
-            <ImpactOverridesProvider>
-              <HVAScoresProvider>
-                <AppDataProvider>
+        <AppDataProvider>
+          <TacticScoresProvider>
+            <LikelihoodProvider>
+              <ImpactOverridesProvider>
+                <HVAScoresProvider>
                   <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
                     <Router />
                   </WouterRouter>
-                </AppDataProvider>
-              </HVAScoresProvider>
-            </ImpactOverridesProvider>
-          </LikelihoodProvider>
-        </TacticScoresProvider>
+                </HVAScoresProvider>
+              </ImpactOverridesProvider>
+            </LikelihoodProvider>
+          </TacticScoresProvider>
+        </AppDataProvider>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

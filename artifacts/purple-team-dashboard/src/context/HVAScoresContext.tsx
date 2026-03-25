@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, ReactNode } from "react";
+import { useAppData } from "@/context/AppDataContext";
 
 export type HVAScore = {
   tid: string;
@@ -6,18 +7,23 @@ export type HVAScore = {
   avgLikelihood: number;
 };
 
-const LS_KEY = "pt_hva_scores";
+const LS_BASE = "pt_hva_scores";
 
-function load(): HVAScore[] {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "[]"); } catch { return []; }
+function fromStorage(key: string): HVAScore[] {
+  try { return JSON.parse(localStorage.getItem(key) ?? "[]"); } catch { return []; }
 }
-function persist(v: HVAScore[]) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(v)); } catch {}
+function toStorage(key: string, v: HVAScore[]) {
+  try { localStorage.setItem(key, JSON.stringify(v)); } catch {}
+}
+function migrate() {
+  const baseKey = `${LS_BASE}:base`;
+  if (!localStorage.getItem(baseKey) && localStorage.getItem(LS_BASE)) {
+    localStorage.setItem(baseKey, localStorage.getItem(LS_BASE)!);
+  }
 }
 
 type Ctx = {
   hvaScores: HVAScore[];
-  /** Keyed by TID — ready-made lookup for RiskCalculation and LikelihoodTable */
   hvaScoreMap: Record<string, { avgRisk: number; avgLikelihood: number }>;
   setHVAScores: (scores: HVAScore[]) => void;
 };
@@ -25,11 +31,25 @@ type Ctx = {
 const HVAScoresCtx = createContext<Ctx>(null!);
 
 export function HVAScoresProvider({ children }: { children: ReactNode }) {
-  const [hvaScores, setHVAScoresState] = useState<HVAScore[]>(load);
+  const { activeMitreVersionId } = useAppData();
+  const versionKey = activeMitreVersionId ?? "base";
+  const lsKey = `${LS_BASE}:${versionKey}`;
+  const lsKeyRef = useRef(lsKey);
+
+  const [hvaScores, setHVAScoresState] = useState<HVAScore[]>(() => {
+    migrate();
+    return fromStorage(`${LS_BASE}:base`);
+  });
+
+  useEffect(() => {
+    migrate();
+    lsKeyRef.current = lsKey;
+    setHVAScoresState(fromStorage(lsKey));
+  }, [lsKey]);
 
   const setHVAScores = useCallback((scores: HVAScore[]) => {
     setHVAScoresState(scores);
-    persist(scores);
+    toStorage(lsKeyRef.current, scores);
   }, []);
 
   const hvaScoreMap = useMemo(

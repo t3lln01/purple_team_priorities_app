@@ -1,17 +1,24 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from "react";
+import { useAppData } from "@/context/AppDataContext";
 
 export type LikelihoodOverride = {
   lastOccurrence?: string;
   confidence?: string;
 };
 
-const LS_KEY = "pt_likelihood_overrides";
+const LS_BASE = "pt_likelihood_overrides";
 
-function load(): Record<string, LikelihoodOverride> {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "{}"); } catch { return {}; }
+function fromStorage(key: string): Record<string, LikelihoodOverride> {
+  try { return JSON.parse(localStorage.getItem(key) ?? "{}"); } catch { return {}; }
 }
-function persist(v: Record<string, LikelihoodOverride>) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(v)); } catch {}
+function toStorage(key: string, v: Record<string, LikelihoodOverride>) {
+  try { localStorage.setItem(key, JSON.stringify(v)); } catch {}
+}
+function migrate() {
+  const baseKey = `${LS_BASE}:base`;
+  if (!localStorage.getItem(baseKey) && localStorage.getItem(LS_BASE)) {
+    localStorage.setItem(baseKey, localStorage.getItem(LS_BASE)!);
+  }
 }
 
 type Ctx = {
@@ -24,12 +31,26 @@ type Ctx = {
 const LikelihoodCtx = createContext<Ctx>(null!);
 
 export function LikelihoodProvider({ children }: { children: ReactNode }) {
-  const [overrides, setOverrides] = useState<Record<string, LikelihoodOverride>>(load);
+  const { activeMitreVersionId } = useAppData();
+  const versionKey = activeMitreVersionId ?? "base";
+  const lsKey = `${LS_BASE}:${versionKey}`;
+  const lsKeyRef = useRef(lsKey);
+
+  const [overrides, setOverrides] = useState<Record<string, LikelihoodOverride>>(() => {
+    migrate();
+    return fromStorage(`${LS_BASE}:base`);
+  });
+
+  useEffect(() => {
+    migrate();
+    lsKeyRef.current = lsKey;
+    setOverrides(fromStorage(lsKey));
+  }, [lsKey]);
 
   const setOverride = useCallback((tid: string, patch: Partial<LikelihoodOverride>) => {
     setOverrides(prev => {
       const next = { ...prev, [tid]: { ...prev[tid], ...patch } };
-      persist(next);
+      toStorage(lsKeyRef.current, next);
       return next;
     });
   }, []);
@@ -38,14 +59,14 @@ export function LikelihoodProvider({ children }: { children: ReactNode }) {
     setOverrides(prev => {
       const next = { ...prev };
       delete next[tid];
-      persist(next);
+      toStorage(lsKeyRef.current, next);
       return next;
     });
   }, []);
 
   const resetAll = useCallback(() => {
     setOverrides({});
-    persist({});
+    toStorage(lsKeyRef.current, {});
   }, []);
 
   return (

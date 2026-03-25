@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect, Fragment } from "react";
+import { useState, useMemo, useEffect, useRef, Fragment } from "react";
 import { Link } from "wouter";
 import data from "@/data.json";
+import { useAppData } from "@/context/AppDataContext";
 import { Plus, Pencil, Trash2, Check, X, RotateCcw, Info } from "lucide-react";
 import { useSortTable } from "@/hooks/useSortTable";
 import { useHVAScores } from "@/context/HVAScoresContext";
@@ -50,14 +51,18 @@ const techNameMap: Record<string, string> = (data as any).techNameMap ?? {};
 
 // ── localStorage ───────────────────────────────────────────────────────────────
 
-const LS_CUSTOM    = "pt_hva_custom";
-const LS_OVERRIDES = "pt_hva_overrides";
-const LS_SCORES    = "pt_hva_scores";
+const LS_CUSTOM_BASE    = "pt_hva_custom";
+const LS_OVERRIDES_BASE = "pt_hva_overrides";
 
-function loadCustom(): HVRow[]                      { try { return JSON.parse(localStorage.getItem(LS_CUSTOM)    ?? "[]"); } catch { return []; } }
-function loadOverrides(): Record<string, Partial<HVRow>> { try { return JSON.parse(localStorage.getItem(LS_OVERRIDES) ?? "{}"); } catch { return {}; } }
-function saveCustom(rows: HVRow[])                  { try { localStorage.setItem(LS_CUSTOM, JSON.stringify(rows)); }    catch {} }
-function saveOverrides(ov: Record<string, Partial<HVRow>>) { try { localStorage.setItem(LS_OVERRIDES, JSON.stringify(ov)); } catch {} }
+function loadCustomFromKey(key: string): HVRow[]                      { try { return JSON.parse(localStorage.getItem(key) ?? "[]"); } catch { return []; } }
+function loadOverridesFromKey(key: string): Record<string, Partial<HVRow>> { try { return JSON.parse(localStorage.getItem(key) ?? "{}"); } catch { return {}; } }
+function saveCustom(key: string, rows: HVRow[])                      { try { localStorage.setItem(key, JSON.stringify(rows)); }    catch {} }
+function saveOverrides(key: string, ov: Record<string, Partial<HVRow>>) { try { localStorage.setItem(key, JSON.stringify(ov)); } catch {} }
+
+function migrateHVA() {
+  if (!localStorage.getItem(`${LS_CUSTOM_BASE}:base`)    && localStorage.getItem(LS_CUSTOM_BASE))    localStorage.setItem(`${LS_CUSTOM_BASE}:base`,    localStorage.getItem(LS_CUSTOM_BASE)!);
+  if (!localStorage.getItem(`${LS_OVERRIDES_BASE}:base`) && localStorage.getItem(LS_OVERRIDES_BASE)) localStorage.setItem(`${LS_OVERRIDES_BASE}:base`, localStorage.getItem(LS_OVERRIDES_BASE)!);
+}
 
 /** Recompute HVScores from all rows (pure function — caller handles persistence) */
 function recomputeHVScores(all: HVRow[]) {
@@ -97,9 +102,23 @@ function blankForm(): HVRow {
 
 export default function HighValueAssets() {
   const { setHVAScores } = useHVAScores();
+  const { activeMitreVersionId } = useAppData();
+  const versionKey    = activeMitreVersionId ?? "base";
+  const lsCustomKey   = `${LS_CUSTOM_BASE}:${versionKey}`;
+  const lsOverrideKey = `${LS_OVERRIDES_BASE}:${versionKey}`;
+  const lsCustomRef   = useRef(lsCustomKey);
+  const lsOvRef       = useRef(lsOverrideKey);
 
-  const [custom, setCustom]       = useState<HVRow[]>(loadCustom);
-  const [overrides, setOverrides] = useState<Record<string, Partial<HVRow>>>(loadOverrides);
+  const [custom, setCustom]       = useState<HVRow[]>(() => { migrateHVA(); return loadCustomFromKey(`${LS_CUSTOM_BASE}:base`); });
+  const [overrides, setOverrides] = useState<Record<string, Partial<HVRow>>>(() => loadOverridesFromKey(`${LS_OVERRIDES_BASE}:base`));
+
+  useEffect(() => {
+    migrateHVA();
+    lsCustomRef.current = lsCustomKey;
+    lsOvRef.current     = lsOverrideKey;
+    setCustom(loadCustomFromKey(lsCustomKey));
+    setOverrides(loadOverridesFromKey(lsOverrideKey));
+  }, [lsCustomKey, lsOverrideKey]);
 
   const [search, setSearch]           = useState("");
   const [targetFilter, setTargetFilter] = useState("All");
@@ -194,7 +213,7 @@ export default function HighValueAssets() {
     };
     const next = [...custom, newEntry];
     setCustom(next);
-    saveCustom(next);
+    saveCustom(lsCustomRef.current, next);
     setAddForm(blankForm());
     setShowAdd(false);
   }
@@ -204,13 +223,13 @@ export default function HighValueAssets() {
       const idx = parseInt(key.slice(2));
       const next = custom.filter((_, i) => i !== idx);
       setCustom(next);
-      saveCustom(next);
+      saveCustom(lsCustomRef.current, next);
     } else {
       // Baseline rows can't be deleted, but overrides can be reset
       const nextOv = { ...overrides };
       delete nextOv[key];
       setOverrides(nextOv);
-      saveOverrides(nextOv);
+      saveOverrides(lsOvRef.current, nextOv);
     }
   }
 
@@ -252,11 +271,11 @@ export default function HighValueAssets() {
       const idx = parseInt(editId.slice(2));
       const next = custom.map((r, i) => i === idx ? { ...r, ...editForm } as HVRow : r);
       setCustom(next);
-      saveCustom(next);
+      saveCustom(lsCustomRef.current, next);
     } else {
       const nextOv = { ...overrides, [editId]: editForm };
       setOverrides(nextOv);
-      saveOverrides(nextOv);
+      saveOverrides(lsOvRef.current, nextOv);
     }
     setEditId(null);
     setEditForm({});
@@ -271,7 +290,7 @@ export default function HighValueAssets() {
     const nextOv = { ...overrides };
     delete nextOv[key];
     setOverrides(nextOv);
-    saveOverrides(nextOv);
+    saveOverrides(lsOvRef.current, nextOv);
   }
 
   return (

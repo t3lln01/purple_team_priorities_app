@@ -1,0 +1,26 @@
+﻿AD source names,Container source names,Cloud source names,OnPrem source names
+Web Credentials,Container,Application Log,Active Directory
+Firewall,Container,Firewall,Application Log
+Cloud Service,Cluster,Logon Session,Command
+Azure AD,Command,Network Traffic,Drive
+Active Directory,Pod,Snapshot,Driver
+Group,Scheduled Job,User Account,File
+,User Account,Web Credential,Firewall
+,,Image,Firmware
+,,Instance,Group
+,,Cloud,Kernel
+,,Volume,Logon Session
+,,AWS,Module
+,,Azure,Named Pipe
+,,SaaS,Network Share
+,,IaaS,Network Traffic
+,,Google,Process
+,,Office,Scheduled Job
+,,,Script
+,,,Sensor Health
+,,,Service
+,,,User Account
+,,,Volume
+,,,WMI
+,,,Web Credential
+,,,Windows Registry

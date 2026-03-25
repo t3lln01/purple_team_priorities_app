@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useMemo, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useMemo, useCallback, useEffect, useRef, ReactNode } from "react";
 import data from "@/data.json";
+import { useAppData } from "@/context/AppDataContext";
 
 // ── types ─────────────────────────────────────────────────────────────────────
 export type Tactic = {
@@ -19,12 +20,19 @@ export type TacticOverrides = Record<string, TacticOverride>;
 export const baseTactics: Tactic[] = (data as any).tactics;
 
 // ── persistence ───────────────────────────────────────────────────────────────
-const LS_KEY = "pt_tactic_overrides";
-function load(): TacticOverrides {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "{}"); } catch { return {}; }
+const LS_BASE = "pt_tactic_overrides";
+
+function fromStorage(key: string): TacticOverrides {
+  try { return JSON.parse(localStorage.getItem(key) ?? "{}"); } catch { return {}; }
 }
-function save(o: TacticOverrides) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(o)); } catch {}
+function toStorage(key: string, o: TacticOverrides) {
+  try { localStorage.setItem(key, JSON.stringify(o)); } catch {}
+}
+function migrate() {
+  const baseKey = `${LS_BASE}:base`;
+  if (!localStorage.getItem(baseKey) && localStorage.getItem(LS_BASE)) {
+    localStorage.setItem(baseKey, localStorage.getItem(LS_BASE)!);
+  }
 }
 
 // ── context type ──────────────────────────────────────────────────────────────
@@ -41,7 +49,21 @@ const TacticScoresCtx = createContext<Ctx>(null!);
 
 // ── provider ──────────────────────────────────────────────────────────────────
 export function TacticScoresProvider({ children }: { children: ReactNode }) {
-  const [overrides, setOverrides] = useState<TacticOverrides>(load);
+  const { activeMitreVersionId } = useAppData();
+  const versionKey = activeMitreVersionId ?? "base";
+  const lsKey = `${LS_BASE}:${versionKey}`;
+  const lsKeyRef = useRef(lsKey);
+
+  const [overrides, setOverrides] = useState<TacticOverrides>(() => {
+    migrate();
+    return fromStorage(`${LS_BASE}:base`);
+  });
+
+  useEffect(() => {
+    migrate();
+    lsKeyRef.current = lsKey;
+    setOverrides(fromStorage(lsKey));
+  }, [lsKey]);
 
   const liveTactics = useMemo(() =>
     baseTactics.map(t => {
@@ -65,7 +87,7 @@ export function TacticScoresProvider({ children }: { children: ReactNode }) {
   const setOverride = useCallback((name: string, field: TacticField, value: string | number) => {
     setOverrides(prev => {
       const next = { ...prev, [name]: { ...(prev[name] ?? {}), [field]: value } };
-      save(next);
+      toStorage(lsKeyRef.current, next);
       return next;
     });
   }, []);
@@ -74,14 +96,14 @@ export function TacticScoresProvider({ children }: { children: ReactNode }) {
     setOverrides(prev => {
       const next = { ...prev };
       delete next[name];
-      save(next);
+      toStorage(lsKeyRef.current, next);
       return next;
     });
   }, []);
 
   const resetAll = useCallback(() => {
     setOverrides({});
-    save({});
+    toStorage(lsKeyRef.current, {});
   }, []);
 
   return (

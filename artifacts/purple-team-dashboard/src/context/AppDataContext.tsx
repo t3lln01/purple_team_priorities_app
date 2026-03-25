@@ -23,6 +23,61 @@ const _tacticExtentMap: Record<string, number> = Object.fromEntries(
   ((data as any).tactics ?? []).map((t: any) => [t.tactic as string, Number(t.extent) || 1])
 );
 
+type TacticDatum = { tactic: string; conf: string; integrity: string; avail: string; extent: number };
+const _tacticData: TacticDatum[] = ((data as any).tactics ?? []) as TacticDatum[];
+
+function _bestTacticForTid(tacticNames: string[]): TacticDatum | null {
+  let best: TacticDatum | null = null;
+  for (const name of tacticNames) {
+    const t = _tacticData.find(td => td.tactic === name);
+    if (!t) continue;
+    if (!best || calcCIAScore(t.conf, t.integrity, t.avail) > calcCIAScore(best.conf, best.integrity, best.avail)) {
+      best = t;
+    }
+  }
+  return best;
+}
+
+function _autoPopulateVersionOverrides(v: { id: string; impactRows: Array<{ id: string; tactics: string }> }) {
+  const impOvKey = `pt_impact_overrides:${v.id}`;
+  const likOvKey = `pt_likelihood_overrides:${v.id}`;
+  const existingImp: Record<string, object> =
+    JSON.parse(localStorage.getItem(impOvKey) ?? "{}");
+  const existingLik: Record<string, object> =
+    JSON.parse(localStorage.getItem(likOvKey) ?? "{}");
+
+  let changed = false;
+  for (const row of v.impactRows) {
+    if (_baseImpactIds.has(row.id)) continue;
+    if (existingImp[row.id]) continue;
+
+    const tacticNames = (row.tactics || "").split(", ").filter(Boolean);
+    const best = _bestTacticForTid(tacticNames);
+
+    existingImp[row.id] = {
+      confidentiality:    best?.conf      ?? "Medium",
+      integrity:          best?.integrity ?? "Medium",
+      availability:       best?.avail     ?? "Low",
+      initialTTPExtent:   best?.extent    ?? 1,
+      adScore:            0,
+      containerScore:     0,
+      cloudScore:         0,
+      supportRemoteScore: 0,
+      systemReqScore:     0,
+      capecSeverityScore: 0,
+      permRequiredScore:  0,
+      effectivePermsScore:0,
+    };
+    existingLik[row.id] = { confidence: "high confidence" };
+    changed = true;
+  }
+
+  if (changed) {
+    try { localStorage.setItem(impOvKey, JSON.stringify(existingImp)); } catch {}
+    try { localStorage.setItem(likOvKey, JSON.stringify(existingLik)); } catch {}
+  }
+}
+
 // ── Full 656-technique riskCalc base ──────────────────────────────────────────
 // data.json's riskCalc only covers 200 prioritised techniques. For every
 // impactTable entry not already present we compute equivalent rows using
@@ -387,6 +442,7 @@ type AppDataCtx = {
   removeMitreVersion: (id: string) => void;
   activeNewImpactRows: NewImpactRow[];
   activeNewRiskRows: NewRiskRow[];
+  versionKey: string;
 };
 
 const AppDataCtx = createContext<AppDataCtx>(null!);
@@ -414,6 +470,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addMitreVersion = useCallback((v: MitreVersion) => {
+    _autoPopulateVersionOverrides(v);
     setMitreVersionsState((prev) => {
       const next = [...prev.filter((x) => x.specVersion !== v.specVersion), v];
       saveMitreVersions(next);
@@ -442,6 +499,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   const activeNewImpactRows = activeVersion?.impactRows ?? [];
   const activeNewRiskRows = activeVersion?.riskRows ?? [];
+  const versionKey = activeMitreVersionId ?? "base";
 
   return (
     <AppDataCtx.Provider
@@ -456,6 +514,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         removeMitreVersion,
         activeNewImpactRows,
         activeNewRiskRows,
+        versionKey,
       }}
     >
       {children}
