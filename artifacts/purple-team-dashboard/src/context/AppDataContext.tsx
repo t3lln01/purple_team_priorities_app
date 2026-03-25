@@ -5,6 +5,7 @@ import {
   calcImpactScore,
   calcImpactRate,
   calcTTPExtent,
+  calcLikelihoodScore,
   calcLikelihoodRate,
   CONF_SCORES,
   INT_SCORES,
@@ -21,6 +22,65 @@ const _baseRiskIds = new Set<string>(
 const _tacticExtentMap: Record<string, number> = Object.fromEntries(
   ((data as any).tactics ?? []).map((t: any) => [t.tactic as string, Number(t.extent) || 1])
 );
+
+// ── Full 656-technique riskCalc base ──────────────────────────────────────────
+// data.json's riskCalc only covers 200 prioritised techniques. For every
+// impactTable entry not already present we compute equivalent rows using
+// conservative defaults so that Likelihood Table and Risk Calculation show
+// all 656 ATT&CK techniques.
+const _DEFAULT_LAST_OCC       = "between 1 and 2 yrs";
+const _DEFAULT_LAST_OCC_SCORE = 1.1;
+const _DEFAULT_CONF           = "medium confidence";
+const _DEFAULT_CONF_SCORE     = 1.0;
+const _DEFAULT_TID_PRIORITY   = 1;
+const _DEFAULT_HVA            = 1;
+
+export const baseFullRiskCalc: object[] = (() => {
+  const result: object[] = [...((data as any).riskCalc ?? [])];
+  const riskIds = new Set(((data as any).riskCalc ?? []).map((r: any) => r.TID as string));
+
+  for (const row of ((data as any).impactTable ?? [])) {
+    if (riskIds.has(row.id)) continue;
+
+    const conf  = row.confidentiality ?? "Medium";
+    const int_  = row.integrity       ?? "Medium";
+    const avail = row.availability    ?? "Low";
+    const ciaScore  = calcCIAScore(conf, int_, avail);
+    const ttpExtent = Number(row.finalTTPExtent) || 1;
+    const impactScore = calcImpactScore(ciaScore, ttpExtent, _DEFAULT_HVA);
+    const impactRate  = calcImpactRate(impactScore);
+    const likScore    = calcLikelihoodScore(_DEFAULT_TID_PRIORITY, _DEFAULT_LAST_OCC_SCORE, _DEFAULT_CONF_SCORE, _DEFAULT_HVA);
+    const likRate     = calcLikelihoodRate(likScore);
+
+    result.push({
+      TID:                       row.id,
+      "Technique Name":          row.name,
+      Platforms:                 row.platforms ?? "",
+      Tactic:                    row.tactics   ?? "",
+      Confidentiality:           conf,
+      "Confidentiality Score":   CONF_SCORES[conf]  ?? 0,
+      Integrity:                 int_,
+      "Integrity Score":         INT_SCORES[int_]   ?? 0,
+      Availability:              avail,
+      "Availability Score":      AVAIL_SCORES[avail] ?? 0,
+      "CIA Score":               ciaScore,
+      "TTP Extent Score":        ttpExtent,
+      "HIGH VALUE ASSSET RISK":  _DEFAULT_HVA,
+      "Impact Score":            impactScore,
+      "Impact Rate":             impactRate,
+      "TID  Priority":           _DEFAULT_TID_PRIORITY,
+      "Last Occurrence":         _DEFAULT_LAST_OCC,
+      "Last occurrence Score":   _DEFAULT_LAST_OCC_SCORE,
+      Confidence:                _DEFAULT_CONF,
+      "Confidence Score":        _DEFAULT_CONF_SCORE,
+      "Likelihood Score":        likScore,
+      "Likelihood Rate":         likRate,
+      "Risk Rate":               0,
+      "Risk Scores":             impactScore * likScore,
+    });
+  }
+  return result;
+})();
 
 // ── public types ───────────────────────────────────────────────────────────────
 export type LiveActorData = {

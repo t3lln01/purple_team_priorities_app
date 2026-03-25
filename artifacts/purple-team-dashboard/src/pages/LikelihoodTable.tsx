@@ -1,8 +1,7 @@
 import { useState, useMemo, useCallback, Fragment } from "react";
 import { Link } from "wouter";
-import data from "@/data.json";
 import { useLikelihood } from "@/context/LikelihoodContext";
-import { useAppData } from "@/context/AppDataContext";
+import { useAppData, baseFullRiskCalc } from "@/context/AppDataContext";
 import { useHVAScores } from "@/context/HVAScoresContext";
 import {
   LAST_OCC_OPTIONS,
@@ -28,7 +27,7 @@ type RiskRow = {
 };
 
 // ── base data ─────────────────────────────────────────────────────────────────
-const rawRiskCalc: RiskRow[] = (data as any).riskCalc;
+const rawRiskCalc: RiskRow[] = baseFullRiskCalc as RiskRow[];
 
 // ── style helpers ──────────────────────────────────────────────────────────────
 function rateStyle(rate: string) {

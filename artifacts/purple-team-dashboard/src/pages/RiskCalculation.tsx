@@ -8,7 +8,7 @@ import {
 } from "@/utils/impactFormulas";
 import { useTacticScores, type TacticOverrides } from "@/context/TacticScoresContext";
 import { useLikelihood }  from "@/context/LikelihoodContext";
-import { useAppData }    from "@/context/AppDataContext";
+import { useAppData, baseFullRiskCalc } from "@/context/AppDataContext";
 import { CalendarRange, ChevronDown } from "lucide-react";
 import { useImpactOverrides } from "@/context/ImpactOverridesContext";
 import { useHVAScores }       from "@/context/HVAScoresContext";
@@ -59,7 +59,7 @@ type RiskRow = {
   "Risk Scores": number;
 };
 
-const rawRiskCalc: RiskRow[] = (data as any).riskCalc;
+const rawRiskCalc: RiskRow[] = baseFullRiskCalc as RiskRow[];
 
 function applyOverrides(
   rows: RiskRow[],
