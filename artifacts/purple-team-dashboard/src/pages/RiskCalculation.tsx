@@ -10,6 +10,8 @@ import { useTacticScores, type TacticOverrides } from "@/context/TacticScoresCon
 import { useLikelihood }  from "@/context/LikelihoodContext";
 import { useAppData }    from "@/context/AppDataContext";
 import { CalendarRange, ChevronDown } from "lucide-react";
+import { useImpactOverrides } from "@/context/ImpactOverridesContext";
+import { useHVAScores }       from "@/context/HVAScoresContext";
 
 // ── date range types (mirror Actor Prioritisation) ────────────────────────────
 type DateRange = "all" | "3m" | "6m" | "9m" | "1y" | "custom";
@@ -22,23 +24,12 @@ const DATE_RANGE_LABELS: Record<DateRange, string> = {
 const allProceduresData: Array<{ mitreId: string; date: number | null }> =
   (data as any).allProcedures ?? [];
 
-function loadImpactOverrides(): Record<string, any> {
-  try { return JSON.parse(localStorage.getItem("pt_impact_overrides") ?? "{}"); } catch { return {}; }
-}
+// Module-level impact table (immutable base data, not user-editable)
 function loadImpactTable(): Record<string, any> {
   const rows = (data as any).impactTable ?? [];
   const map: Record<string, any> = {};
   for (const r of rows) map[r.id] = r;
   return map;
-}
-function loadHVAScores(): Record<string, { avgRisk: number; avgLikelihood: number }> {
-  try {
-    const arr: Array<{ tid: string; avgRisk: number; avgLikelihood: number }> =
-      JSON.parse(localStorage.getItem("pt_hva_scores") ?? "[]");
-    const map: Record<string, { avgRisk: number; avgLikelihood: number }> = {};
-    for (const s of arr) map[s.tid] = { avgRisk: s.avgRisk, avgLikelihood: s.avgLikelihood };
-    return map;
-  } catch { return {}; }
 }
 
 type RiskRow = {
@@ -74,10 +65,10 @@ function applyOverrides(
   rows: RiskRow[],
   tacticOvMap: TacticOverrides = {},
   likOvMap: Record<string, { lastOccurrence?: string; confidence?: string }> = {},
+  impactOvs: Record<string, any> = {},
+  hvaScores: Record<string, { avgRisk: number; avgLikelihood: number }> = {},
 ): RiskRow[] {
-  const impactOvs   = loadImpactOverrides();
   const impactMap   = loadImpactTable();
-  const hvaScores   = loadHVAScores();
 
   return rows.map(row => {
     const impOv   = impactOvs[row.TID];
@@ -217,6 +208,8 @@ export default function RiskCalculation() {
 
   const { overrides: tacticOverrides }     = useTacticScores();
   const { overrides: likelihoodOverrides } = useLikelihood();
+  const { overrides: impactOverrides }     = useImpactOverrides();
+  const { hvaScoreMap }                    = useHVAScores();
   const { activeNewRiskRows, liveActorData } = useAppData();
 
   // TIDs that appear in at least one procedure within the active date window
@@ -241,8 +234,8 @@ export default function RiskCalculation() {
   );
 
   const riskCalc = useMemo(
-    () => applyOverrides(allRawRows, tacticOverrides, likelihoodOverrides),
-    [allRawRows, tacticOverrides, likelihoodOverrides]
+    () => applyOverrides(allRawRows, tacticOverrides, likelihoodOverrides, impactOverrides, hvaScoreMap),
+    [allRawRows, tacticOverrides, likelihoodOverrides, impactOverrides, hvaScoreMap]
   );
 
   // Apply date window — only show TIDs observed within the window

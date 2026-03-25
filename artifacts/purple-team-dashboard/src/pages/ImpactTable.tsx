@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, Fragment } from "react";
 import { Link } from "wouter";
 import data from "@/data.json";
-import { useImpactOverrides, ImpactOverride } from "@/hooks/useImpactOverrides";
+import { useImpactOverrides, ImpactOverride } from "@/context/ImpactOverridesContext";
 import { useTacticScores } from "@/context/TacticScoresContext";
 import { useAppData } from "@/context/AppDataContext";
 import {

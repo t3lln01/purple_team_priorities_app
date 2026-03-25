@@ -11,9 +11,11 @@ import TacticsScores from "@/pages/TacticsScores";
 import RiskRate from "@/pages/RiskRate";
 import AllProcedures from "@/pages/AllProcedures";
 import DataSources from "@/pages/DataSources";
-import { TacticScoresProvider } from "@/context/TacticScoresContext";
-import { LikelihoodProvider }   from "@/context/LikelihoodContext";
-import { AppDataProvider } from "@/context/AppDataContext";
+import { TacticScoresProvider }    from "@/context/TacticScoresContext";
+import { LikelihoodProvider }       from "@/context/LikelihoodContext";
+import { AppDataProvider }          from "@/context/AppDataContext";
+import { ImpactOverridesProvider }  from "@/context/ImpactOverridesContext";
+import { HVAScoresProvider }        from "@/context/HVAScoresContext";
 import { Shield, Users, Activity, Target, ChartBar, AlertTriangle, List, Database, Table2, TrendingUp } from "lucide-react";
 import ImpactTable       from "@/pages/ImpactTable";
 import LikelihoodTable   from "@/pages/LikelihoodTable";
@@ -113,11 +115,15 @@ function App() {
       <TooltipProvider>
         <TacticScoresProvider>
           <LikelihoodProvider>
-            <AppDataProvider>
-              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-                <Router />
-              </WouterRouter>
-            </AppDataProvider>
+            <ImpactOverridesProvider>
+              <HVAScoresProvider>
+                <AppDataProvider>
+                  <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                    <Router />
+                  </WouterRouter>
+                </AppDataProvider>
+              </HVAScoresProvider>
+            </ImpactOverridesProvider>
           </LikelihoodProvider>
         </TacticScoresProvider>
         <Toaster />

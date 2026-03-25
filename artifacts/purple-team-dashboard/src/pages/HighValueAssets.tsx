@@ -1,8 +1,9 @@
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import { Link } from "wouter";
 import data from "@/data.json";
 import { Plus, Pencil, Trash2, Check, X, RotateCcw, Info } from "lucide-react";
 import { useSortTable } from "@/hooks/useSortTable";
+import { useHVAScores } from "@/context/HVAScoresContext";
 import SortableTh from "@/components/SortableTh";
 
 type HVRow = {
@@ -58,7 +59,7 @@ function loadOverrides(): Record<string, Partial<HVRow>> { try { return JSON.par
 function saveCustom(rows: HVRow[])                  { try { localStorage.setItem(LS_CUSTOM, JSON.stringify(rows)); }    catch {} }
 function saveOverrides(ov: Record<string, Partial<HVRow>>) { try { localStorage.setItem(LS_OVERRIDES, JSON.stringify(ov)); } catch {} }
 
-/** Recompute HVScores from all rows and persist so Risk Calculation can use them */
+/** Recompute HVScores from all rows (pure function — caller handles persistence) */
 function recomputeHVScores(all: HVRow[]) {
   const byTid: Record<string, number[][]> = {};
   for (const r of all) {
@@ -67,13 +68,11 @@ function recomputeHVScores(all: HVRow[]) {
     const ls = Number(r.likelihoodScore) || 1;
     (byTid[r.tid] ??= []).push([rs, ls]);
   }
-  const scores: HVScore[] = Object.entries(byTid).map(([tid, pairs]) => ({
+  return Object.entries(byTid).map(([tid, pairs]) => ({
     tid,
     avgRisk: pairs.reduce((s, p) => s + p[0], 0) / pairs.length,
     avgLikelihood: pairs.reduce((s, p) => s + p[1], 0) / pairs.length,
   }));
-  try { localStorage.setItem(LS_SCORES, JSON.stringify(scores)); } catch {}
-  return scores;
 }
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
@@ -97,6 +96,8 @@ function blankForm(): HVRow {
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function HighValueAssets() {
+  const { setHVAScores } = useHVAScores();
+
   const [custom, setCustom]       = useState<HVRow[]>(loadCustom);
   const [overrides, setOverrides] = useState<Record<string, Partial<HVRow>>>(loadOverrides);
 
@@ -133,8 +134,10 @@ export default function HighValueAssets() {
     return [...baseline, ...cust];
   }, [custom, overrides]);
 
-  // Keep HVScores in sync
+  // Keep HVScores in sync — recompute locally and push to shared context so
+  // Risk Calculation and Likelihood Table react immediately.
   const hvscores: HVScore[] = useMemo(() => recomputeHVScores(merged), [merged]);
+  useEffect(() => { setHVAScores(hvscores); }, [hvscores, setHVAScores]);
 
   // ── Filters ──────────────────────────────────────────────────────────────────
 

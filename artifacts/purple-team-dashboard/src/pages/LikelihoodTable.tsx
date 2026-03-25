@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import data from "@/data.json";
 import { useLikelihood } from "@/context/LikelihoodContext";
 import { useAppData } from "@/context/AppDataContext";
+import { useHVAScores } from "@/context/HVAScoresContext";
 import {
   LAST_OCC_OPTIONS,
   CONFIDENCE_LIK_OPTIONS,
@@ -28,16 +29,6 @@ type RiskRow = {
 
 // ── base data ─────────────────────────────────────────────────────────────────
 const rawRiskCalc: RiskRow[] = (data as any).riskCalc;
-
-function loadHVAScores(): Record<string, { avgLikelihood: number }> {
-  try {
-    const arr: Array<{ tid: string; avgLikelihood: number }> =
-      JSON.parse(localStorage.getItem("pt_hva_scores") ?? "[]");
-    const m: Record<string, { avgLikelihood: number }> = {};
-    for (const s of arr) m[s.tid] = { avgLikelihood: s.avgLikelihood };
-    return m;
-  } catch { return {}; }
-}
 
 // ── style helpers ──────────────────────────────────────────────────────────────
 function rateStyle(rate: string) {
@@ -78,6 +69,7 @@ type ComputedRow = RiskRow & {
 export default function LikelihoodTable() {
   const { overrides, setOverride, resetOverride, resetAll } = useLikelihood();
   const { activeNewRiskRows, liveActorData } = useAppData();
+  const { hvaScoreMap: hvaScores } = useHVAScores();
 
   const [search, setSearch] = useState("");
   const [tacticFilter, setTacticFilter] = useState("All");
@@ -85,8 +77,6 @@ export default function LikelihoodTable() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
-
-  const hvaScores = useMemo(loadHVAScores, []);
 
   // Max date per TID from live procedures (for auto last-occurrence detection)
   const liveDateByTid = useMemo(() => {
