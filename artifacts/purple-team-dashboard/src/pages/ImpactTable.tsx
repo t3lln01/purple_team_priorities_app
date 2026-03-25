@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import data from "@/data.json";
 import { useImpactOverrides, ImpactOverride } from "@/context/ImpactOverridesContext";
 import { useTacticScores } from "@/context/TacticScoresContext";
+import { useHVAScores } from "@/context/HVAScoresContext";
 import { useAppData } from "@/context/AppDataContext";
 import {
   calcCIAScore,
@@ -91,6 +92,7 @@ type ComputedRow = ImpactRow & {
 export default function ImpactTable() {
   const { overrides, setOverride, resetOverride, resetAll } = useImpactOverrides();
   const { overrides: tacticOverrides } = useTacticScores();
+  const { hvaScoreMap } = useHVAScores();
   const { activeNewImpactRows } = useAppData();
   const [search, setSearch] = useState("");
   const [tacticFilter, setTacticFilter] = useState("All");
@@ -148,7 +150,8 @@ export default function ImpactTable() {
     const ciaScore   = isValidCIA(conf) && isValidCIA(int_) && isValidCIA(avail)
       ? calcCIAScore(conf, int_, avail)
       : 0;
-    const impactScore = calcImpactScore(ciaScore, ttpExtent, "");
+    const hvaFactor   = hvaScoreMap[row.id]?.avgRisk ?? 1;
+    const impactScore = calcImpactScore(ciaScore, ttpExtent, hvaFactor);
     const impactRate  = calcImpactRate(impactScore);
 
     return {
@@ -165,7 +168,7 @@ export default function ImpactTable() {
       _impactRate:  impactRate,
       _hasOverride: Object.keys(ov).length > 0 || Object.keys(tacticOv).length > 0,
     };
-  }), [allSourceRows, overrides, stixOverrides, tacticOverrides]);
+  }), [allSourceRows, overrides, stixOverrides, tacticOverrides, hvaScoreMap]);
 
   const filtered = useMemo(() => computed.filter(r => {
     const q = search.toLowerCase();
