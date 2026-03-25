@@ -1,4 +1,11 @@
 // ── Pure generation utilities — no saved-view state ───────────────────────────
+import data from "@/data.json";
+
+/** Risk Score lookup keyed by TID from the riskCalc analytical model (Impact × Likelihood).
+ *  Used to make live procedure risk consistent with Risk Calculation / TID Priority pages. */
+const _ttpRiskMap: Record<string, number> = Object.fromEntries(
+  ((data as any).riskCalc ?? []).map((r: any) => [r.TID as string, Number(r["Risk Scores"]) || 0])
+);
 
 /** Converts any actor-name casing to canonical Title Case.
  *  "ALPHA SPIDER" → "Alpha Spider", "alpha spider" → "Alpha Spider" */
@@ -105,7 +112,9 @@ export function generateView(
       seen.add(dedupKey);
 
       const externalRef = `${actorName} ${bestReport.name} - ${bestReport.url}`;
-      const risk = Math.round(reports.length * 100 + observables.length * 50);
+      // Use the analytical risk score (Impact × Likelihood) from riskCalc when available;
+      // fall back to a counting-based heuristic for TIDs not yet in the model.
+      const risk = _ttpRiskMap[mitreId] ?? Math.round(reports.length * 100 + observables.length * 50);
       const procedure = `[${actorName}] - ${observablesText}`;
 
       procedures.push({
