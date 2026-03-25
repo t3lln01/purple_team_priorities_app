@@ -1,22 +1,24 @@
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import data from "@/data.json";
-import { calcCIAScore, calcImpactScore, calcImpactRate, calcTTPExtent } from "@/utils/impactFormulas";
+import {
+  calcCIAScore, calcImpactScore, calcImpactRate, calcTTPExtent,
+  calcLikelihoodScore, calcLikelihoodRate,
+  LAST_OCC_OPTIONS, CONFIDENCE_LIK_OPTIONS,
+} from "@/utils/impactFormulas";
 import { useTacticScores, type TacticOverrides } from "@/context/TacticScoresContext";
-import { useAppData } from "@/context/AppDataContext";
+import { useLikelihood }  from "@/context/LikelihoodContext";
+import { useAppData }    from "@/context/AppDataContext";
 
 function loadImpactOverrides(): Record<string, any> {
   try { return JSON.parse(localStorage.getItem("pt_impact_overrides") ?? "{}"); } catch { return {}; }
 }
-
 function loadImpactTable(): Record<string, any> {
   const rows = (data as any).impactTable ?? [];
   const map: Record<string, any> = {};
   for (const r of rows) map[r.id] = r;
   return map;
 }
-
-/** Load per-TID HVA scores from the High Value Assets editable matrix */
 function loadHVAScores(): Record<string, { avgRisk: number; avgLikelihood: number }> {
   try {
     const arr: Array<{ tid: string; avgRisk: number; avgLikelihood: number }> =
@@ -56,120 +58,127 @@ type RiskRow = {
 
 const rawRiskCalc: RiskRow[] = (data as any).riskCalc;
 
-function applyImpactOverrides(rows: RiskRow[], tacticOvMap: TacticOverrides = {}): RiskRow[] {
-  const overrides = loadImpactOverrides();
-  const impactMap = loadImpactTable();
-  const hvaScores = loadHVAScores();
-  const hasOverrides = Object.keys(overrides).length > 0;
-  const hasHVA = Object.keys(hvaScores).length > 0;
-  const hasTacticOv = Object.keys(tacticOvMap).length > 0;
-  if (!hasOverrides && !hasHVA && !hasTacticOv) return rows;
+function applyOverrides(
+  rows: RiskRow[],
+  tacticOvMap: TacticOverrides = {},
+  likOvMap: Record<string, { lastOccurrence?: string; confidence?: string }> = {},
+): RiskRow[] {
+  const impactOvs   = loadImpactOverrides();
+  const impactMap   = loadImpactTable();
+  const hvaScores   = loadHVAScores();
 
   return rows.map(row => {
-    const ov      = overrides[row.TID];
+    const impOv   = impactOvs[row.TID];
     const base    = impactMap[row.TID];
     const hvaLive = hvaScores[row.TID];
+    const likOv   = likOvMap[row.TID];
 
-    // Tactic-level fallback (CIA precedence: per-technique > tactic-level > base data)
     const primaryTactic = (row.Tactic ?? "").split(",")[0].trim();
-    const tacticOv = tacticOvMap[primaryTactic] ?? {};
-    const hasTacticRowOv = Object.keys(tacticOv).length > 0;
+    const tacticOv      = tacticOvMap[primaryTactic] ?? {};
+    const hasTacticOv   = Object.keys(tacticOv).length > 0;
 
-    // If no changes to this row at all, return as-is
-    if (!ov && !hvaLive && !hasTacticRowOv) return row;
+    // ── Impact ────────────────────────────────────────────────────────────────
+    const conf  = impOv?.confidentiality ?? tacticOv.conf      ?? row.Confidentiality;
+    const int_  = impOv?.integrity       ?? tacticOv.integrity  ?? row.Integrity;
+    const avail = impOv?.availability    ?? tacticOv.avail      ?? row.Availability;
 
-    // CIA / TTP overrides (only if explicit override exists for this TID)
-    const conf  = ov?.confidentiality  ?? tacticOv.conf      ?? row.Confidentiality;
-    const int_  = ov?.integrity        ?? tacticOv.integrity  ?? row.Integrity;
-    const avail = ov?.availability     ?? tacticOv.avail      ?? row.Availability;
-    const newCIA = (ov || hasTacticRowOv) && base
+    const newCIA = (impOv || hasTacticOv) && base
       ? calcCIAScore(conf, int_, avail)
       : row["CIA Score"];
 
     const ttpRow = base ? {
-      initialTTPExtent:    ov?.initialTTPExtent    ?? base.initialTTPExtent,
-      adScore:             ov?.adScore             ?? base.adScore,
-      containerScore:      ov?.containerScore      ?? base.containerScore,
-      cloudScore:          ov?.cloudScore          ?? base.cloudScore,
-      supportRemoteScore:  ov?.supportRemoteScore  ?? base.supportRemoteScore,
-      systemReqScore:      ov?.systemReqScore      ?? base.systemReqScore,
-      capecSeverityScore:  ov?.capecSeverityScore  ?? base.capecSeverityScore,
-      permRequiredScore:   ov?.permRequiredScore   ?? base.permRequiredScore,
-      effectivePermsScore: ov?.effectivePermsScore ?? base.effectivePermsScore,
+      initialTTPExtent:    impOv?.initialTTPExtent    ?? base.initialTTPExtent,
+      adScore:             impOv?.adScore             ?? base.adScore,
+      containerScore:      impOv?.containerScore      ?? base.containerScore,
+      cloudScore:          impOv?.cloudScore          ?? base.cloudScore,
+      supportRemoteScore:  impOv?.supportRemoteScore  ?? base.supportRemoteScore,
+      systemReqScore:      impOv?.systemReqScore      ?? base.systemReqScore,
+      capecSeverityScore:  impOv?.capecSeverityScore  ?? base.capecSeverityScore,
+      permRequiredScore:   impOv?.permRequiredScore   ?? base.permRequiredScore,
+      effectivePermsScore: impOv?.effectivePermsScore ?? base.effectivePermsScore,
     } : null;
-    const newExt = (ov && ttpRow) ? calcTTPExtent(ttpRow) : row["TTP Extent Score"];
+    const newExt = (impOv && ttpRow) ? calcTTPExtent(ttpRow) : row["TTP Extent Score"];
 
-    // HVA Risk — use live avgRisk from the editable matrix if available
-    const hvaRisk = hvaLive ? hvaLive.avgRisk : (row["HIGH VALUE ASSSET RISK"] || 1);
+    const hvaRisk    = hvaLive ? hvaLive.avgRisk : (row["HIGH VALUE ASSSET RISK"] || 1);
+    const newImpact  = calcImpactScore(newCIA, newExt, hvaRisk);
+    const newImpRate = calcImpactRate(newImpact);
 
-    const newImpact = calcImpactScore(newCIA, newExt, hvaRisk);
-    const newRate   = calcImpactRate(newImpact);
+    // ── Likelihood ────────────────────────────────────────────────────────────
+    const tidPriority     = row["TID  Priority"] ?? 1;
+    const baseLastOccScore = row["Last occurrence Score"] ?? 1;
+    const baseConfScore    = row["Confidence Score"] ?? 1;
 
-    // HVA Likelihood — use live avgLikelihood if available
-    const hvaLik = hvaLive ? hvaLive.avgLikelihood : 1;
-    const baseLikScore = row["Likelihood Score"] || 1;
-    // Re-scale: LikScore = TIDPriority × LastOcc × ConfScore × HVA_Lik
-    // We approximate by replacing HVA factor only: baseLikScore / old_hva_lik * new_hva_lik
-    // Since old hva lik was baked in, we keep baseLikScore if no HVA change
-    const newLikScore = hvaLive ? baseLikScore * hvaLik : baseLikScore;
+    // Effective Last Occurrence score (override → base)
+    const lastOccLabel  = likOv?.lastOccurrence ?? row["Last Occurrence"];
+    const lastOccScore  = LAST_OCC_OPTIONS.find(o => o.label === lastOccLabel)?.score ?? baseLastOccScore;
+
+    // Effective Confidence score (override → base)
+    const confLabel   = likOv?.confidence ?? row.Confidence;
+    const confScore   = CONFIDENCE_LIK_OPTIONS.find(o => o.label === confLabel)?.score ?? baseConfScore;
+
+    // HVA likelihood factor: from matrix if available, else back-compute from base
+    const baseNoHVA    = tidPriority * baseLastOccScore * baseConfScore;
+    const baseHVAFact  = baseNoHVA > 0 ? (row["Likelihood Score"] ?? 1) / baseNoHVA : 1;
+    const hvaLikFactor = hvaLive ? hvaLive.avgLikelihood : baseHVAFact;
+
+    const newLikScore = calcLikelihoodScore(tidPriority, lastOccScore, confScore, hvaLikFactor);
+    const newLikRate  = calcLikelihoodRate(newLikScore);
 
     return {
       ...row,
-      Confidentiality:    conf,
-      Integrity:          int_,
-      Availability:       avail,
-      "CIA Score":        newCIA,
-      "TTP Extent Score": newExt,
-      "HIGH VALUE ASSSET RISK": hvaRisk,
-      "Impact Score":     newImpact,
-      "Impact Rate":      newRate,
-      "Likelihood Score": newLikScore,
-      "Risk Scores":      newImpact * newLikScore,
+      Confidentiality:           conf,
+      Integrity:                 int_,
+      Availability:              avail,
+      "CIA Score":               newCIA,
+      "TTP Extent Score":        newExt,
+      "HIGH VALUE ASSSET RISK":  hvaRisk,
+      "Impact Score":            newImpact,
+      "Impact Rate":             newImpRate,
+      "Last Occurrence":         lastOccLabel,
+      "Last occurrence Score":   lastOccScore,
+      Confidence:                confLabel,
+      "Confidence Score":        confScore,
+      "Likelihood Score":        newLikScore,
+      "Likelihood Rate":         newLikRate,
+      "Risk Scores":             newImpact * newLikScore,
     };
   });
 }
 
 type SortKey = "TID" | "Technique Name" | "Tactic" | "CIA Score" | "Impact Rate" | "Likelihood Rate" | "Risk Scores";
 
-const RATE_ORDER: Record<string, number> = {
-  "very high": 4,
-  "high": 3,
-  "medium": 2,
-  "low": 1,
-};
-
+const RATE_ORDER: Record<string, number> = { "very high": 4, "high": 3, "medium": 2, "low": 1 };
 function rateRank(v: string): number {
   return RATE_ORDER[(v || "").toLowerCase().trim()] ?? 0;
 }
-
 function rateColor(rate: string) {
   if (!rate) return "text-muted-foreground";
   const r = String(rate).toLowerCase();
   if (r.includes("very high")) return "text-red-400";
-  if (r.includes("high")) return "text-orange-400";
-  if (r.includes("medium")) return "text-yellow-400";
-  if (r.includes("low")) return "text-green-400";
+  if (r.includes("high"))      return "text-orange-400";
+  if (r.includes("medium"))    return "text-yellow-400";
+  if (r.includes("low"))       return "text-green-400";
   return "text-muted-foreground";
 }
-
 function rateStyle(rate: string) {
   if (!rate) return "bg-muted/50 text-muted-foreground";
   const r = String(rate).toLowerCase();
   if (r.includes("very high")) return "bg-red-500/10 border border-red-500/30 text-red-400";
-  if (r.includes("high")) return "bg-orange-500/10 border border-orange-500/30 text-orange-400";
-  if (r.includes("medium")) return "bg-yellow-500/10 border border-yellow-500/30 text-yellow-400";
-  if (r.includes("low")) return "bg-green-500/10 border border-green-500/30 text-green-400";
+  if (r.includes("high"))      return "bg-orange-500/10 border border-orange-500/30 text-orange-400";
+  if (r.includes("medium"))    return "bg-yellow-500/10 border border-yellow-500/30 text-yellow-400";
+  if (r.includes("low"))       return "bg-green-500/10 border border-green-500/30 text-green-400";
   return "bg-muted/50 text-muted-foreground border border-border";
 }
 
 export default function RiskCalculation() {
-  const [search, setSearch] = useState("");
+  const [search, setSearch]       = useState("");
   const [tacticFilter, setTacticFilter] = useState("All");
-  const [sortKey, setSortKey] = useState<SortKey>("Risk Scores");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [sortKey, setSortKey]     = useState<SortKey>("Risk Scores");
+  const [sortDir, setSortDir]     = useState<"asc" | "desc">("desc");
 
-  const { overrides: tacticOverrides } = useTacticScores();
-  const { activeNewRiskRows } = useAppData();
+  const { overrides: tacticOverrides }    = useTacticScores();
+  const { overrides: likelihoodOverrides } = useLikelihood();
+  const { activeNewRiskRows }             = useAppData();
 
   const allRawRows = useMemo(
     () => [...rawRiskCalc, ...(activeNewRiskRows as RiskRow[])],
@@ -177,14 +186,18 @@ export default function RiskCalculation() {
   );
 
   const riskCalc = useMemo(
-    () => applyImpactOverrides(allRawRows, tacticOverrides),
-    [allRawRows, tacticOverrides]
+    () => applyOverrides(allRawRows, tacticOverrides, likelihoodOverrides),
+    [allRawRows, tacticOverrides, likelihoodOverrides]
   );
+
   const tactics = ["All", ...Array.from(new Set(riskCalc.flatMap(r => r.Tactic?.split(", ") || []))).sort()];
 
   const filtered = riskCalc.filter(r => {
     const q = search.toLowerCase();
-    const matchSearch = !q || r.TID?.toLowerCase().includes(q) || r["Technique Name"]?.toLowerCase().includes(q) || r.Tactic?.toLowerCase().includes(q);
+    const matchSearch = !q ||
+      r.TID?.toLowerCase().includes(q) ||
+      r["Technique Name"]?.toLowerCase().includes(q) ||
+      r.Tactic?.toLowerCase().includes(q);
     const matchTactic = tacticFilter === "All" || (r.Tactic || "").includes(tacticFilter);
     return matchSearch && matchTactic;
   });
@@ -204,28 +217,22 @@ export default function RiskCalculation() {
         case "CIA Score":
         case "Risk Scores":
           return dir * (Number(a[sortKey] ?? 0) - Number(b[sortKey] ?? 0));
-        default:
-          return 0;
+        default: return 0;
       }
     });
   }, [filtered, sortKey, sortDir]);
 
   function handleSort(key: SortKey) {
-    if (sortKey === key) {
-      setSortDir(d => d === "asc" ? "desc" : "asc");
-    } else {
-      setSortKey(key);
-      setSortDir("desc");
-    }
+    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir("desc"); }
   }
-
   function SortIcon({ col }: { col: SortKey }) {
     if (sortKey !== col) return <span className="ml-1 opacity-30">↕</span>;
     return <span className="ml-1 text-primary">{sortDir === "asc" ? "↑" : "↓"}</span>;
   }
 
-  const avgRisk = riskCalc.reduce((s, r) => s + (r["Risk Scores"] || 0), 0) / riskCalc.length;
-  const maxRisk = Math.max(...riskCalc.map(r => r["Risk Scores"] || 0));
+  const avgRisk  = riskCalc.reduce((s, r) => s + (r["Risk Scores"] || 0), 0) / riskCalc.length;
+  const maxRisk  = Math.max(...riskCalc.map(r => r["Risk Scores"] || 0));
   const vhImpact = riskCalc.filter(r => r["Impact Rate"] === "Very High").length;
 
   return (
@@ -233,7 +240,7 @@ export default function RiskCalculation() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Risk Calculation</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Risk formula: [(CIA Score × TTP Extent) × (Priority × Last Occurrence × Confidence)] — {riskCalc.length} techniques
+          Risk = Impact × Likelihood — {riskCalc.length} techniques
         </p>
       </div>
 
@@ -280,26 +287,24 @@ export default function RiskCalculation() {
               <tr className="border-b border-border bg-muted/20">
                 {(
                   [
-                    { col: "TID", label: "TID" },
+                    { col: "TID",            label: "TID" },
                     { col: "Technique Name", label: "Technique Name" },
-                    { col: "Tactic", label: "Tactic" },
-                    { col: "CIA Score", label: "CIA Score" },
-                    { col: "Impact Rate", label: "Impact Rate" },
-                    { col: "Likelihood Rate", label: "Likelihood" },
+                    { col: "Tactic",         label: "Tactic" },
+                    { col: "CIA Score",      label: "CIA Score" },
+                    { col: "Impact Rate",    label: "Impact Rate" },
+                    { col: "Likelihood Rate",label: "Likelihood" },
                   ] as { col: SortKey; label: string }[]
                 ).map(({ col, label }) => (
                   <th key={col} className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">
                     <button onClick={() => handleSort(col)} className="flex items-center hover:text-foreground transition-colors">
-                      {label}
-                      <SortIcon col={col} />
+                      {label}<SortIcon col={col} />
                     </button>
                   </th>
                 ))}
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">Last Seen</th>
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">
                   <button onClick={() => handleSort("Risk Scores")} className="flex items-center hover:text-foreground transition-colors">
-                    Risk Score
-                    <SortIcon col="Risk Scores" />
+                    Risk Score<SortIcon col="Risk Scores" />
                   </button>
                 </th>
               </tr>
@@ -309,14 +314,14 @@ export default function RiskCalculation() {
                 <tr key={i} className="border-b border-border/40 hover:bg-accent/20 transition-colors">
                   <td className="px-4 py-2.5">
                     <Link href={`/all-procedures?mitre=${encodeURIComponent(row.TID)}`}>
-                      <span className="font-mono text-xs text-primary bg-primary/10 px-2 py-0.5 rounded hover:bg-primary/20 transition-colors cursor-pointer" title="View procedures for this technique">
+                      <span className="font-mono text-xs text-primary bg-primary/10 px-2 py-0.5 rounded hover:bg-primary/20 transition-colors cursor-pointer">
                         {row.TID}
                       </span>
                     </Link>
                   </td>
                   <td className="px-4 py-2.5 text-xs text-foreground max-w-xs">
                     <Link href={`/all-procedures?mitre=${encodeURIComponent(row.TID)}`}>
-                      <div className="truncate hover:text-primary hover:underline cursor-pointer transition-colors" title="View procedures for this technique">
+                      <div className="truncate hover:text-primary hover:underline cursor-pointer transition-colors">
                         {row["Technique Name"]}
                       </div>
                     </Link>

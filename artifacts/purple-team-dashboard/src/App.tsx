@@ -12,16 +12,19 @@ import RiskRate from "@/pages/RiskRate";
 import AllProcedures from "@/pages/AllProcedures";
 import DataSources from "@/pages/DataSources";
 import { TacticScoresProvider } from "@/context/TacticScoresContext";
+import { LikelihoodProvider }   from "@/context/LikelihoodContext";
 import { AppDataProvider } from "@/context/AppDataContext";
-import { Shield, Users, Activity, Target, ChartBar, AlertTriangle, List, Database, Table2 } from "lucide-react";
-import ImpactTable from "@/pages/ImpactTable";
+import { Shield, Users, Activity, Target, ChartBar, AlertTriangle, List, Database, Table2, TrendingUp } from "lucide-react";
+import ImpactTable       from "@/pages/ImpactTable";
+import LikelihoodTable   from "@/pages/LikelihoodTable";
 
 const queryClient = new QueryClient();
 
 const navItems = [
   { path: "/", label: "Actor Prioritisation", icon: Users },
   { path: "/risk-calculation", label: "Risk Calculation", icon: Activity },
-  { path: "/impact-table", label: "Impact Table", icon: Table2 },
+  { path: "/impact-table",      label: "Impact Table",      icon: Table2 },
+  { path: "/likelihood-table",  label: "Likelihood Table",  icon: TrendingUp },
   { path: "/high-value-assets", label: "High Value Assets", icon: Target },
   { path: "/tid-priority", label: "TID Priority", icon: ChartBar },
   { path: "/tactics-scores", label: "Tactic Scores", icon: AlertTriangle },
@@ -90,7 +93,8 @@ function Router() {
       <Switch>
         <Route path="/" component={ActorPrioritisation} />
         <Route path="/risk-calculation" component={RiskCalculation} />
-        <Route path="/impact-table" component={ImpactTable} />
+        <Route path="/impact-table"     component={ImpactTable} />
+        <Route path="/likelihood-table" component={LikelihoodTable} />
         <Route path="/high-value-assets" component={HighValueAssets} />
         <Route path="/tid-priority" component={TidPriority} />
         <Route path="/tactics-scores" component={TacticsScores} />
@@ -108,11 +112,13 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <TacticScoresProvider>
-          <AppDataProvider>
-            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-              <Router />
-            </WouterRouter>
-          </AppDataProvider>
+          <LikelihoodProvider>
+            <AppDataProvider>
+              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                <Router />
+              </WouterRouter>
+            </AppDataProvider>
+          </LikelihoodProvider>
         </TacticScoresProvider>
         <Toaster />
       </TooltipProvider>
