@@ -102,7 +102,7 @@ function applyOverrides(
     } : null;
     const newExt = (impOv && ttpRow) ? calcTTPExtent(ttpRow) : row["TTP Extent Score"];
 
-    const hvaRisk    = hvaLive ? hvaLive.avgRisk : (row["HIGH VALUE ASSSET RISK"] || 1);
+    const hvaRisk    = hvaLive?.avgRisk ?? 1;
     const newImpact  = calcImpactScore(newCIA, newExt, hvaRisk);
     const newImpRate = calcImpactRate(newImpact);
 
