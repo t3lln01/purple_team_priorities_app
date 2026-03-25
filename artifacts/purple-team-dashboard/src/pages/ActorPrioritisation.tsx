@@ -24,6 +24,12 @@ const baseActors: Actor[] = (data as any).actors;
 const actorRanking: ActorRanking[] = (data as any).actorRanking;
 const allProcedures: Procedure[] = (data as any).allProcedures;
 
+/** Analytical risk scores (Impact × Likelihood) keyed by TID — used to normalise
+ *  live procedure risk values stored with an older counting-based formula. */
+const riskCalcMap: Record<string, number> = Object.fromEntries(
+  ((data as any).riskCalc ?? []).map((r: any) => [r.TID as string, Number(r["Risk Scores"]) || 0])
+);
+
 const procedureActors: string[] = Array.from(
   new Set(allProcedures.map(r => r.actor).filter(Boolean))
 ).sort();
@@ -166,9 +172,14 @@ export default function ActorPrioritisation() {
   // Source procedures: MERGE live CrowdStrike procedures with base data.json procedures.
   // The actor list (Active Monitoring) is always from data.json — never replaced by live data.
   // CrowdStrike procedures are ADDITIVE: they increase TTP Risk for existing actors.
+  // Live procedure risk values are normalised to the analytical model (Impact × Likelihood).
   const sourceProcedures = useMemo(() => {
     if (liveActorData && liveActorData.procedures.length > 0) {
-      return [...allProcedures, ...liveActorData.procedures];
+      const normalizedLive = liveActorData.procedures.map(p => ({
+        ...p,
+        risk: riskCalcMap[p.mitreId] ?? p.risk,
+      }));
+      return [...allProcedures, ...normalizedLive];
     }
     return allProcedures;
   }, [liveActorData]);

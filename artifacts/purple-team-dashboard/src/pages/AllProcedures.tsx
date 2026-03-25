@@ -26,6 +26,12 @@ const baseProcedures: Procedure[] = ((data as any).allProcedures as Procedure[])
 const techTacticMap: Record<string, string[]> = (data as any).techTacticMap ?? {};
 const techNameMap: Record<string, string> = (data as any).techNameMap ?? {};
 
+/** Analytical risk scores (Impact × Likelihood) keyed by TID, used to normalise
+ *  live procedure risk values that may have been stored with an older formula. */
+const riskCalcMap: Record<string, number> = Object.fromEntries(
+  ((data as any).riskCalc ?? []).map((r: any) => [r.TID as string, Number(r["Risk Scores"]) || 0])
+);
+
 const baseProcedureActors: string[] = Array.from(
   new Set(baseProcedures.map(r => r.actor).filter(Boolean))
 ).sort();
@@ -617,7 +623,10 @@ export default function AllProcedures() {
 
   const [customProcs, setCustomProcs] = useState<Procedure[]>(loadCustom);
 
-  // Live procedures from CrowdStrike sync — mapped to the local Procedure type
+  // Live procedures from CrowdStrike sync — mapped to the local Procedure type.
+  // Risk is normalised to the analytical model (Impact × Likelihood) to keep it
+  // consistent with Risk Calculation and TID Priority, regardless of which formula
+  // was used when the data was originally pushed.
   const liveProcs = useMemo<Procedure[]>(() => {
     if (!liveActorData || liveActorData.procedures.length === 0) return [];
     return liveActorData.procedures.map((p, i) => ({
@@ -626,7 +635,7 @@ export default function AllProcedures() {
       externalRef: p.externalRef ?? "",
       procedure:   p.procedure ?? "",
       date:        p.date,
-      risk:        p.risk,
+      risk:        riskCalcMap[p.mitreId] ?? p.risk,
       _id:         `live_${i}`,
     }));
   }, [liveActorData]);
