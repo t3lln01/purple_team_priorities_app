@@ -7,10 +7,10 @@ const _ttpRiskMap: Record<string, number> = Object.fromEntries(
   ((data as any).riskCalc ?? []).map((r: any) => [r.TID as string, Number(r["Risk Scores"]) || 0])
 );
 
-/** Converts any actor-name casing to canonical Title Case.
- *  "ALPHA SPIDER" → "Alpha Spider", "alpha spider" → "Alpha Spider" */
+/** Converts any actor-name casing to canonical ALL CAPS.
+ *  "Alpha Spider" → "ALPHA SPIDER", "alpha spider" → "ALPHA SPIDER" */
 export function toTitleCase(str: string): string {
-  return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  return str.toUpperCase();
 }
 
 export type ViewProcedure = {
