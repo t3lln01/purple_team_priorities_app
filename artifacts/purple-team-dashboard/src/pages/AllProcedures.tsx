@@ -650,6 +650,22 @@ export default function AllProcedures() {
     new Set(allProcedures.map(r => r.actor).filter(Boolean))
   ).sort(), [allProcedures]);
 
+  // Set of actor names present in the Actor Prioritisation table (base − deleted + custom)
+  const prioritisedActorSet = useMemo<Set<string>>(() => {
+    const base: string[] = ((data as any).actors ?? []).map((a: any) => toTitleCase(a.name));
+    const ovRaw: Record<string, { deleted?: boolean }> = (() => {
+      try { return JSON.parse(localStorage.getItem("pt_actor_overrides") ?? "{}"); } catch { return {}; }
+    })();
+    const deleted = new Set(
+      Object.entries(ovRaw).filter(([, v]) => v.deleted).map(([k]) => toTitleCase(k))
+    );
+    const custom: string[] = (() => {
+      try { return (JSON.parse(localStorage.getItem("pt_actor_custom") ?? "[]") as any[]).map((a: any) => toTitleCase(a.name)); }
+      catch { return []; }
+    })();
+    return new Set([...base.filter(n => !deleted.has(n)), ...custom]);
+  }, []);
+
   const [selectedActors, setSelectedActors] = useState<Set<string>>(() => {
     const params = new URLSearchParams(search);
     const actor = matchActor(params.get("actor") ?? "");
@@ -675,6 +691,7 @@ export default function AllProcedures() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showCustomOnly, setShowCustomOnly] = useState(false);
+  const [showPrioritisedOnly, setShowPrioritisedOnly] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
@@ -731,6 +748,7 @@ export default function AllProcedures() {
     const toMs   = dateTo   ? new Date(dateTo).getTime() + 86400000 - 1 : Infinity;
     return allProcedures.filter(row => {
       if (showCustomOnly && !row._custom) return false;
+      if (showPrioritisedOnly && !prioritisedActorSet.has(row.actor)) return false;
       if (selectedActors.size > 0 && !selectedActors.has(row.actor)) return false;
       if (selectedMitreIds.size > 0 && !selectedMitreIds.has(row.mitreId)) return false;
       if (procedureSearch && !row.procedure.toLowerCase().includes(procedureSearch.toLowerCase())) return false;
@@ -738,7 +756,7 @@ export default function AllProcedures() {
       if (row.date !== null && (row.date < fromMs || row.date > toMs)) return false;
       return true;
     });
-  }, [allProcedures, showCustomOnly, selectedActors, selectedMitreIds, procedureSearch, minRisk, maxRisk, dateFrom, dateTo]);
+  }, [allProcedures, showCustomOnly, showPrioritisedOnly, prioritisedActorSet, selectedActors, selectedMitreIds, procedureSearch, minRisk, maxRisk, dateFrom, dateTo]);
 
   const { sortKey, sortDir, toggle, sorted: sortedFiltered } = useSortTable(filtered);
 
@@ -750,10 +768,10 @@ export default function AllProcedures() {
   function clearAll() {
     setSelectedActors(new Set()); setSelectedMitreIds(new Set());
     setProcedureSearch(""); setMinRisk(""); setMaxRisk("");
-    setDateFrom(""); setDateTo(""); setShowCustomOnly(false); setPage(1);
+    setDateFrom(""); setDateTo(""); setShowCustomOnly(false); setShowPrioritisedOnly(false); setPage(1);
   }
 
-  const hasFilters = selectedActors.size > 0 || selectedMitreIds.size > 0 || procedureSearch || minRisk || maxRisk || dateFrom || dateTo || showCustomOnly;
+  const hasFilters = selectedActors.size > 0 || selectedMitreIds.size > 0 || procedureSearch || minRisk || maxRisk || dateFrom || dateTo || showCustomOnly || showPrioritisedOnly;
 
   return (
     <div className="p-6 space-y-5">
@@ -864,6 +882,11 @@ export default function AllProcedures() {
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Filters</span>
           <div className="flex items-center gap-3">
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+              <input type="checkbox" checked={showPrioritisedOnly} onChange={e => { setShowPrioritisedOnly(e.target.checked); setPage(1); }}
+                className="w-3 h-3 rounded border-border accent-primary" />
+              Prioritised actors only
+            </label>
             {customProcs.length > 0 && (
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
                 <input type="checkbox" checked={showCustomOnly} onChange={e => { setShowCustomOnly(e.target.checked); setPage(1); }}
