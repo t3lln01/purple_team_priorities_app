@@ -4,8 +4,14 @@ import data from "@/data.json";
 import { useSortTable } from "@/hooks/useSortTable";
 import SortableTh from "@/components/SortableTh";
 import { Plus, Upload, Trash2, X, Check, FileJson, FileText, AlertCircle, ChevronDown, ChevronUp, Activity, XCircle, Download } from "lucide-react";
-import { useAppData } from "@/context/AppDataContext";
+import { useAppData, baseFullRiskCalc } from "@/context/AppDataContext";
 import { toTitleCase } from "@/context/ViewContext";
+import { useTacticScores } from "@/context/TacticScoresContext";
+import { useLikelihood } from "@/context/LikelihoodContext";
+import { useImpactOverrides } from "@/context/ImpactOverridesContext";
+import { useHVAScores } from "@/context/HVAScoresContext";
+import { applyOverrides } from "@/utils/riskOverrides";
+import { useDateWindow } from "@/context/DateWindowContext";
 
 // ──────────────────────────── types ──────────────────────────────────────────
 type Procedure = {
@@ -620,6 +626,23 @@ function AddForm({ allActors, onSave, onCancel }: {
 export default function AllProcedures() {
   const search = useSearch();
   const { liveActorData, clearLiveActorData } = useAppData();
+  const { overrides: tacticOverrides }     = useTacticScores();
+  const { overrides: likelihoodOverrides } = useLikelihood();
+  const { overrides: impactOverrides }     = useImpactOverrides();
+  const { hvaScoreMap }                    = useHVAScores();
+  const { dateRange, fromMs: winFromMs, toMs: winToMs } = useDateWindow();
+
+  // Dynamic risk score map — same computation as Risk Calculation page so that
+  // any TID shows the same risk score across all pages after CIA/HVA overrides.
+  const riskScoreMap = useMemo(() => {
+    const computed = applyOverrides(
+      baseFullRiskCalc as any[],
+      tacticOverrides, likelihoodOverrides, impactOverrides, hvaScoreMap
+    );
+    const map: Record<string, number> = {};
+    for (const r of computed) map[r.TID] = r["Risk Scores"] ?? 0;
+    return map;
+  }, [tacticOverrides, likelihoodOverrides, impactOverrides, hvaScoreMap]);
 
   const [customProcs, setCustomProcs] = useState<Procedure[]>(loadCustom);
 
@@ -635,10 +658,10 @@ export default function AllProcedures() {
       externalRef: p.externalRef ?? "",
       procedure:   p.procedure ?? "",
       date:        p.date,
-      risk:        riskCalcMap[p.mitreId] ?? p.risk,
+      risk:        riskScoreMap[p.mitreId] ?? p.risk,
       _id:         `live_${i}`,
     }));
-  }, [liveActorData]);
+  }, [liveActorData, riskScoreMap]);
 
   // All procedures: base data.json + manually added custom + live CrowdStrike procedures
   const allProcedures = useMemo(
@@ -741,12 +764,21 @@ export default function AllProcedures() {
     saveCustom([]);
   }
 
+  // Normalise all procedure risk scores to the dynamically-computed values so
+  // the same TID shows the same risk in All Procedures and in Risk Calculation.
+  const normalizedAllProcedures = useMemo(
+    () => allProcedures.map(p => ({ ...p, risk: riskScoreMap[p.mitreId] ?? p.risk })),
+    [allProcedures, riskScoreMap]
+  );
+
   const filtered = useMemo(() => {
     const lo = minRisk !== "" ? Number(minRisk) : -Infinity;
     const hi = maxRisk !== "" ? Number(maxRisk) : Infinity;
     const fromMs = dateFrom ? new Date(dateFrom).getTime() : -Infinity;
     const toMs   = dateTo   ? new Date(dateTo).getTime() + 86400000 - 1 : Infinity;
-    return allProcedures.filter(row => {
+    return normalizedAllProcedures.filter(row => {
+      // Global date window (set from sidebar) — applied on top of local date filter
+      if (dateRange !== "all" && (row.date === null || row.date < winFromMs || row.date > winToMs)) return false;
       if (showCustomOnly && !row._custom) return false;
       if (showPrioritisedOnly && !prioritisedActorSet.has(row.actor)) return false;
       if (selectedActors.size > 0 && !selectedActors.has(row.actor)) return false;
@@ -756,7 +788,7 @@ export default function AllProcedures() {
       if (row.date !== null && (row.date < fromMs || row.date > toMs)) return false;
       return true;
     });
-  }, [allProcedures, showCustomOnly, showPrioritisedOnly, prioritisedActorSet, selectedActors, selectedMitreIds, procedureSearch, minRisk, maxRisk, dateFrom, dateTo]);
+  }, [normalizedAllProcedures, showCustomOnly, showPrioritisedOnly, prioritisedActorSet, selectedActors, selectedMitreIds, procedureSearch, minRisk, maxRisk, dateFrom, dateTo, dateRange, winFromMs, winToMs]);
 
   const { sortKey, sortDir, toggle, sorted: sortedFiltered } = useSortTable(filtered);
 

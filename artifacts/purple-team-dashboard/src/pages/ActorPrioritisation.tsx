@@ -3,9 +3,10 @@ import { Link } from "wouter";
 import data from "@/data.json";
 import { useSortTable } from "@/hooks/useSortTable";
 import SortableTh from "@/components/SortableTh";
-import { Pencil, Check, X, RotateCcw, Trash2, Plus, Undo2, ChevronDown, ChevronUp, CalendarRange, Shield, Activity, XCircle } from "lucide-react";
+import { Pencil, Check, X, RotateCcw, Trash2, Plus, Undo2, ChevronDown, ChevronUp, Shield, Activity, XCircle } from "lucide-react";
 import { useAppData } from "@/context/AppDataContext";
 import { toTitleCase } from "@/context/ViewContext";
+import { useDateWindow } from "@/context/DateWindowContext";
 
 type Actor = {
   name: string;
@@ -34,12 +35,6 @@ const procedureActors: string[] = Array.from(
   new Set(allProcedures.map(r => r.actor).filter(Boolean))
 ).sort();
 
-// ──────────────────────────── date filter types ───────────────────────────────
-type DateRange = "all" | "3m" | "6m" | "9m" | "1y" | "custom";
-const DATE_RANGE_LABELS: Record<DateRange, string> = {
-  all: "All time", "3m": "Last 3 months", "6m": "Last 6 months",
-  "9m": "Last 9 months", "1y": "Last year", custom: "Custom",
-};
 
 // ──────────────────────────── persistence ────────────────────────────────────
 const LS_OV  = "pt_actor_overrides";
@@ -139,35 +134,7 @@ export default function ActorPrioritisation() {
   const [customActors, setCustomActors] = useState<CustomActor[]>(loadCustom);
 
   // ── date filter state ──────────────────────────────────────────────────────
-  const [dateRange, setDateRange]   = useState<DateRange>("all");
-  const [customFrom, setCustomFrom] = useState("");
-  const [customTo,   setCustomTo]   = useState("");
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const datePickerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function onOut(e: MouseEvent) {
-      if (datePickerRef.current && !datePickerRef.current.contains(e.target as Node))
-        setShowDatePicker(false);
-    }
-    document.addEventListener("mousedown", onOut);
-    return () => document.removeEventListener("mousedown", onOut);
-  }, []);
-
-  // Resolve the active time window (inclusive ms bounds)
-  const { fromMs, toMs } = useMemo(() => {
-    const now = Date.now();
-    const DAY = 86_400_000;
-    if (dateRange === "3m") return { fromMs: now - 90  * DAY, toMs: now };
-    if (dateRange === "6m") return { fromMs: now - 180 * DAY, toMs: now };
-    if (dateRange === "9m") return { fromMs: now - 270 * DAY, toMs: now };
-    if (dateRange === "1y") return { fromMs: now - 365 * DAY, toMs: now };
-    if (dateRange === "custom") return {
-      fromMs: customFrom ? new Date(customFrom).getTime()            : -Infinity,
-      toMs:   customTo   ? new Date(customTo).getTime() + DAY - 1   :  Infinity,
-    };
-    return { fromMs: -Infinity, toMs: Infinity };
-  }, [dateRange, customFrom, customTo]);
+  const { dateRange, fromMs, toMs } = useDateWindow();
 
   // Source procedures: MERGE live CrowdStrike procedures with base data.json procedures.
   // The actor list (Active Monitoring) is always from data.json — never replaced by live data.
@@ -407,74 +374,6 @@ export default function ActorPrioritisation() {
           </p>
         </div>
 
-        {/* Date filter — top-right */}
-        <div className="relative flex-shrink-0" ref={datePickerRef}>
-          <button
-            onClick={() => setShowDatePicker(v => !v)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium transition-colors shadow-sm ${
-              dateRange !== "all"
-                ? "bg-primary/15 text-primary border-primary/40 hover:bg-primary/25"
-                : "bg-card border-border text-muted-foreground hover:bg-accent hover:text-foreground"
-            }`}
-          >
-            <CalendarRange className="w-3.5 h-3.5" />
-            <span>{DATE_RANGE_LABELS[dateRange]}</span>
-            {dateRange === "custom" && customFrom && customTo && (
-              <span className="text-muted-foreground font-normal">
-                ({new Date(customFrom).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })} – {new Date(customTo).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })})
-              </span>
-            )}
-            <ChevronDown className={`w-3 h-3 transition-transform ${showDatePicker ? "rotate-180" : ""}`} />
-          </button>
-
-          {showDatePicker && (
-            <div className="absolute right-0 top-full mt-1.5 z-50 w-72 bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
-              <div className="p-3 border-b border-border">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Calculation date window</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Only procedures within this window contribute to TTP Risk, Priority, and Risk %</p>
-              </div>
-              <div className="p-2 space-y-0.5">
-                {(["all", "3m", "6m", "9m", "1y", "custom"] as DateRange[]).map(opt => (
-                  <button key={opt} onClick={() => { setDateRange(opt); if (opt !== "custom") setShowDatePicker(false); }}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-colors text-left ${
-                      dateRange === opt ? "bg-primary/15 text-primary font-medium" : "text-foreground hover:bg-accent"
-                    }`}>
-                    <span>{DATE_RANGE_LABELS[opt]}</span>
-                    {dateRange === opt && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
-                  </button>
-                ))}
-              </div>
-              {dateRange === "custom" && (
-                <div className="px-3 pb-3 pt-2 border-t border-border space-y-2">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] text-muted-foreground font-medium">From</label>
-                    <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
-                      className="bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring [color-scheme:dark]" />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] text-muted-foreground font-medium">To</label>
-                    <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
-                      className="bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring [color-scheme:dark]" />
-                  </div>
-                  {(customFrom || customTo) && (
-                    <button onClick={() => setShowDatePicker(false)}
-                      className="w-full py-1.5 text-xs bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium">
-                      Apply
-                    </button>
-                  )}
-                </div>
-              )}
-              {dateRange !== "all" && (
-                <div className="px-3 pb-3">
-                  <button onClick={() => { setDateRange("all"); setCustomFrom(""); setCustomTo(""); setShowDatePicker(false); }}
-                    className="w-full text-xs text-muted-foreground hover:text-foreground underline transition-colors text-center">
-                    Reset to all time
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
       </div>
 
       {/* ── Live data indicator ──────────────────────────────────────────── */}

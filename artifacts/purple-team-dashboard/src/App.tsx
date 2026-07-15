@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from "react";
 import { Switch, Route, Router as WouterRouter, Link, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -16,7 +17,8 @@ import { LikelihoodProvider }       from "@/context/LikelihoodContext";
 import { AppDataProvider, useAppData } from "@/context/AppDataContext";
 import { ImpactOverridesProvider }  from "@/context/ImpactOverridesContext";
 import { HVAScoresProvider }        from "@/context/HVAScoresContext";
-import { Shield, Users, Activity, Target, ChartBar, AlertTriangle, List, Database, Table2, TrendingUp } from "lucide-react";
+import { DateWindowProvider, useDateWindow, DATE_RANGE_LABELS, type DateRange } from "@/context/DateWindowContext";
+import { Shield, Users, Activity, Target, ChartBar, AlertTriangle, List, Database, Table2, TrendingUp, CalendarRange, ChevronDown } from "lucide-react";
 import ImpactTable       from "@/pages/ImpactTable";
 import LikelihoodTable   from "@/pages/LikelihoodTable";
 
@@ -34,6 +36,95 @@ const navItems = [
   { path: "/all-procedures", label: "All Procedures", icon: List },
   { path: "/data-sources", label: "Data Sources", icon: Database },
 ];
+
+function DatePickerWidget() {
+  const { dateRange, setDateRange, customFrom, customTo, setCustomFrom, setCustomTo } = useDateWindow();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onOut(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onOut);
+    return () => document.removeEventListener("mousedown", onOut);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-colors ${
+          dateRange !== "all"
+            ? "bg-primary/15 text-primary border-primary/40"
+            : "bg-sidebar-accent/30 border-sidebar-border text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
+        }`}
+      >
+        <CalendarRange className="w-3.5 h-3.5 flex-shrink-0" />
+        <span className="truncate flex-1 text-left">{DATE_RANGE_LABELS[dateRange]}</span>
+        {dateRange === "custom" && customFrom && customTo && (
+          <span className="text-muted-foreground font-normal truncate">
+            {new Date(customFrom).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}–{new Date(customTo).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}
+          </span>
+        )}
+        <ChevronDown className={`w-3 h-3 flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 bottom-full mb-1.5 z-50 w-64 bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
+          <div className="p-3 border-b border-border">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Calculation date window</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Applies across all pages — filters to techniques observed in this period</p>
+          </div>
+          <div className="p-2 space-y-0.5">
+            {(["all", "3m", "6m", "9m", "1y", "custom"] as DateRange[]).map(opt => (
+              <button
+                key={opt}
+                onClick={() => { setDateRange(opt); if (opt !== "custom") setOpen(false); }}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-colors text-left ${
+                  dateRange === opt ? "bg-primary/15 text-primary font-medium" : "text-foreground hover:bg-accent"
+                }`}
+              >
+                <span>{DATE_RANGE_LABELS[opt]}</span>
+                {dateRange === opt && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+              </button>
+            ))}
+          </div>
+          {dateRange === "custom" && (
+            <div className="px-3 pb-3 pt-2 border-t border-border space-y-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] text-muted-foreground font-medium">From</label>
+                <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+                  className="bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring [color-scheme:dark]" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] text-muted-foreground font-medium">To</label>
+                <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+                  className="bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring [color-scheme:dark]" />
+              </div>
+              {(customFrom || customTo) && (
+                <button onClick={() => setOpen(false)}
+                  className="w-full py-1.5 text-xs bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium">
+                  Apply
+                </button>
+              )}
+            </div>
+          )}
+          {dateRange !== "all" && (
+            <div className="px-3 pb-3">
+              <button
+                onClick={() => { setDateRange("all"); setCustomFrom(""); setCustomTo(""); setOpen(false); }}
+                className="w-full text-xs text-muted-foreground hover:text-foreground underline transition-colors text-center"
+              >
+                Reset to all time
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Sidebar() {
   const [location] = useLocation();
@@ -75,9 +166,12 @@ function Sidebar() {
         })}
       </nav>
 
-      <div className="p-4 border-t border-sidebar-border">
-        <div className="text-xs text-muted-foreground">{mitreLabel}</div>
-        <div className="text-xs text-muted-foreground">Purple Team Framework</div>
+      <div className="p-4 border-t border-sidebar-border space-y-3">
+        <DatePickerWidget />
+        <div>
+          <div className="text-xs text-muted-foreground">{mitreLabel}</div>
+          <div className="text-xs text-muted-foreground">Purple Team Framework</div>
+        </div>
       </div>
     </aside>
   );
@@ -119,17 +213,19 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AppDataProvider>
-          <TacticScoresProvider>
-            <LikelihoodProvider>
-              <ImpactOverridesProvider>
-                <HVAScoresProvider>
-                  <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-                    <Router />
-                  </WouterRouter>
-                </HVAScoresProvider>
-              </ImpactOverridesProvider>
-            </LikelihoodProvider>
-          </TacticScoresProvider>
+          <DateWindowProvider>
+            <TacticScoresProvider>
+              <LikelihoodProvider>
+                <ImpactOverridesProvider>
+                  <HVAScoresProvider>
+                    <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                      <Router />
+                    </WouterRouter>
+                  </HVAScoresProvider>
+                </ImpactOverridesProvider>
+              </LikelihoodProvider>
+            </TacticScoresProvider>
+          </DateWindowProvider>
         </AppDataProvider>
         <Toaster />
       </TooltipProvider>

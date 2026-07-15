@@ -5,6 +5,7 @@ import { useImpactOverrides, ImpactOverride } from "@/context/ImpactOverridesCon
 import { useTacticScores } from "@/context/TacticScoresContext";
 import { useHVAScores } from "@/context/HVAScoresContext";
 import { useAppData } from "@/context/AppDataContext";
+import { useDateWindow } from "@/context/DateWindowContext";
 import {
   calcCIAScore,
   calcImpactScore,
@@ -94,6 +95,7 @@ export default function ImpactTable() {
   const { overrides: tacticOverrides } = useTacticScores();
   const { hvaScoreMap } = useHVAScores();
   const { activeNewImpactRows } = useAppData();
+  const { tidsInWindow } = useDateWindow();
   const [search, setSearch] = useState("");
   const [tacticFilter, setTacticFilter] = useState("All");
   const [sortKey, setSortKey] = useState<SortKey>("impactRate");
@@ -171,6 +173,7 @@ export default function ImpactTable() {
   }), [allSourceRows, overrides, stixOverrides, tacticOverrides, hvaScoreMap]);
 
   const filtered = useMemo(() => computed.filter(r => {
+    if (tidsInWindow && !tidsInWindow.has(r.id)) return false;
     const q = search.toLowerCase();
     const matchSearch = !q ||
       r.id.toLowerCase().includes(q) ||
@@ -179,7 +182,7 @@ export default function ImpactTable() {
       r.platforms.toLowerCase().includes(q);
     const matchTactic = tacticFilter === "All" || r.tactics.includes(tacticFilter);
     return matchSearch && matchTactic;
-  }), [computed, search, tacticFilter]);
+  }), [computed, search, tacticFilter, tidsInWindow]);
 
   const sorted = useMemo(() => {
     const dir = sortDir === "asc" ? 1 : -1;

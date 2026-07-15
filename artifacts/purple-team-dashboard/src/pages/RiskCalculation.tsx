@@ -1,149 +1,15 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
-import data from "@/data.json";
-import {
-  calcCIAScore, calcImpactScore, calcImpactRate, calcTTPExtent,
-  calcLikelihoodScore, calcLikelihoodRate,
-  LAST_OCC_OPTIONS, CONFIDENCE_LIK_OPTIONS,
-} from "@/utils/impactFormulas";
-import { useTacticScores, type TacticOverrides } from "@/context/TacticScoresContext";
+import { applyOverrides, type RiskRow } from "@/utils/riskOverrides";
+import { useTacticScores } from "@/context/TacticScoresContext";
 import { useLikelihood }  from "@/context/LikelihoodContext";
 import { useAppData, baseFullRiskCalc } from "@/context/AppDataContext";
-import { CalendarRange, ChevronDown } from "lucide-react";
+import { CalendarRange } from "lucide-react";
 import { useImpactOverrides } from "@/context/ImpactOverridesContext";
 import { useHVAScores }       from "@/context/HVAScoresContext";
-
-// ── date range types (mirror Actor Prioritisation) ────────────────────────────
-type DateRange = "all" | "3m" | "6m" | "9m" | "1y" | "custom";
-const DATE_RANGE_LABELS: Record<DateRange, string> = {
-  all: "All time", "3m": "Last 3 months", "6m": "Last 6 months",
-  "9m": "Last 9 months", "1y": "Last year", custom: "Custom",
-};
-
-// ── base procedure dates keyed by TID ─────────────────────────────────────────
-const allProceduresData: Array<{ mitreId: string; date: number | null }> =
-  (data as any).allProcedures ?? [];
-
-// Module-level impact table (immutable base data, not user-editable)
-function loadImpactTable(): Record<string, any> {
-  const rows = (data as any).impactTable ?? [];
-  const map: Record<string, any> = {};
-  for (const r of rows) map[r.id] = r;
-  return map;
-}
-
-type RiskRow = {
-  TID: string;
-  "Technique Name": string;
-  Platforms: string;
-  Tactic: string;
-  Confidentiality: string;
-  "Confidentiality Score": number;
-  Integrity: string;
-  "Integrity Score": number;
-  Availability: string;
-  "Availability Score": number;
-  "CIA Score": number;
-  "TTP Extent Score": number;
-  "HIGH VALUE ASSSET RISK": number;
-  "Impact Score": number;
-  "Impact Rate": string;
-  "TID  Priority": number;
-  "Last Occurrence": string;
-  "Last occurrence Score": number;
-  Confidence: string;
-  "Confidence Score": number;
-  "Likelihood Score": number;
-  "Likelihood Rate": string;
-  "Risk Rate": number;
-  "Risk Scores": number;
-};
+import { useDateWindow, DATE_RANGE_LABELS } from "@/context/DateWindowContext";
 
 const rawRiskCalc: RiskRow[] = baseFullRiskCalc as RiskRow[];
-
-function applyOverrides(
-  rows: RiskRow[],
-  tacticOvMap: TacticOverrides = {},
-  likOvMap: Record<string, { lastOccurrence?: string; confidence?: string }> = {},
-  impactOvs: Record<string, any> = {},
-  hvaScores: Record<string, { avgRisk: number; avgLikelihood: number }> = {},
-): RiskRow[] {
-  const impactMap   = loadImpactTable();
-
-  return rows.map(row => {
-    const impOv   = impactOvs[row.TID];
-    const base    = impactMap[row.TID];
-    const hvaLive = hvaScores[row.TID];
-    const likOv   = likOvMap[row.TID];
-
-    const primaryTactic = (row.Tactic ?? "").split(",")[0].trim();
-    const tacticOv      = tacticOvMap[primaryTactic] ?? {};
-    const hasTacticOv   = Object.keys(tacticOv).length > 0;
-
-    // ── Impact ────────────────────────────────────────────────────────────────
-    const conf  = impOv?.confidentiality ?? tacticOv.conf      ?? row.Confidentiality;
-    const int_  = impOv?.integrity       ?? tacticOv.integrity  ?? row.Integrity;
-    const avail = impOv?.availability    ?? tacticOv.avail      ?? row.Availability;
-
-    const newCIA = (impOv || hasTacticOv) && base
-      ? calcCIAScore(conf, int_, avail)
-      : row["CIA Score"];
-
-    const ttpRow = base ? {
-      initialTTPExtent:    impOv?.initialTTPExtent    ?? base.initialTTPExtent,
-      adScore:             impOv?.adScore             ?? base.adScore,
-      containerScore:      impOv?.containerScore      ?? base.containerScore,
-      cloudScore:          impOv?.cloudScore          ?? base.cloudScore,
-      supportRemoteScore:  impOv?.supportRemoteScore  ?? base.supportRemoteScore,
-      systemReqScore:      impOv?.systemReqScore      ?? base.systemReqScore,
-      capecSeverityScore:  impOv?.capecSeverityScore  ?? base.capecSeverityScore,
-      permRequiredScore:   impOv?.permRequiredScore   ?? base.permRequiredScore,
-      effectivePermsScore: impOv?.effectivePermsScore ?? base.effectivePermsScore,
-    } : null;
-    const newExt = (impOv && ttpRow) ? calcTTPExtent(ttpRow) : row["TTP Extent Score"];
-
-    const hvaRisk    = hvaLive?.avgRisk ?? 1;
-    const newImpact  = calcImpactScore(newCIA, newExt, hvaRisk);
-    const newImpRate = calcImpactRate(newImpact);
-
-    // ── Likelihood ────────────────────────────────────────────────────────────
-    const tidPriority     = row["TID  Priority"] ?? 1;
-    const baseLastOccScore = row["Last occurrence Score"] ?? 1;
-    const baseConfScore    = row["Confidence Score"] ?? 1;
-
-    const lastOccLabel  = likOv?.lastOccurrence ?? row["Last Occurrence"];
-    const lastOccScore  = LAST_OCC_OPTIONS.find(o => o.label === lastOccLabel)?.score ?? baseLastOccScore;
-
-    const confLabel   = likOv?.confidence ?? row.Confidence;
-    const confScore   = CONFIDENCE_LIK_OPTIONS.find(o => o.label === confLabel)?.score ?? baseConfScore;
-
-    const baseNoHVA    = tidPriority * baseLastOccScore * baseConfScore;
-    const baseHVAFact  = baseNoHVA > 0 ? (row["Likelihood Score"] ?? 1) / baseNoHVA : 1;
-    const hvaLikFactor = hvaLive ? hvaLive.avgLikelihood : baseHVAFact;
-
-    const newLikScore = calcLikelihoodScore(tidPriority, lastOccScore, confScore, hvaLikFactor);
-    const newLikRate  = calcLikelihoodRate(newLikScore);
-
-    return {
-      ...row,
-      Confidentiality:           conf,
-      Integrity:                 int_,
-      Availability:              avail,
-      "CIA Score":               newCIA,
-      "TTP Extent Score":        newExt,
-      "HIGH VALUE ASSSET RISK":  hvaRisk,
-      "Impact Score":            newImpact,
-      "Impact Rate":             newImpRate,
-      "Last Occurrence":         lastOccLabel,
-      "Last occurrence Score":   lastOccScore,
-      Confidence:                confLabel,
-      "Confidence Score":        confScore,
-      "Likelihood Score":        newLikScore,
-      "Likelihood Rate":         newLikRate,
-      "Risk Scores":             newImpact * newLikScore,
-    };
-  });
-}
 
 type SortKey = "TID" | "Technique Name" | "Tactic" | "CIA Score" | "Impact Rate" | "Likelihood Rate" | "Risk Scores";
 
@@ -176,57 +42,13 @@ export default function RiskCalculation() {
   const [sortKey, setSortKey]           = useState<SortKey>("Risk Scores");
   const [sortDir, setSortDir]           = useState<"asc" | "desc">("desc");
 
-  // ── date window state ──────────────────────────────────────────────────────
-  const [dateRange, setDateRange]   = useState<DateRange>("all");
-  const [customFrom, setCustomFrom] = useState("");
-  const [customTo,   setCustomTo]   = useState("");
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const datePickerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function onOut(e: MouseEvent) {
-      if (datePickerRef.current && !datePickerRef.current.contains(e.target as Node))
-        setShowDatePicker(false);
-    }
-    document.addEventListener("mousedown", onOut);
-    return () => document.removeEventListener("mousedown", onOut);
-  }, []);
-
-  const { fromMs, toMs } = useMemo(() => {
-    const now = Date.now();
-    const DAY = 86_400_000;
-    if (dateRange === "3m") return { fromMs: now - 90  * DAY, toMs: now };
-    if (dateRange === "6m") return { fromMs: now - 180 * DAY, toMs: now };
-    if (dateRange === "9m") return { fromMs: now - 270 * DAY, toMs: now };
-    if (dateRange === "1y") return { fromMs: now - 365 * DAY, toMs: now };
-    if (dateRange === "custom") return {
-      fromMs: customFrom ? new Date(customFrom).getTime()           : -Infinity,
-      toMs:   customTo   ? new Date(customTo).getTime() + DAY - 1  :  Infinity,
-    };
-    return { fromMs: -Infinity, toMs: Infinity };
-  }, [dateRange, customFrom, customTo]);
+  const { dateRange, tidsInWindow, setDateRange, setCustomFrom, setCustomTo } = useDateWindow();
 
   const { overrides: tacticOverrides }     = useTacticScores();
   const { overrides: likelihoodOverrides } = useLikelihood();
   const { overrides: impactOverrides }     = useImpactOverrides();
   const { hvaScoreMap }                    = useHVAScores();
   const { activeNewRiskRows, liveActorData } = useAppData();
-
-  // TIDs that appear in at least one procedure within the active date window
-  const tidsInWindow = useMemo(() => {
-    if (dateRange === "all") return null; // null = no filter active
-    const set = new Set<string>();
-    const inWindow = (date: number | null) =>
-      date !== null && date >= fromMs && date <= toMs;
-
-    for (const p of allProceduresData) {
-      if (p.mitreId && inWindow(p.date)) set.add(p.mitreId);
-    }
-    for (const p of liveActorData?.procedures ?? []) {
-      if (p.mitreId && inWindow(p.date)) set.add(p.mitreId);
-    }
-    return set;
-  }, [dateRange, fromMs, toMs, liveActorData]);
 
   const allRawRows = useMemo(
     () => [...rawRiskCalc, ...(activeNewRiskRows as RiskRow[])],
@@ -294,86 +116,15 @@ export default function RiskCalculation() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* ── Header + date filter ──────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Risk Calculation</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Risk = Impact × Likelihood
-            {tidsInWindow
-              ? ` · showing ${windowFiltered.length} of ${riskCalc.length} techniques observed in window`
-              : ` · ${riskCalc.length} techniques`}
-          </p>
-        </div>
-
-        {/* Date window picker */}
-        <div className="relative flex-shrink-0" ref={datePickerRef}>
-          <button
-            onClick={() => setShowDatePicker(v => !v)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium transition-colors shadow-sm ${
-              dateRange !== "all"
-                ? "bg-primary/15 text-primary border-primary/40 hover:bg-primary/25"
-                : "bg-card border-border text-muted-foreground hover:bg-accent hover:text-foreground"
-            }`}
-          >
-            <CalendarRange className="w-3.5 h-3.5" />
-            <span>{DATE_RANGE_LABELS[dateRange]}</span>
-            {dateRange === "custom" && customFrom && customTo && (
-              <span className="text-muted-foreground font-normal">
-                ({new Date(customFrom).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })} – {new Date(customTo).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })})
-              </span>
-            )}
-            <ChevronDown className={`w-3 h-3 transition-transform ${showDatePicker ? "rotate-180" : ""}`} />
-          </button>
-
-          {showDatePicker && (
-            <div className="absolute right-0 top-full mt-1.5 z-50 w-72 bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
-              <div className="p-3 border-b border-border">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Calculation date window</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Only techniques observed within this window are shown</p>
-              </div>
-              <div className="p-2 space-y-0.5">
-                {(["all", "3m", "6m", "9m", "1y", "custom"] as DateRange[]).map(opt => (
-                  <button key={opt} onClick={() => { setDateRange(opt); if (opt !== "custom") setShowDatePicker(false); }}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-colors text-left ${
-                      dateRange === opt ? "bg-primary/15 text-primary font-medium" : "text-foreground hover:bg-accent"
-                    }`}>
-                    <span>{DATE_RANGE_LABELS[opt]}</span>
-                    {dateRange === opt && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
-                  </button>
-                ))}
-              </div>
-              {dateRange === "custom" && (
-                <div className="px-3 pb-3 pt-2 border-t border-border space-y-2">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] text-muted-foreground font-medium">From</label>
-                    <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
-                      className="bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring [color-scheme:dark]" />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] text-muted-foreground font-medium">To</label>
-                    <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
-                      className="bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring [color-scheme:dark]" />
-                  </div>
-                  {(customFrom || customTo) && (
-                    <button onClick={() => setShowDatePicker(false)}
-                      className="w-full py-1.5 text-xs bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium">
-                      Apply
-                    </button>
-                  )}
-                </div>
-              )}
-              {dateRange !== "all" && (
-                <div className="px-3 pb-3">
-                  <button onClick={() => { setDateRange("all"); setCustomFrom(""); setCustomTo(""); setShowDatePicker(false); }}
-                    className="w-full text-xs text-muted-foreground hover:text-foreground underline transition-colors text-center">
-                    Reset to all time
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Risk Calculation</h1>
+        <p className="text-muted-foreground text-sm mt-1">
+          Risk = Impact × Likelihood
+          {tidsInWindow
+            ? ` · showing ${windowFiltered.length} of ${riskCalc.length} techniques observed in window`
+            : ` · ${riskCalc.length} techniques`}
+        </p>
       </div>
 
       {tidsInWindow && (

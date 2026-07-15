@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, Fragment } from "react";
+import { useDateWindow } from "@/context/DateWindowContext";
 import { Link } from "wouter";
 import { useLikelihood } from "@/context/LikelihoodContext";
 import { useAppData, baseFullRiskCalc } from "@/context/AppDataContext";
@@ -69,6 +70,7 @@ export default function LikelihoodTable() {
   const { overrides, setOverride, resetOverride, resetAll } = useLikelihood();
   const { activeNewRiskRows, liveActorData } = useAppData();
   const { hvaScoreMap: hvaScores } = useHVAScores();
+  const { tidsInWindow } = useDateWindow();
 
   const [search, setSearch] = useState("");
   const [tacticFilter, setTacticFilter] = useState("All");
@@ -134,6 +136,7 @@ export default function LikelihoodTable() {
   }), [allSourceRows, overrides, hvaScores, liveDateByTid]);
 
   const filtered = useMemo(() => computed.filter(r => {
+    if (tidsInWindow && !tidsInWindow.has(r.TID)) return false;
     const q = search.toLowerCase();
     const matchSearch = !q ||
       r.TID.toLowerCase().includes(q) ||
@@ -141,7 +144,7 @@ export default function LikelihoodTable() {
       r.Tactic?.toLowerCase().includes(q);
     const matchTactic = tacticFilter === "All" || r.Tactic?.includes(tacticFilter);
     return matchSearch && matchTactic;
-  }), [computed, search, tacticFilter]);
+  }), [computed, search, tacticFilter, tidsInWindow]);
 
   const sorted = useMemo(() => {
     const dir = sortDir === "asc" ? 1 : -1;
