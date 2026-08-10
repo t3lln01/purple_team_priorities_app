@@ -59,6 +59,17 @@ type CustomActor = {
   csEnriched: boolean;
   csLastRefreshed: string | null;
   description: string;
+} & RubricScores;
+
+type RubricScores = {
+  intentRationale?: string;
+  willingnessRationale?: string;
+  capabilityRationale?: string;
+  noveltyRationale?: string;
+  intentBaseScore?: number | null;
+  willingnessModifier?: number | null;
+  capabilityBaseScore?: number | null;
+  noveltyModifier?: number | null;
 };
 
 type ActorOverride = {
@@ -66,9 +77,9 @@ type ActorOverride = {
   csEnriched?: boolean;
   csLastRefreshed?: string | null;
   csData?: Partial<CustomActor>;
-  intentFinalScore?: number | null;     // manual score override
-  capabilityFinalScore?: number | null; // manual score override
-};
+  intentFinalScore?: number | null;     // derived: intentBaseScore + willingnessModifier
+  capabilityFinalScore?: number | null; // derived: capabilityBaseScore + noveltyModifier
+} & RubricScores;
 
 type MergedActor = BaseActor & {
   isCustom: boolean;
@@ -82,12 +93,27 @@ type MergedActor = BaseActor & {
   effectiveCapabilityScore: number;
   inPpTap: boolean;
   inSirt: boolean;
+  /** Resolved rubric selections (override wins over static data) */
+  intentRationale: string;
+  willingnessRationale: string;
+  capabilityRationale: string;
+  noveltyRationale: string;
+  intentBaseScore: number | null;
+  willingnessModifier: number | null;
+  capabilityBaseScore: number | null;
+  noveltyModifier: number | null;
 };
 
 // ── Static data ────────────────────────────────────────────────────────────────
 
 const staticActors = (threatModelData as any).threatModelActors as BaseActor[];
 const scoringFramework = (threatModelData as any).scoringFramework as any[];
+
+// ── Rubric option arrays (derived from scoringFramework) ────────────────────
+const INTENT_OPTIONS     = scoringFramework.filter((r: any) => r.intent).map((r: any) => ({ text: r.intent as string, score: r.intentScore as number }));
+const WILLINGNESS_OPTIONS = scoringFramework.filter((r: any) => r.willingness).map((r: any) => ({ text: r.willingness as string, score: r.willingnessScore as number }));
+const CAPABILITY_OPTIONS  = scoringFramework.filter((r: any) => r.capability).map((r: any) => ({ text: r.capability as string, score: r.capabilityScore as number }));
+const NOVELTY_OPTIONS     = scoringFramework.filter((r: any) => r.novelty).map((r: any) => ({ text: r.novelty as string, score: r.noveltyScore as number }));
 
 // Actor names seeded from Excel pptap/sirt fields (used to pre-populate lists)
 const SEED_PPTAP: string[] = staticActors
@@ -180,13 +206,18 @@ function ActorRow({
   onRefresh: (name: string) => void;
   onToggleMonitor: (name: string) => void;
   onDelete?: (name: string) => void;
-  onSaveScores: (name: string, intent: number | null, capability: number | null) => void;
+  onSaveScores: (name: string, scores: {
+    intentFinalScore: number | null;
+    capabilityFinalScore: number | null;
+  } & RubricScores) => void;
   refreshing: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [editIntent, setEditIntent] = useState<number>(actor.effectiveIntentScore);
-  const [editCap, setEditCap] = useState<number>(actor.effectiveCapabilityScore);
+  const [editIntentText, setEditIntentText]         = useState<string>("");
+  const [editWillingnessText, setEditWillingnessText] = useState<string>("");
+  const [editCapabilityText, setEditCapabilityText] = useState<string>("");
+  const [editNoveltyText, setEditNoveltyText]       = useState<string>("");
 
   const typeShort = actorTypeShort(actor.actorType);
   const typeColor = actorTypeColor(actor.actorType);
@@ -194,16 +225,41 @@ function ActorRow({
   const combined = actor.effectiveIntentScore + actor.effectiveCapabilityScore;
   const riskPct = combined / 13;
 
+  // Live rubric selections while editing
+  const selIntent   = INTENT_OPTIONS.find(o => o.text === editIntentText) ?? null;
+  const selWill     = WILLINGNESS_OPTIONS.find(o => o.text === editWillingnessText) ?? null;
+  const selCap      = CAPABILITY_OPTIONS.find(o => o.text === editCapabilityText) ?? null;
+  const selNovelty  = NOVELTY_OPTIONS.find(o => o.text === editNoveltyText) ?? null;
+  const previewIntent = selIntent ? selIntent.score + (selWill?.score ?? 0) : null;
+  const previewCap    = selCap ? selCap.score + (selNovelty?.score ?? 0) : null;
+
   function startEdit(e: React.MouseEvent) {
     e.stopPropagation();
-    setEditIntent(actor.effectiveIntentScore);
-    setEditCap(actor.effectiveCapabilityScore);
+    // Pre-populate from stored rubric selections or try to match static text
+    setEditIntentText(actor.intentRationale ?? "");
+    setEditWillingnessText(actor.willingnessRationale ?? "");
+    setEditCapabilityText(actor.capabilityRationale ?? "");
+    setEditNoveltyText(actor.noveltyRationale ?? "");
     setEditing(true);
+    setExpanded(true);
   }
 
   function saveEdit(e: React.MouseEvent) {
     e.stopPropagation();
-    onSaveScores(actor.name, editIntent, editCap);
+    const intentFinal = selIntent ? selIntent.score + (selWill?.score ?? 0) : null;
+    const capFinal    = selCap    ? selCap.score    + (selNovelty?.score ?? 0) : null;
+    onSaveScores(actor.name, {
+      intentFinalScore: intentFinal,
+      capabilityFinalScore: capFinal,
+      intentRationale: editIntentText || undefined,
+      willingnessRationale: editWillingnessText || undefined,
+      capabilityRationale: editCapabilityText || undefined,
+      noveltyRationale: editNoveltyText || undefined,
+      intentBaseScore: selIntent?.score ?? null,
+      willingnessModifier: selWill?.score ?? null,
+      capabilityBaseScore: selCap?.score ?? null,
+      noveltyModifier: selNovelty?.score ?? null,
+    });
     setEditing(false);
   }
 
@@ -266,44 +322,32 @@ function ActorRow({
           )}
         </td>
         {/* Intent cell */}
-        <td className="px-3 py-3 min-w-[140px]" onClick={e => editing && e.stopPropagation()}>
-          {editing ? (
-            <div className="flex items-center gap-1">
-              <input
-                type="number" min={1} max={7}
-                value={editIntent}
-                onChange={e => setEditIntent(Math.min(7, Math.max(1, Number(e.target.value))))}
-                className="w-14 bg-input border border-ring rounded px-2 py-1 text-xs font-semibold text-amber-400 focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-              <span className="text-[10px] text-muted-foreground">/7</span>
-            </div>
-          ) : (
-            <div>
-              {scoreBar(actor.effectiveIntentScore, 7, "bg-amber-500")}
-              {bonusIntent > 0 && (
-                <div className="flex items-center gap-0.5 mt-0.5">
-                  <ArrowUp className="w-2.5 h-2.5 text-amber-400" />
-                  <span className="text-[10px] text-amber-400/70">+{bonusIntent} bonus</span>
-                </div>
-              )}
-            </div>
-          )}
+        <td className="px-3 py-3 min-w-[140px]">
+          <div>
+            {scoreBar(editing && previewIntent !== null ? Math.min(7, previewIntent + bonusIntent) : actor.effectiveIntentScore, 7, "bg-amber-500")}
+            {editing && previewIntent !== null && (
+              <div className="text-[10px] text-amber-400/70 mt-0.5 font-mono">
+                preview: {previewIntent}{bonusIntent > 0 ? ` +${bonusIntent}` : ""} = {Math.min(7, previewIntent + bonusIntent)}/7
+              </div>
+            )}
+            {!editing && bonusIntent > 0 && (
+              <div className="flex items-center gap-0.5 mt-0.5">
+                <ArrowUp className="w-2.5 h-2.5 text-amber-400" />
+                <span className="text-[10px] text-amber-400/70">+{bonusIntent} bonus</span>
+              </div>
+            )}
+          </div>
         </td>
         {/* Capability cell */}
-        <td className="px-3 py-3 min-w-[120px]" onClick={e => editing && e.stopPropagation()}>
-          {editing ? (
-            <div className="flex items-center gap-1">
-              <input
-                type="number" min={1} max={6}
-                value={editCap}
-                onChange={e => setEditCap(Math.min(6, Math.max(1, Number(e.target.value))))}
-                className="w-14 bg-input border border-ring rounded px-2 py-1 text-xs font-semibold text-primary focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-              <span className="text-[10px] text-muted-foreground">/6</span>
-            </div>
-          ) : (
-            scoreBar(actor.effectiveCapabilityScore, 6, "bg-primary")
-          )}
+        <td className="px-3 py-3 min-w-[120px]">
+          <div>
+            {scoreBar(editing && previewCap !== null ? previewCap : actor.effectiveCapabilityScore, 6, "bg-primary")}
+            {editing && previewCap !== null && (
+              <div className="text-[10px] text-primary/70 mt-0.5 font-mono">
+                preview: {previewCap}/6
+              </div>
+            )}
+          </div>
         </td>
         <td className="px-3 py-3 min-w-[110px] cursor-pointer">
           {scoreBar(combined, 13, riskPct >= 0.7 ? "bg-red-400" : riskPct >= 0.5 ? "bg-orange-400" : "bg-yellow-400")}
@@ -312,17 +356,12 @@ function ActorRow({
         <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-1">
             {editing ? (
-              <>
-                <button title="Save scores" onClick={saveEdit} className="p-1.5 rounded-lg text-emerald-400 bg-emerald-400/10 hover:bg-emerald-400/20 transition-colors">
-                  <Check className="w-3.5 h-3.5" />
-                </button>
-                <button title="Cancel" onClick={cancelEdit} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </>
+              <button title="Cancel edit" onClick={cancelEdit} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                <X className="w-3.5 h-3.5" />
+              </button>
             ) : (
               <>
-                <button title="Edit intent & capability scores" onClick={startEdit} className="p-1.5 rounded-lg text-muted-foreground hover:text-amber-400 hover:bg-amber-400/10 transition-colors">
+                <button title="Edit scores via rubric" onClick={startEdit} className="p-1.5 rounded-lg text-muted-foreground hover:text-amber-400 hover:bg-amber-400/10 transition-colors">
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
                 <button
@@ -363,54 +402,205 @@ function ActorRow({
           <td colSpan={9} className="bg-card/50 px-6 py-5">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {/* Scores */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Score Breakdown</h4>
-                <div className="flex gap-2 flex-wrap">
-                  {[
-                    { label: "Intent (base)", value: actor.intentFinalScore, color: "text-amber-400/70 border-amber-400/20 bg-amber-400/5" },
-                    { label: "Intent (effective)", value: actor.effectiveIntentScore, color: "text-amber-400 border-amber-400/30 bg-amber-400/10" },
-                    { label: "Capability", value: actor.effectiveCapabilityScore, color: "text-primary border-primary/30 bg-primary/5" },
-                    { label: "Willingness", value: actor.willingnessScore, color: "text-purple-400 border-purple-400/30 bg-purple-400/5" },
-                  ].map(({ label, value, color }) => value !== null && value !== undefined && (
-                    <div key={label} className={`flex flex-col items-center px-3 py-2 rounded-lg border ${color} min-w-[60px]`}>
-                      <span className="text-lg font-bold font-mono">{value}</span>
-                      <span className="text-[10px] text-muted-foreground uppercase tracking-wide mt-0.5 text-center leading-tight">{label}</span>
+              {editing ? (
+                /* ── Rubric Score Editor ─────────────────────────── */
+                <div className="space-y-4 col-span-full">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <Edit2 className="w-3 h-3" /> Score Rubric
+                    <span className="text-[10px] font-normal normal-case text-muted-foreground/60 ml-1">— select options to compute scores automatically</span>
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Intent Rationale */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-semibold text-amber-400 uppercase tracking-wide">Intent Rationale</label>
+                        {selIntent && (
+                          <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20 px-1.5 py-0.5 rounded">
+                            {selIntent.score}/5
+                          </span>
+                        )}
+                      </div>
+                      <select
+                        value={editIntentText}
+                        onChange={e => setEditIntentText(e.target.value)}
+                        onClick={e => e.stopPropagation()}
+                        className="w-full bg-input border border-border rounded-lg px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500/50"
+                      >
+                        <option value="">— Select intent rationale —</option>
+                        {INTENT_OPTIONS.map(o => (
+                          <option key={o.text} value={o.text}>[{o.score}] {o.text}</option>
+                        ))}
+                      </select>
+                      {selIntent && <p className="text-[10px] text-muted-foreground leading-relaxed">{selIntent.text}</p>}
                     </div>
-                  ))}
+
+                    {/* Willingness */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-semibold text-purple-400 uppercase tracking-wide">Willingness</label>
+                        {selWill && (
+                          <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${selWill.score < 0 ? "text-red-400 bg-red-400/10 border border-red-400/20" : "text-muted-foreground bg-muted/30 border border-border"}`}>
+                            {selWill.score >= 0 ? "+" : ""}{selWill.score}
+                          </span>
+                        )}
+                      </div>
+                      <select
+                        value={editWillingnessText}
+                        onChange={e => setEditWillingnessText(e.target.value)}
+                        onClick={e => e.stopPropagation()}
+                        className="w-full bg-input border border-border rounded-lg px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-purple-500/50 focus:border-purple-500/50"
+                      >
+                        <option value="">— Select willingness —</option>
+                        {WILLINGNESS_OPTIONS.map(o => (
+                          <option key={o.text} value={o.text}>[{o.score >= 0 ? "+" : ""}{o.score}] {o.text}</option>
+                        ))}
+                      </select>
+                      {selWill && <p className="text-[10px] text-muted-foreground leading-relaxed">{selWill.text}</p>}
+                    </div>
+
+                    {/* Capability Rationale */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-semibold text-primary uppercase tracking-wide">Capability Rationale</label>
+                        {selCap && (
+                          <span className="text-[10px] font-mono font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
+                            {selCap.score}/5
+                          </span>
+                        )}
+                      </div>
+                      <select
+                        value={editCapabilityText}
+                        onChange={e => setEditCapabilityText(e.target.value)}
+                        onClick={e => e.stopPropagation()}
+                        className="w-full bg-input border border-border rounded-lg px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50"
+                      >
+                        <option value="">— Select capability rationale —</option>
+                        {CAPABILITY_OPTIONS.map(o => (
+                          <option key={o.text} value={o.text}>[{o.score}] {o.text}</option>
+                        ))}
+                      </select>
+                      {selCap && <p className="text-[10px] text-muted-foreground leading-relaxed">{selCap.text}</p>}
+                    </div>
+
+                    {/* Novelty */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-semibold text-cyan-400 uppercase tracking-wide">Novelty</label>
+                        {selNovelty && (
+                          <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${selNovelty.score < 0 ? "text-red-400 bg-red-400/10 border border-red-400/20" : "text-muted-foreground bg-muted/30 border border-border"}`}>
+                            {selNovelty.score >= 0 ? "+" : ""}{selNovelty.score}
+                          </span>
+                        )}
+                      </div>
+                      <select
+                        value={editNoveltyText}
+                        onChange={e => setEditNoveltyText(e.target.value)}
+                        onClick={e => e.stopPropagation()}
+                        className="w-full bg-input border border-border rounded-lg px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50"
+                      >
+                        <option value="">— Select novelty —</option>
+                        {NOVELTY_OPTIONS.map(o => (
+                          <option key={o.text} value={o.text}>[{o.score >= 0 ? "+" : ""}{o.score}] {o.text}</option>
+                        ))}
+                      </select>
+                      {selNovelty && <p className="text-[10px] text-muted-foreground leading-relaxed">{selNovelty.text}</p>}
+                    </div>
+                  </div>
+
+                  {/* Computed preview */}
+                  {(previewIntent !== null || previewCap !== null) && (
+                    <div className="flex flex-wrap items-center gap-4 pt-3 border-t border-border/50">
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold">Computed:</span>
+                      {previewIntent !== null && (
+                        <span className="text-xs text-amber-400 font-mono">
+                          Intent = {selIntent!.score}{selWill ? ` + (${selWill.score >= 0 ? "+" : ""}${selWill.score})` : ""}
+                          {" = "}<strong>{previewIntent}</strong>
+                          {bonusIntent > 0 && <span className="text-amber-400/60"> + {bonusIntent} PP-TAP/SIRT → {Math.min(7, previewIntent + bonusIntent)}</span>}
+                          <span className="text-muted-foreground">/7</span>
+                        </span>
+                      )}
+                      {previewCap !== null && (
+                        <span className="text-xs text-primary font-mono">
+                          Capability = {selCap!.score}{selNovelty ? ` + (${selNovelty.score >= 0 ? "+" : ""}${selNovelty.score})` : ""}
+                          {" = "}<strong>{previewCap}</strong>
+                          <span className="text-muted-foreground">/6</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Save / Cancel */}
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <button onClick={cancelEdit} className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors">
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveEdit}
+                      disabled={previewIntent === null && previewCap === null}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+                    >
+                      <Check className="w-3 h-3" /> Save Scores
+                    </button>
+                  </div>
                 </div>
-                {bonusIntent > 0 && (
-                  <div className="text-[11px] text-amber-400/80 flex items-center gap-1">
-                    <ArrowUp className="w-3 h-3" />
-                    Intent boosted by +{bonusIntent}
-                    {actor.inPpTap && " (PP-TAP +1)"}
-                    {actor.inSirt && " (SIRT +2)"}
+              ) : (
+                <div className="space-y-3">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Score Breakdown</h4>
+                  <div className="flex gap-2 flex-wrap">
+                    {[
+                      { label: "Intent base", value: actor.intentBaseScore ?? actor.intentFinalScore, color: "text-amber-400/70 border-amber-400/20 bg-amber-400/5" },
+                      { label: "Willingness", value: actor.willingnessModifier ?? actor.willingnessScore, color: "text-purple-400 border-purple-400/30 bg-purple-400/5" },
+                      { label: "Intent (effective)", value: actor.effectiveIntentScore, color: "text-amber-400 border-amber-400/30 bg-amber-400/10" },
+                      { label: "Cap. base", value: actor.capabilityBaseScore ?? actor.capabilityFinalScore, color: "text-primary/70 border-primary/20 bg-primary/5" },
+                      { label: "Novelty", value: actor.noveltyModifier ?? actor.noveltyScore, color: "text-cyan-400 border-cyan-400/30 bg-cyan-400/5" },
+                      { label: "Capability", value: actor.effectiveCapabilityScore, color: "text-primary border-primary/30 bg-primary/10" },
+                    ].map(({ label, value, color }) => value !== null && value !== undefined && (
+                      <div key={label} className={`flex flex-col items-center px-3 py-2 rounded-lg border ${color} min-w-[60px]`}>
+                        <span className="text-lg font-bold font-mono">{typeof value === "number" && value > 0 && label.includes("illingnes") ? `+${value}` : value}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wide mt-0.5 text-center leading-tight">{label}</span>
+                      </div>
+                    ))}
                   </div>
-                )}
-                {actor.description && (
-                  <div>
-                    <div className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide mb-0.5">Description</div>
-                    <p className="text-xs text-foreground leading-relaxed">{actor.description}</p>
-                  </div>
-                )}
-                {(actor as any).intent && (
-                  <div>
-                    <div className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide mb-0.5">Intent Rationale</div>
-                    <p className="text-xs text-foreground leading-relaxed">{(actor as any).intent}</p>
-                  </div>
-                )}
-                {(actor as any).capabilities && (
-                  <div>
-                    <div className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide mb-0.5">Capability Rationale</div>
-                    <p className="text-xs text-foreground leading-relaxed">{(actor as any).capabilities}</p>
-                  </div>
-                )}
-                {(actor as any).novelty && (
-                  <div>
-                    <div className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide mb-0.5">Novelty</div>
-                    <p className="text-xs text-foreground leading-relaxed">{(actor as any).novelty}</p>
-                  </div>
-                )}
-              </div>
+                  {bonusIntent > 0 && (
+                    <div className="text-[11px] text-amber-400/80 flex items-center gap-1">
+                      <ArrowUp className="w-3 h-3" />
+                      Intent boosted by +{bonusIntent}
+                      {actor.inPpTap && " (PP-TAP +1)"}
+                      {actor.inSirt && " (SIRT +2)"}
+                    </div>
+                  )}
+                  {actor.description && (
+                    <div>
+                      <div className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide mb-0.5">Description</div>
+                      <p className="text-xs text-foreground leading-relaxed">{actor.description}</p>
+                    </div>
+                  )}
+                  {actor.intentRationale && (
+                    <div>
+                      <div className="text-[10px] text-amber-400/70 font-semibold uppercase tracking-wide mb-0.5">Intent Rationale</div>
+                      <p className="text-xs text-foreground leading-relaxed">{actor.intentRationale}</p>
+                    </div>
+                  )}
+                  {actor.willingnessRationale && (
+                    <div>
+                      <div className="text-[10px] text-purple-400/70 font-semibold uppercase tracking-wide mb-0.5">Willingness</div>
+                      <p className="text-xs text-foreground leading-relaxed">{actor.willingnessRationale}</p>
+                    </div>
+                  )}
+                  {actor.capabilityRationale && (
+                    <div>
+                      <div className="text-[10px] text-primary/70 font-semibold uppercase tracking-wide mb-0.5">Capability Rationale</div>
+                      <p className="text-xs text-foreground leading-relaxed">{actor.capabilityRationale}</p>
+                    </div>
+                  )}
+                  {actor.noveltyRationale && (
+                    <div>
+                      <div className="text-[10px] text-cyan-400/70 font-semibold uppercase tracking-wide mb-0.5">Novelty</div>
+                      <p className="text-xs text-foreground leading-relaxed">{actor.noveltyRationale}</p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Profile */}
               <div className="space-y-3">
@@ -1112,6 +1302,15 @@ export default function ThreatModel() {
         effectiveCapabilityScore,
         inPpTap,
         inSirt,
+        // Rubric selections: override wins over static Excel data
+        intentRationale:      ovr.intentRationale      ?? a.intent      ?? "",
+        willingnessRationale: ovr.willingnessRationale ?? a.willingness  ?? "",
+        capabilityRationale:  ovr.capabilityRationale  ?? a.capabilities ?? "",
+        noveltyRationale:     ovr.noveltyRationale     ?? a.novelty      ?? "",
+        intentBaseScore:      ovr.intentBaseScore      !== undefined ? ovr.intentBaseScore      : a.intentScore,
+        willingnessModifier:  ovr.willingnessModifier  !== undefined ? ovr.willingnessModifier  : a.willingnessScore,
+        capabilityBaseScore:  ovr.capabilityBaseScore  !== undefined ? ovr.capabilityBaseScore  : a.capabilitiesScore,
+        noveltyModifier:      ovr.noveltyModifier      !== undefined ? ovr.noveltyModifier      : a.noveltyScore,
       };
     });
 
@@ -1136,6 +1335,14 @@ export default function ThreatModel() {
         effectiveCapabilityScore,
         inPpTap,
         inSirt,
+        intentRationale:      a.intentRationale      ?? "",
+        willingnessRationale: a.willingnessRationale ?? "",
+        capabilityRationale:  a.capabilityRationale  ?? "",
+        noveltyRationale:     a.noveltyRationale     ?? "",
+        intentBaseScore:      a.intentBaseScore      ?? null,
+        willingnessModifier:  a.willingnessModifier  ?? null,
+        capabilityBaseScore:  a.capabilityBaseScore  ?? null,
+        noveltyModifier:      a.noveltyModifier      ?? null,
       };
     });
 
@@ -1143,11 +1350,15 @@ export default function ThreatModel() {
   }, [staticActors, customActors, actorOverrides, ppTapList, sirtList]);
 
   // ── Save intent/capability scores for an actor ────────────────────────────
-  async function saveScores(name: string, intent: number | null, capability: number | null) {
+  async function saveScores(name: string, scores: {
+    intentFinalScore: number | null;
+    capabilityFinalScore: number | null;
+  } & RubricScores) {
+    const { intentFinalScore, capabilityFinalScore, ...rubric } = scores;
     const customIdx = customActors.findIndex(a => a.name.toUpperCase() === name.toUpperCase());
     if (customIdx !== -1) {
       const updated = [...customActors];
-      updated[customIdx] = { ...updated[customIdx], intentFinalScore: intent, capabilityFinalScore: capability };
+      updated[customIdx] = { ...updated[customIdx], intentFinalScore, capabilityFinalScore, ...rubric };
       setCustomActors(updated);
       await persistState({ customActors: updated });
       showMsg(`${name} scores updated`);
@@ -1155,7 +1366,7 @@ export default function ThreatModel() {
     }
     const newOverrides = {
       ...actorOverrides,
-      [name]: { ...actorOverrides[name], intentFinalScore: intent, capabilityFinalScore: capability },
+      [name]: { ...actorOverrides[name], intentFinalScore, capabilityFinalScore, ...rubric },
     };
     setActorOverrides(newOverrides);
     await persistState({ actorOverrides: newOverrides });
