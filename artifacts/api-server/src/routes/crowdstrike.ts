@@ -445,3 +445,177 @@ csRouter.get("/cs/sync-result", async (_req, res) => {
   const state = await loadState();
   res.json(state);
 });
+
+// ── Threat Model custom state ──────────────────────────────────────────────────
+
+const TM_STATE_FILE = path.join(ROOT, "cs-threat-model-state.json");
+
+interface ThreatModelActor {
+  name: string;
+  origins: string;
+  aliases: string;
+  actorType: string;
+  lastSeen: string | null;
+  malware: string;
+  countries: string[];
+  industries: string[];
+  intentFinalScore: number | null;
+  capabilityFinalScore: number | null;
+  willingnessScore: number | null;
+  motivation: string;
+  adversaryType: string;
+  communityIds: string;
+  inMonitoringList: boolean;
+  isCustom: boolean;
+  csEnriched: boolean;
+  csLastRefreshed: string | null;
+  csRawData: any | null;
+  description: string;
+}
+
+interface ThreatModelState {
+  customActors: ThreatModelActor[];
+  /** Per-actor overrides keyed by actor name (UPPER CASE) — applied on top of base static data */
+  actorOverrides: Record<string, Partial<ThreatModelActor>>;
+}
+
+async function loadTmState(): Promise<ThreatModelState> {
+  try {
+    const raw = await fs.readFile(TM_STATE_FILE, "utf-8");
+    const parsed = JSON.parse(raw);
+    return { customActors: parsed.customActors ?? [], actorOverrides: parsed.actorOverrides ?? {} };
+  } catch {
+    return { customActors: [], actorOverrides: {} };
+  }
+}
+
+async function saveTmState(state: ThreatModelState): Promise<void> {
+  await fs.writeFile(TM_STATE_FILE, JSON.stringify(state, null, 2));
+}
+
+/** Normalise a CS combined-actors resource into our ThreatModelActor shape */
+function normalizeCSActor(r: any): ThreatModelActor {
+  const countries: string[] = (r.target_countries ?? [])
+    .map((c: any) => c.country ?? c.name ?? "")
+    .filter(Boolean);
+
+  const industries: string[] = (r.target_industries ?? [])
+    .map((i: any) => i.name ?? "")
+    .filter(Boolean);
+
+  const malwareFamilies: string[] = (r.malware_families ?? [])
+    .map((m: any) => m.name ?? "")
+    .filter(Boolean);
+
+  const origins: string = (r.origins ?? [])
+    .map((o: any) => o.country ?? o.name ?? "")
+    .filter(Boolean)
+    .join(", ");
+
+  const motivations: string = (r.motivations ?? [])
+    .map((m: any) => m.name ?? m.value ?? "")
+    .filter(Boolean)
+    .join(", ");
+
+  const knownAs: string = typeof r.known_as === "string"
+    ? r.known_as
+    : (r.known_as ?? []).join(", ");
+
+  // Map CS adversary_type / capability to our actorType field
+  const capName: string = r.capability?.name ?? "";
+  const advType: string = r.adversary_type ?? "";
+  let actorType = "";
+  if (advType.toLowerCase().includes("espionage") || advType.toLowerCase().includes("state")) {
+    actorType = "Espionage — attacks impacting the Confidentiality of data or systems";
+  } else if (advType.toLowerCase().includes("ecrime") || advType.toLowerCase().includes("crime") || motivations.toLowerCase().includes("criminal")) {
+    actorType = "Cyber-Crime — attacks intended for near-term financial profit";
+  } else if (advType.toLowerCase().includes("disrupt") || advType.toLowerCase().includes("hacktivist")) {
+    actorType = "Disruptive — attacks impacting the Availability of data or systems";
+  } else if (advType.toLowerCase().includes("destruct")) {
+    actorType = "Destructive — attacks impacting the Integrity of data or systems";
+  }
+
+  // Convert CS capability score
+  let capScore: number | null = null;
+  const capVal = capName.toLowerCase();
+  if (capVal.includes("high") || capVal.includes("advanced")) capScore = 5;
+  else if (capVal.includes("medium") || capVal.includes("moderate")) capScore = 3;
+  else if (capVal.includes("low") || capVal.includes("limited")) capScore = 2;
+
+  // Last activity date (unix seconds → ISO string)
+  let lastSeen: string | null = null;
+  if (r.last_activity_date) {
+    const ms = r.last_activity_date > 1e10 ? r.last_activity_date : r.last_activity_date * 1000;
+    lastSeen = new Date(ms).toISOString().slice(0, 10);
+  }
+
+  return {
+    name: (r.name ?? "").toUpperCase(),
+    origins,
+    aliases: knownAs,
+    actorType,
+    lastSeen,
+    malware: malwareFamilies.join(" "),
+    countries,
+    industries,
+    intentFinalScore: null,         // not directly in CS data — preserved from static
+    capabilityFinalScore: capScore,
+    willingnessScore: null,
+    motivation: motivations,
+    adversaryType: r.adversary_type ?? "",
+    communityIds: knownAs,
+    inMonitoringList: false,
+    isCustom: true,
+    csEnriched: true,
+    csLastRefreshed: new Date().toISOString(),
+    csRawData: r,
+    description: r.short_description ?? r.description ?? "",
+  };
+}
+
+/** GET /api/cs/actor?q=NAME — search CS intel combined actors endpoint */
+csRouter.get("/cs/actor", async (req, res) => {
+  const q = (req.query.q as string ?? "").trim();
+  if (!q) {
+    res.status(400).json({ ok: false, error: "q parameter is required" });
+    return;
+  }
+  try {
+    const token = await getToken();
+    const params = new URLSearchParams({ q, limit: "5" });
+    const r = await fetch(`${CS_BASE}/intel/combined/actors/v1?${params}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!r.ok) {
+      const body = await r.text();
+      res.status(r.status).json({ ok: false, error: `CS API error (${r.status}): ${body.slice(0, 300)}` });
+      return;
+    }
+    const data = await r.json() as any;
+    const resources: any[] = data.resources ?? [];
+    res.json({ ok: true, actors: resources.map(normalizeCSActor), raw: resources });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/** GET /api/cs/threat-model-state — load custom actors + per-actor overrides */
+csRouter.get("/cs/threat-model-state", async (_req, res) => {
+  const state = await loadTmState();
+  res.json({ ok: true, ...state });
+});
+
+/** POST /api/cs/threat-model-state — save custom actors + per-actor overrides */
+csRouter.post("/cs/threat-model-state", async (req, res) => {
+  const { customActors, actorOverrides } = req.body ?? {};
+  if (!Array.isArray(customActors) || typeof actorOverrides !== "object") {
+    res.status(400).json({ ok: false, error: "customActors (array) and actorOverrides (object) are required" });
+    return;
+  }
+  try {
+    await saveTmState({ customActors, actorOverrides });
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
