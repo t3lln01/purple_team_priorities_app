@@ -18,14 +18,16 @@ import { AppDataProvider, useAppData } from "@/context/AppDataContext";
 import { ImpactOverridesProvider }  from "@/context/ImpactOverridesContext";
 import { HVAScoresProvider }        from "@/context/HVAScoresContext";
 import { DateWindowProvider, useDateWindow, DATE_RANGE_LABELS, type DateRange } from "@/context/DateWindowContext";
-import { Shield, Users, Activity, Target, ChartBar, AlertTriangle, List, Database, Table2, TrendingUp, CalendarRange, ChevronDown } from "lucide-react";
+import { Shield, Users, Activity, Target, ChartBar, AlertTriangle, List, Database, Table2, TrendingUp, CalendarRange, ChevronDown, Crosshair } from "lucide-react";
 import ImpactTable       from "@/pages/ImpactTable";
 import LikelihoodTable   from "@/pages/LikelihoodTable";
+import ThreatModel       from "@/pages/ThreatModel";
 
 const queryClient = new QueryClient();
 
 const navItems = [
   { path: "/", label: "Actor Prioritisation", icon: Users },
+  { path: "/threat-model", label: "Threat Model", icon: Crosshair },
   { path: "/risk-calculation", label: "Risk Calculation", icon: Activity },
   { path: "/impact-table",      label: "Impact Table",      icon: Table2 },
   { path: "/likelihood-table",  label: "Likelihood Table",  icon: TrendingUp },
@@ -193,6 +195,7 @@ function Router() {
     <Layout>
       <Switch>
         <Route path="/" component={ActorPrioritisation} />
+        <Route path="/threat-model" component={ThreatModel} />
         <Route path="/risk-calculation" component={RiskCalculation} />
         <Route path="/impact-table"     component={ImpactTable} />
         <Route path="/likelihood-table" component={LikelihoodTable} />
