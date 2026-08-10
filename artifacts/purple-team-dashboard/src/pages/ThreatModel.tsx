@@ -84,7 +84,8 @@ const scoringFramework = (threatModelData as any).scoringFramework as any[];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function actorTypeShort(type: string) {
+function actorTypeShort(type: string | undefined | null) {
+  if (!type) return "Unknown";
   if (type.includes("Espionage")) return "Espionage";
   if (type.includes("Destructive")) return "Destructive";
   if (type.includes("Disruptive")) return "Disruptive";
