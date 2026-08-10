@@ -180,6 +180,39 @@ function fmtDate(iso: string | null) {
   return new Date(iso).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
 }
 
+/** Returns "Q1 2026" etc. based on fiscal quarters starting Feb/May/Aug/Nov */
+function currentQuarterLabel(): string {
+  const now = new Date();
+  const month = now.getMonth() + 1; // 1–12
+  const year  = now.getFullYear();
+  let q: number;
+  let qYear = year;
+  if (month === 1)        { q = 4; qYear = year - 1; } // Jan belongs to Q4 of prior year
+  else if (month <= 4)    { q = 1; }
+  else if (month <= 7)    { q = 2; }
+  else if (month <= 10)   { q = 3; }
+  else                    { q = 4; }
+  return `Q${q} ${qYear}`;
+}
+
+const QUARTER_LABEL = currentQuarterLabel();
+
+const LS_KEY = "tm-state-v1";
+function saveToLocalStorage(state: {
+  customActors: CustomActor[];
+  actorOverrides: Record<string, ActorOverride>;
+  ppTapList: string[];
+  sirtList: string[];
+}) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch { /* quota */ }
+}
+function loadFromLocalStorage() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
 /** Returns true if the actor's name or malware field matches any item in the list */
 function matchesList(actorName: string, malware: string, list: string[]): boolean {
   if (!list.length) return false;
@@ -1219,27 +1252,48 @@ export default function ThreatModel() {
     msgTimer.current = setTimeout(() => setRefreshMsg(null), 4000);
   }
 
-  // ── Load state from server ─────────────────────────────────────────────────
+  // ── Load state from server (with localStorage fallback) ───────────────────
   useEffect(() => {
     (async () => {
+      let loaded = false;
       try {
         const res = await fetch(`${CS_API}/cs/threat-model-state`);
         const data = await res.json();
         if (data.ok) {
           setCustomActors(data.customActors ?? []);
           setActorOverrides(data.actorOverrides ?? {});
-          // Seed lists from Excel data if server has nothing stored yet
           const loadedPpTap: string[] = data.ppTapList ?? [];
           const loadedSirt: string[]  = data.sirtList ?? [];
           setPpTapList(loadedPpTap.length > 0 ? loadedPpTap : SEED_PPTAP);
           setSirtList(loadedSirt.length > 0 ? loadedSirt : SEED_SIRT);
+          // Mirror to localStorage so we always have a fresh copy
+          saveToLocalStorage({
+            customActors: data.customActors ?? [],
+            actorOverrides: data.actorOverrides ?? {},
+            ppTapList: loadedPpTap.length > 0 ? loadedPpTap : SEED_PPTAP,
+            sirtList: loadedSirt.length > 0 ? loadedSirt : SEED_SIRT,
+          });
+          loaded = true;
         }
-      } catch { /* offline */ }
+      } catch { /* offline — fall through to localStorage */ }
+
+      if (!loaded) {
+        // API unavailable: restore last-known state from localStorage
+        const ls = loadFromLocalStorage();
+        if (ls) {
+          setCustomActors(ls.customActors ?? []);
+          setActorOverrides(ls.actorOverrides ?? {});
+          const lsPpTap: string[] = ls.ppTapList ?? [];
+          const lsSirt: string[]  = ls.sirtList ?? [];
+          setPpTapList(lsPpTap.length > 0 ? lsPpTap : SEED_PPTAP);
+          setSirtList(lsSirt.length > 0 ? lsSirt : SEED_SIRT);
+        }
+      }
       setServerLoading(false);
     })();
   }, []);
 
-  // ── Persist state to server ────────────────────────────────────────────────
+  // ── Persist state to server + localStorage ────────────────────────────────
   const persistState = useCallback(async (
     next: {
       customActors?: CustomActor[];
@@ -1248,17 +1302,19 @@ export default function ThreatModel() {
       sirtList?: string[];
     }
   ) => {
-    const ca   = next.customActors   ?? customActors;
-    const ovr  = next.actorOverrides ?? actorOverrides;
-    const pptap = next.ppTapList     ?? ppTapList;
-    const sirt  = next.sirtList      ?? sirtList;
+    const ca    = next.customActors   ?? customActors;
+    const ovr   = next.actorOverrides ?? actorOverrides;
+    const pptap = next.ppTapList      ?? ppTapList;
+    const sirt  = next.sirtList       ?? sirtList;
+    // Always write to localStorage immediately — survives offline and page reloads
+    saveToLocalStorage({ customActors: ca, actorOverrides: ovr, ppTapList: pptap, sirtList: sirt });
     try {
       await fetch(`${CS_API}/cs/threat-model-state`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ customActors: ca, actorOverrides: ovr, ppTapList: pptap, sirtList: sirt }),
       });
-    } catch { /* offline */ }
+    } catch { /* offline — localStorage copy already saved above */ }
   }, [customActors, actorOverrides, ppTapList, sirtList]);
 
   // ── Merge static + custom actors, compute effective scores ────────────────
@@ -1581,7 +1637,7 @@ export default function ThreatModel() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Threat Model — Q3 2027</h1>
+          <h1 className="text-2xl font-bold text-foreground">Threat Model — {QUARTER_LABEL}</h1>
           <p className="text-muted-foreground text-sm mt-1">
             {mergedActors.length} actors assessed · {csEnriched} enriched from CrowdStrike · {customActors.length} custom
           </p>
@@ -1767,7 +1823,7 @@ export default function ThreatModel() {
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Source: APT Groups &amp; Operations — Threat Model Update Q3 2027 · CrowdStrike Falcon Intel API.
+            Source: APT Groups &amp; Operations — Threat Model Update {QUARTER_LABEL} · CrowdStrike Falcon Intel API.
             Combined score = Effective Intent + Capability (max 13). Click the pencil icon to manually edit scores.
           </p>
         </>

@@ -73,7 +73,19 @@
       }
     },
     "ALPHA SPIDER": {
-      "inMonitoringList": true
+      "inMonitoringList": true,
+      "intentFinalScore": 5,
+      "capabilityFinalScore": 5,
+      "intentRationale": "Target-Specific Data: $ACTOR targets $ORG based on an objective that can only be achieved within $ORG’s network",
+      "willingnessRationale": "Strained diplomatic relations/previous hostilities/significant economic disruption perceived by $ACTOR from $ORG’s operations",
+      "capabilityRationale": "Significant Capability: Significant evidence that $ACTOR previously conducted this type of activity; multiple trusted sources confirmed",
+      "noveltyRationale": "Custom toolset per campaign with demonstrated living off the land capability",
+      "intentBaseScore": 5,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 5,
+      "noveltyModifier": 0
     }
-  }
+  },
+  "ppTapList": [],
+  "sirtList": []
 }
