@@ -1,0 +1,2 @@
+- [Threat Model score architecture](threat-model-scores.md) — TM effective scores flow to Actor Prioritisation via API fetch on mount; PP-TAP/SIRT lists drive bonuses.
+- [TM state file](threat-model-scores.md) — cs-threat-model-state.json stores customActors, actorOverrides (with intentFinalScore/capabilityFinalScore), ppTapList, sirtList.

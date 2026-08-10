@@ -5,7 +5,7 @@ import SortableTh from "@/components/SortableTh";
 import {
   ChevronDown, ChevronRight, Shield, Target, Zap, Globe, X,
   RefreshCw, Plus, Check, AlertCircle, Search, Eye, EyeOff,
-  Loader2, Trash2, Edit2, BookOpen,
+  Loader2, Trash2, Edit2, BookOpen, Pencil, Tag, ListX, ArrowUp,
 } from "lucide-react";
 
 const CS_API = "/api";
@@ -66,6 +66,8 @@ type ActorOverride = {
   csEnriched?: boolean;
   csLastRefreshed?: string | null;
   csData?: Partial<CustomActor>;
+  intentFinalScore?: number | null;     // manual score override
+  capabilityFinalScore?: number | null; // manual score override
 };
 
 type MergedActor = BaseActor & {
@@ -75,12 +77,26 @@ type MergedActor = BaseActor & {
   description: string;
   /** monitoring is the resolved value after override */
   monitored: boolean;
+  /** Effective scores after applying manual overrides + PP-TAP/SIRT bonuses */
+  effectiveIntentScore: number;
+  effectiveCapabilityScore: number;
+  inPpTap: boolean;
+  inSirt: boolean;
 };
 
 // ── Static data ────────────────────────────────────────────────────────────────
 
 const staticActors = (threatModelData as any).threatModelActors as BaseActor[];
 const scoringFramework = (threatModelData as any).scoringFramework as any[];
+
+// Actor names seeded from Excel pptap/sirt fields (used to pre-populate lists)
+const SEED_PPTAP: string[] = staticActors
+  .filter(a => (a as any).pptap > 0)
+  .map(a => a.name);
+
+const SEED_SIRT: string[] = staticActors
+  .filter(a => (a as any).sirt > 0)
+  .map(a => a.name);
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -138,6 +154,18 @@ function fmtDate(iso: string | null) {
   return new Date(iso).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
 }
 
+/** Returns true if the actor's name or malware field matches any item in the list */
+function matchesList(actorName: string, malware: string, list: string[]): boolean {
+  if (!list.length) return false;
+  const nameUpper = actorName.toUpperCase();
+  const malwareUpper = (malware ?? "").toUpperCase();
+  return list.some(item => {
+    const t = item.trim().toUpperCase();
+    if (!t) return false;
+    return nameUpper === t || malwareUpper.includes(t);
+  });
+}
+
 // ── Per-actor row ──────────────────────────────────────────────────────────────
 
 function ActorRow({
@@ -145,26 +173,52 @@ function ActorRow({
   onRefresh,
   onToggleMonitor,
   onDelete,
+  onSaveScores,
   refreshing,
 }: {
   actor: MergedActor;
   onRefresh: (name: string) => void;
   onToggleMonitor: (name: string) => void;
   onDelete?: (name: string) => void;
+  onSaveScores: (name: string, intent: number | null, capability: number | null) => void;
   refreshing: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editIntent, setEditIntent] = useState<number>(actor.effectiveIntentScore);
+  const [editCap, setEditCap] = useState<number>(actor.effectiveCapabilityScore);
+
   const typeShort = actorTypeShort(actor.actorType);
   const typeColor = actorTypeColor(actor.actorType);
   const flag = originFlag(actor.origins);
-  const combined = (actor.intentFinalScore ?? 0) + (actor.capabilityFinalScore ?? 0);
+  const combined = actor.effectiveIntentScore + actor.effectiveCapabilityScore;
   const riskPct = combined / 13;
+
+  function startEdit(e: React.MouseEvent) {
+    e.stopPropagation();
+    setEditIntent(actor.effectiveIntentScore);
+    setEditCap(actor.effectiveCapabilityScore);
+    setEditing(true);
+  }
+
+  function saveEdit(e: React.MouseEvent) {
+    e.stopPropagation();
+    onSaveScores(actor.name, editIntent, editCap);
+    setEditing(false);
+  }
+
+  function cancelEdit(e: React.MouseEvent) {
+    e.stopPropagation();
+    setEditing(false);
+  }
+
+  const bonusIntent = (actor.inPpTap ? 1 : 0) + (actor.inSirt ? 2 : 0);
 
   return (
     <>
       <tr
         className="border-b border-border/50 hover:bg-accent/20 transition-colors"
-        onClick={() => setExpanded(v => !v)}
+        onClick={() => !editing && setExpanded(v => !v)}
       >
         <td className="px-3 py-3 w-8 cursor-pointer">
           <span className="text-muted-foreground">
@@ -183,11 +237,11 @@ function ActorRow({
             {actor.csEnriched && (
               <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-cyan-500/15 text-cyan-400 border border-cyan-400/30">CS LIVE</span>
             )}
-            {(actor as any).pptap > 0 && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-400/30">PP-TAP</span>
+            {actor.inPpTap && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-400/30">PP-TAP +1</span>
             )}
-            {(actor as any).sirt > 0 && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500/15 text-red-400 border border-red-400/30">SIRT</span>
+            {actor.inSirt && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500/15 text-red-400 border border-red-400/30">SIRT +2</span>
             )}
           </div>
           {actor.aliases && (
@@ -211,45 +265,95 @@ function ActorRow({
             <div className="text-[10px] text-cyan-400/70 mt-0.5">↺ {fmtDate(actor.csLastRefreshed)}</div>
           )}
         </td>
-        <td className="px-3 py-3 min-w-[110px] cursor-pointer">
-          {scoreBar(actor.intentFinalScore ?? 0, 7, "bg-amber-500")}
+        {/* Intent cell */}
+        <td className="px-3 py-3 min-w-[140px]" onClick={e => editing && e.stopPropagation()}>
+          {editing ? (
+            <div className="flex items-center gap-1">
+              <input
+                type="number" min={1} max={7}
+                value={editIntent}
+                onChange={e => setEditIntent(Math.min(7, Math.max(1, Number(e.target.value))))}
+                className="w-14 bg-input border border-ring rounded px-2 py-1 text-xs font-semibold text-amber-400 focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+              <span className="text-[10px] text-muted-foreground">/7</span>
+            </div>
+          ) : (
+            <div>
+              {scoreBar(actor.effectiveIntentScore, 7, "bg-amber-500")}
+              {bonusIntent > 0 && (
+                <div className="flex items-center gap-0.5 mt-0.5">
+                  <ArrowUp className="w-2.5 h-2.5 text-amber-400" />
+                  <span className="text-[10px] text-amber-400/70">+{bonusIntent} bonus</span>
+                </div>
+              )}
+            </div>
+          )}
         </td>
-        <td className="px-3 py-3 min-w-[110px] cursor-pointer">
-          {scoreBar(actor.capabilityFinalScore ?? 0, 6, "bg-primary")}
+        {/* Capability cell */}
+        <td className="px-3 py-3 min-w-[120px]" onClick={e => editing && e.stopPropagation()}>
+          {editing ? (
+            <div className="flex items-center gap-1">
+              <input
+                type="number" min={1} max={6}
+                value={editCap}
+                onChange={e => setEditCap(Math.min(6, Math.max(1, Number(e.target.value))))}
+                className="w-14 bg-input border border-ring rounded px-2 py-1 text-xs font-semibold text-primary focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+              <span className="text-[10px] text-muted-foreground">/6</span>
+            </div>
+          ) : (
+            scoreBar(actor.effectiveCapabilityScore, 6, "bg-primary")
+          )}
         </td>
         <td className="px-3 py-3 min-w-[110px] cursor-pointer">
           {scoreBar(combined, 13, riskPct >= 0.7 ? "bg-red-400" : riskPct >= 0.5 ? "bg-orange-400" : "bg-yellow-400")}
         </td>
-        {/* Actions — stop propagation so clicks don't toggle expand */}
+        {/* Actions */}
         <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-1">
-            <button
-              title={actor.monitored ? "Remove from monitoring" : "Add to monitoring"}
-              onClick={() => onToggleMonitor(actor.name)}
-              className={`p-1.5 rounded-lg transition-colors ${
-                actor.monitored
-                  ? "text-primary bg-primary/10 hover:bg-primary/20"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
-              }`}
-            >
-              {actor.monitored ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-            </button>
-            <button
-              title="Refresh from CrowdStrike"
-              onClick={() => onRefresh(actor.name)}
-              disabled={refreshing}
-              className="p-1.5 rounded-lg text-muted-foreground hover:text-cyan-400 hover:bg-cyan-400/10 transition-colors disabled:opacity-40"
-            >
-              {refreshing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-            </button>
-            {actor.isCustom && onDelete && (
-              <button
-                title="Remove actor"
-                onClick={() => onDelete(actor.name)}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+            {editing ? (
+              <>
+                <button title="Save scores" onClick={saveEdit} className="p-1.5 rounded-lg text-emerald-400 bg-emerald-400/10 hover:bg-emerald-400/20 transition-colors">
+                  <Check className="w-3.5 h-3.5" />
+                </button>
+                <button title="Cancel" onClick={cancelEdit} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </>
+            ) : (
+              <>
+                <button title="Edit intent & capability scores" onClick={startEdit} className="p-1.5 rounded-lg text-muted-foreground hover:text-amber-400 hover:bg-amber-400/10 transition-colors">
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  title={actor.monitored ? "Remove from monitoring" : "Add to monitoring"}
+                  onClick={() => onToggleMonitor(actor.name)}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    actor.monitored
+                      ? "text-primary bg-primary/10 hover:bg-primary/20"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  }`}
+                >
+                  {actor.monitored ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                </button>
+                <button
+                  title="Refresh from CrowdStrike"
+                  onClick={() => onRefresh(actor.name)}
+                  disabled={refreshing}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-cyan-400 hover:bg-cyan-400/10 transition-colors disabled:opacity-40"
+                >
+                  {refreshing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                </button>
+                {actor.isCustom && onDelete && (
+                  <button
+                    title="Remove actor"
+                    onClick={() => onDelete(actor.name)}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </>
             )}
           </div>
         </td>
@@ -263,16 +367,25 @@ function ActorRow({
                 <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Score Breakdown</h4>
                 <div className="flex gap-2 flex-wrap">
                   {[
-                    { label: "Intent", value: actor.intentFinalScore, color: "text-amber-400 border-amber-400/30 bg-amber-400/5" },
-                    { label: "Capability", value: actor.capabilityFinalScore, color: "text-primary border-primary/30 bg-primary/5" },
+                    { label: "Intent (base)", value: actor.intentFinalScore, color: "text-amber-400/70 border-amber-400/20 bg-amber-400/5" },
+                    { label: "Intent (effective)", value: actor.effectiveIntentScore, color: "text-amber-400 border-amber-400/30 bg-amber-400/10" },
+                    { label: "Capability", value: actor.effectiveCapabilityScore, color: "text-primary border-primary/30 bg-primary/5" },
                     { label: "Willingness", value: actor.willingnessScore, color: "text-purple-400 border-purple-400/30 bg-purple-400/5" },
-                  ].map(({ label, value, color }) => value !== null && (
+                  ].map(({ label, value, color }) => value !== null && value !== undefined && (
                     <div key={label} className={`flex flex-col items-center px-3 py-2 rounded-lg border ${color} min-w-[60px]`}>
                       <span className="text-lg font-bold font-mono">{value}</span>
-                      <span className="text-[10px] text-muted-foreground uppercase tracking-wide mt-0.5">{label}</span>
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wide mt-0.5 text-center leading-tight">{label}</span>
                     </div>
                   ))}
                 </div>
+                {bonusIntent > 0 && (
+                  <div className="text-[11px] text-amber-400/80 flex items-center gap-1">
+                    <ArrowUp className="w-3 h-3" />
+                    Intent boosted by +{bonusIntent}
+                    {actor.inPpTap && " (PP-TAP +1)"}
+                    {actor.inSirt && " (SIRT +2)"}
+                  </div>
+                )}
                 {actor.description && (
                   <div>
                     <div className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide mb-0.5">Description</div>
@@ -374,6 +487,202 @@ function ActorRow({
         </tr>
       )}
     </>
+  );
+}
+
+// ── PP-TAP / SIRT list management page ────────────────────────────────────────
+
+function ListPage({
+  title,
+  tagLabel,
+  tagColor,
+  bonus,
+  list,
+  allActors,
+  onAdd,
+  onRemove,
+}: {
+  title: string;
+  tagLabel: string;
+  tagColor: string;
+  bonus: number;
+  list: string[];
+  allActors: MergedActor[];
+  onAdd: (item: string) => void;
+  onRemove: (item: string) => void;
+}) {
+  const [input, setInput] = useState("");
+
+  function handleAdd() {
+    const v = input.trim().toUpperCase();
+    if (!v) return;
+    if (list.some(l => l.toUpperCase() === v)) return;
+    onAdd(v);
+    setInput("");
+  }
+
+  // Which actors each list item matches
+  const matchMap = useMemo(() => {
+    const m: Record<string, MergedActor[]> = {};
+    list.forEach(item => {
+      m[item] = allActors.filter(a =>
+        matchesList(a.name, a.malware ?? "", [item])
+      );
+    });
+    return m;
+  }, [list, allActors]);
+
+  // All actors currently affected (union of all matches)
+  const affectedActors = useMemo(() => {
+    const seen = new Set<string>();
+    const result: MergedActor[] = [];
+    list.forEach(item => {
+      (matchMap[item] ?? []).forEach(a => {
+        if (!seen.has(a.name)) { seen.add(a.name); result.push(a); }
+      });
+    });
+    return result.sort((a, b) => b.effectiveIntentScore - a.effectiveIntentScore);
+  }, [matchMap, list]);
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+            <Tag className="w-5 h-5" />
+            {title}
+          </h2>
+          <p className="text-muted-foreground text-sm mt-1">
+            Actors or malware names in this list cause matching threat actor groups to receive
+            <span className={`font-bold mx-1 ${tagColor.includes("amber") ? "text-amber-400" : "text-red-400"}`}>
+              +{bonus} intent
+            </span>
+            and the
+            <span className={`inline-flex items-center mx-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${tagColor}`}>{tagLabel}</span>
+            tag.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">{list.length} entries</span>
+          <span className="text-border">·</span>
+          <span className="text-muted-foreground">{affectedActors.length} actors affected</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* List management */}
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="px-4 py-3 border-b border-border bg-muted/20 flex items-center gap-2">
+            <Tag className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-semibold text-foreground">Entries</span>
+            <span className="ml-auto text-xs text-muted-foreground">{list.length} items</span>
+          </div>
+
+          {/* Add input */}
+          <div className="p-3 border-b border-border">
+            <div className="flex gap-2">
+              <input
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleAdd()}
+                placeholder="Enter malware name or actor name…"
+                className="flex-1 bg-input border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+              />
+              <button
+                onClick={handleAdd}
+                disabled={!input.trim()}
+                className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* List */}
+          <div className="max-h-[400px] overflow-y-auto">
+            {list.length === 0 ? (
+              <div className="px-4 py-8 text-center text-muted-foreground text-sm">
+                <ListX className="w-6 h-6 mx-auto mb-2 opacity-40" />
+                No entries yet. Add malware or actor names above.
+              </div>
+            ) : (
+              <div className="divide-y divide-border/50">
+                {list.map(item => {
+                  const matches = matchMap[item] ?? [];
+                  return (
+                    <div key={item} className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/20 transition-colors group">
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs font-mono font-semibold text-foreground">{item}</span>
+                        <span className="ml-2 text-[10px] text-muted-foreground">
+                          {matches.length > 0
+                            ? `→ ${matches.length} actor${matches.length !== 1 ? "s" : ""}`
+                            : "no matches yet"}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => onRemove(item)}
+                        className="p-1 rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-400/10 transition-all"
+                        title="Remove"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Affected actors */}
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="px-4 py-3 border-b border-border bg-muted/20 flex items-center gap-2">
+            <Shield className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-semibold text-foreground">Affected Actors</span>
+            <span className="ml-auto text-xs text-muted-foreground">{affectedActors.length} groups</span>
+          </div>
+          <div className="max-h-[460px] overflow-y-auto">
+            {affectedActors.length === 0 ? (
+              <div className="px-4 py-8 text-center text-muted-foreground text-sm">
+                No actors match any entry yet.
+              </div>
+            ) : (
+              <div className="divide-y divide-border/50">
+                {affectedActors.map(a => {
+                  const baseIntent = a.intentFinalScore ?? 0;
+                  const ppBonus = a.inPpTap ? 1 : 0;
+                  const sirtBonus = a.inSirt ? 2 : 0;
+                  const thisBonus = bonus === 1 ? (a.inPpTap ? 1 : 0) : (a.inSirt ? 2 : 0);
+                  return (
+                    <div key={a.name} className="flex items-center gap-3 px-4 py-2.5">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-mono font-semibold text-foreground">{a.name}</span>
+                          <span className={`inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-medium ${actorTypeColor(a.actorType)}`}>
+                            {actorTypeShort(a.actorType)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs font-mono shrink-0">
+                        <span className="text-muted-foreground">{baseIntent}</span>
+                        <ArrowUp className="w-3 h-3 text-amber-400" />
+                        <span className="font-bold text-amber-400">{a.effectiveIntentScore}</span>
+                        {(ppBonus > 0 || sirtBonus > 0) && (
+                          <span className="text-[10px] text-amber-400/60">
+                            (+{ppBonus + sirtBonus})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -636,7 +945,7 @@ function AddActorModal({
                   <input
                     value={form.malware}
                     onChange={e => setField("malware", e.target.value)}
-                    placeholder="e.g. CobaltStrike Mimikatz RCLone"
+                    placeholder="e.g. CobaltStrike Mimikatz RClone"
                     className="w-full bg-input border border-border rounded-lg px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
@@ -691,13 +1000,18 @@ function AddActorModal({
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
+type TabId = "actors" | "pptap" | "sirt";
+
 export default function ThreatModel() {
   // Server-persisted state
   const [customActors, setCustomActors]     = useState<CustomActor[]>([]);
   const [actorOverrides, setActorOverrides] = useState<Record<string, ActorOverride>>({});
+  const [ppTapList, setPpTapList]           = useState<string[]>([]);
+  const [sirtList, setSirtList]             = useState<string[]>([]);
   const [serverLoading, setServerLoading]   = useState(true);
 
   // UI state
+  const [activeTab, setActiveTab]         = useState<TabId>("actors");
   const [search, setSearch]               = useState("");
   const [originFilter, setOriginFilter]   = useState("all");
   const [typeFilter, setTypeFilter]       = useState("all");
@@ -724,59 +1038,129 @@ export default function ThreatModel() {
         if (data.ok) {
           setCustomActors(data.customActors ?? []);
           setActorOverrides(data.actorOverrides ?? {});
+          // Seed lists from Excel data if server has nothing stored yet
+          const loadedPpTap: string[] = data.ppTapList ?? [];
+          const loadedSirt: string[]  = data.sirtList ?? [];
+          setPpTapList(loadedPpTap.length > 0 ? loadedPpTap : SEED_PPTAP);
+          setSirtList(loadedSirt.length > 0 ? loadedSirt : SEED_SIRT);
         }
-      } catch { /* ignore — offline */ }
+      } catch { /* offline */ }
       setServerLoading(false);
     })();
   }, []);
 
   // ── Persist state to server ────────────────────────────────────────────────
   const persistState = useCallback(async (
-    next: { customActors?: CustomActor[]; actorOverrides?: Record<string, ActorOverride> }
+    next: {
+      customActors?: CustomActor[];
+      actorOverrides?: Record<string, ActorOverride>;
+      ppTapList?: string[];
+      sirtList?: string[];
+    }
   ) => {
-    const ca  = next.customActors   ?? customActors;
-    const ovr = next.actorOverrides ?? actorOverrides;
+    const ca   = next.customActors   ?? customActors;
+    const ovr  = next.actorOverrides ?? actorOverrides;
+    const pptap = next.ppTapList     ?? ppTapList;
+    const sirt  = next.sirtList      ?? sirtList;
     try {
       await fetch(`${CS_API}/cs/threat-model-state`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customActors: ca, actorOverrides: ovr }),
+        body: JSON.stringify({ customActors: ca, actorOverrides: ovr, ppTapList: pptap, sirtList: sirt }),
       });
-    } catch { /* offline — state stays in React */ }
-  }, [customActors, actorOverrides]);
+    } catch { /* offline */ }
+  }, [customActors, actorOverrides, ppTapList, sirtList]);
 
-  // ── Merge static + custom actors ──────────────────────────────────────────
+  // ── Merge static + custom actors, compute effective scores ────────────────
   const mergedActors = useMemo((): MergedActor[] => {
     const staticMerged: MergedActor[] = staticActors.map(a => {
       const ovr = actorOverrides[a.name] ?? {};
       const csData = ovr.csData ?? {};
+
+      // Base intent/capability: manual override → csData → static
+      const baseIntent = ovr.intentFinalScore !== undefined && ovr.intentFinalScore !== null
+        ? ovr.intentFinalScore
+        : (csData.intentFinalScore !== undefined && csData.intentFinalScore !== null
+          ? csData.intentFinalScore
+          : a.intentFinalScore);
+      const baseCap = ovr.capabilityFinalScore !== undefined && ovr.capabilityFinalScore !== null
+        ? ovr.capabilityFinalScore
+        : (csData.capabilityFinalScore !== undefined && csData.capabilityFinalScore !== null
+          ? csData.capabilityFinalScore
+          : a.capabilityFinalScore);
+
+      const mergedMalware = (csData as any).malware ?? a.malware;
+      const inPpTap = matchesList(a.name, mergedMalware ?? "", ppTapList);
+      const inSirt  = matchesList(a.name, mergedMalware ?? "", sirtList);
+
+      const effectiveIntentScore = Math.min(7, (baseIntent ?? 0) + (inPpTap ? 1 : 0) + (inSirt ? 2 : 0));
+      const effectiveCapabilityScore = baseCap ?? 0;
+
       return {
         ...a,
         ...csData,
+        // preserve name and malware from CS if available
+        malware: mergedMalware,
+        intentFinalScore: baseIntent,
+        capabilityFinalScore: baseCap,
         isCustom: false,
         csEnriched: ovr.csEnriched ?? false,
         csLastRefreshed: ovr.csLastRefreshed ?? null,
         description: (csData as any).description ?? "",
         monitored: ovr.inMonitoringList !== undefined ? ovr.inMonitoringList : a.inMonitoringList,
+        effectiveIntentScore,
+        effectiveCapabilityScore,
+        inPpTap,
+        inSirt,
       };
     });
 
-    const customMerged: MergedActor[] = customActors.map(a => ({
-      ...(a as any),
-      intent: "",
-      intentScore: null,
-      willingness: "",
-      pptap: 0,
-      sirt: 0,
-      capabilitiesScore: null,
-      novelty: "",
-      noveltyScore: null,
-      isCustom: true,
-      monitored: a.inMonitoringList,
-    }));
+    const customMerged: MergedActor[] = customActors.map(a => {
+      const inPpTap = matchesList(a.name, a.malware ?? "", ppTapList);
+      const inSirt  = matchesList(a.name, a.malware ?? "", sirtList);
+      const effectiveIntentScore    = Math.min(7, (a.intentFinalScore ?? 0) + (inPpTap ? 1 : 0) + (inSirt ? 2 : 0));
+      const effectiveCapabilityScore = a.capabilityFinalScore ?? 0;
+      return {
+        ...(a as any),
+        intent: "",
+        intentScore: null,
+        willingness: "",
+        pptap: 0,
+        sirt: 0,
+        capabilitiesScore: null,
+        novelty: "",
+        noveltyScore: null,
+        isCustom: true,
+        monitored: a.inMonitoringList,
+        effectiveIntentScore,
+        effectiveCapabilityScore,
+        inPpTap,
+        inSirt,
+      };
+    });
 
     return [...staticMerged, ...customMerged];
-  }, [staticActors, customActors, actorOverrides]);
+  }, [staticActors, customActors, actorOverrides, ppTapList, sirtList]);
+
+  // ── Save intent/capability scores for an actor ────────────────────────────
+  async function saveScores(name: string, intent: number | null, capability: number | null) {
+    const customIdx = customActors.findIndex(a => a.name.toUpperCase() === name.toUpperCase());
+    if (customIdx !== -1) {
+      const updated = [...customActors];
+      updated[customIdx] = { ...updated[customIdx], intentFinalScore: intent, capabilityFinalScore: capability };
+      setCustomActors(updated);
+      await persistState({ customActors: updated });
+      showMsg(`${name} scores updated`);
+      return;
+    }
+    const newOverrides = {
+      ...actorOverrides,
+      [name]: { ...actorOverrides[name], intentFinalScore: intent, capabilityFinalScore: capability },
+    };
+    setActorOverrides(newOverrides);
+    await persistState({ actorOverrides: newOverrides });
+    showMsg(`${name} scores updated`);
+  }
 
   // ── CS refresh for a single actor ─────────────────────────────────────────
   async function refreshActor(name: string) {
@@ -786,7 +1170,6 @@ export default function ThreatModel() {
       const data = await res.json();
       if (!data.ok) throw new Error(data.error ?? "CS lookup failed");
       const actors: CustomActor[] = data.actors ?? [];
-      // Prefer exact name match, otherwise take first result
       const match = actors.find(a => a.name.toUpperCase() === name.toUpperCase()) ?? actors[0];
       if (!match) throw new Error("Actor not found in CrowdStrike");
 
@@ -814,7 +1197,6 @@ export default function ThreatModel() {
       };
       setActorOverrides(newOverrides);
 
-      // For custom actors, update in-place
       setCustomActors(prev => {
         const idx = prev.findIndex(a => a.name.toUpperCase() === name.toUpperCase());
         if (idx === -1) return prev;
@@ -855,11 +1237,8 @@ export default function ThreatModel() {
     setRefreshMsg({ text: `Refreshing ${targets.length} monitored actors from CS…`, type: "ok" });
     let ok = 0; let fail = 0;
     for (const name of targets) {
-      try {
-        await refreshActor(name);
-        ok++;
-      } catch { fail++; }
-      await new Promise(r => setTimeout(r, 200)); // rate-limit
+      try { await refreshActor(name); ok++; } catch { fail++; }
+      await new Promise(r => setTimeout(r, 200));
     }
     setRefreshAllRunning(false);
     showMsg(`Refresh complete — ${ok} updated${fail ? `, ${fail} failed` : ""}`, fail ? "err" : "ok");
@@ -867,7 +1246,6 @@ export default function ThreatModel() {
 
   // ── Toggle monitoring ─────────────────────────────────────────────────────
   async function toggleMonitor(name: string) {
-    // Check if it's a custom or static actor
     const customIdx = customActors.findIndex(a => a.name.toUpperCase() === name.toUpperCase());
     if (customIdx !== -1) {
       const updated = [...customActors];
@@ -879,10 +1257,7 @@ export default function ThreatModel() {
     const curr = actorOverrides[name]?.inMonitoringList;
     const staticActor = staticActors.find(a => a.name === name);
     const baseline = curr !== undefined ? curr : (staticActor?.inMonitoringList ?? false);
-    const newOverrides = {
-      ...actorOverrides,
-      [name]: { ...actorOverrides[name], inMonitoringList: !baseline },
-    };
+    const newOverrides = { ...actorOverrides, [name]: { ...actorOverrides[name], inMonitoringList: !baseline } };
     setActorOverrides(newOverrides);
     await persistState({ actorOverrides: newOverrides });
   }
@@ -902,6 +1277,28 @@ export default function ThreatModel() {
     await persistState({ customActors: updated });
     setShowAdd(false);
     showMsg(`${actor.name} added`);
+  }
+
+  // ── PP-TAP / SIRT list management ─────────────────────────────────────────
+  async function addToPpTap(item: string) {
+    const next = [...ppTapList, item];
+    setPpTapList(next);
+    await persistState({ ppTapList: next });
+  }
+  async function removeFromPpTap(item: string) {
+    const next = ppTapList.filter(i => i !== item);
+    setPpTapList(next);
+    await persistState({ ppTapList: next });
+  }
+  async function addToSirt(item: string) {
+    const next = [...sirtList, item];
+    setSirtList(next);
+    await persistState({ sirtList: next });
+  }
+  async function removeFromSirt(item: string) {
+    const next = sirtList.filter(i => i !== item);
+    setSirtList(next);
+    await persistState({ sirtList: next });
   }
 
   // ── Filtered + sorted table ───────────────────────────────────────────────
@@ -942,8 +1339,10 @@ export default function ThreatModel() {
   // Stats
   const monitored   = mergedActors.filter(a => a.monitored).length;
   const csEnriched  = mergedActors.filter(a => a.csEnriched).length;
-  const highIntent  = mergedActors.filter(a => (a.intentFinalScore ?? 0) >= 5).length;
-  const highCap     = mergedActors.filter(a => (a.capabilityFinalScore ?? 0) >= 5).length;
+  const highIntent  = mergedActors.filter(a => a.effectiveIntentScore >= 5).length;
+  const highCap     = mergedActors.filter(a => a.effectiveCapabilityScore >= 5).length;
+  const ppTapCount  = mergedActors.filter(a => a.inPpTap).length;
+  const sirtCount   = mergedActors.filter(a => a.inSirt).length;
 
   const allOrigins = useMemo(() => {
     const set = new Set<string>();
@@ -959,6 +1358,13 @@ export default function ThreatModel() {
     return Array.from(set).sort();
   }, [mergedActors]);
 
+  // ── Tab definitions ────────────────────────────────────────────────────────
+  const tabs: { id: TabId; label: string; badge?: number; badgeColor?: string }[] = [
+    { id: "actors", label: "Actors", badge: mergedActors.length },
+    { id: "pptap",  label: "PP-TAP",  badge: ppTapCount, badgeColor: "bg-amber-400/20 text-amber-400" },
+    { id: "sirt",   label: "SIRT",    badge: sirtCount,  badgeColor: "bg-red-400/20 text-red-400" },
+  ];
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -970,27 +1376,31 @@ export default function ThreatModel() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => setShowFramework(v => !v)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            {showFramework ? "Hide" : "Show"} Scoring Framework
-          </button>
-          <button
-            onClick={refreshAll}
-            disabled={refreshAllRunning || monitored === 0}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-xs text-cyan-400 hover:bg-cyan-400/20 transition-colors disabled:opacity-40"
-          >
-            {refreshAllRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-            Refresh Monitored ({monitored}) from CS
-          </button>
-          <button
-            onClick={() => setShowAdd(true)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" /> Add Actor
-          </button>
+          {activeTab === "actors" && (
+            <>
+              <button
+                onClick={() => setShowFramework(v => !v)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                {showFramework ? "Hide" : "Show"} Scoring Framework
+              </button>
+              <button
+                onClick={refreshAll}
+                disabled={refreshAllRunning || monitored === 0}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-xs text-cyan-400 hover:bg-cyan-400/20 transition-colors disabled:opacity-40"
+              >
+                {refreshAllRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                Refresh Monitored ({monitored}) from CS
+              </button>
+              <button
+                onClick={() => setShowAdd(true)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add Actor
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -1024,103 +1434,161 @@ export default function ThreatModel() {
         ))}
       </div>
 
-      {/* Scoring framework */}
-      {showFramework && (
-        <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-foreground">Scoring Framework Reference</h3>
-            <button onClick={() => setShowFramework(false)} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {scoringFramework.filter(r => r.category).map((row, i) => (
-              <div key={i} className="p-3 bg-muted/20 rounded-lg border border-border/50 space-y-2">
-                <div className="text-xs font-semibold text-foreground">{row.category}</div>
-                {row.intent && <div className="text-[11px] text-muted-foreground"><span className="text-amber-400 font-medium">Intent:</span> {row.intent} <span className="font-mono text-amber-400">[{row.intentScore}]</span></div>}
-                {row.willingness && <div className="text-[11px] text-muted-foreground"><span className="text-purple-400 font-medium">Willingness:</span> {row.willingness} <span className="font-mono text-purple-400">[{row.willingnessScore}]</span></div>}
-                {row.capability && <div className="text-[11px] text-muted-foreground"><span className="text-primary font-medium">Capability:</span> {row.capability} <span className="font-mono text-primary">[{row.capabilityScore}]</span></div>}
-                {row.novelty && <div className="text-[11px] text-muted-foreground"><span className="text-green-400 font-medium">Novelty:</span> {row.novelty} <span className="font-mono text-green-400">[{row.noveltyScore}]</span></div>}
+      {/* Tab navigation */}
+      <div className="flex gap-1 border-b border-border">
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === tab.id
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+            }`}
+          >
+            {tab.label}
+            {tab.badge !== undefined && (
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${
+                tab.badgeColor ?? "bg-muted text-muted-foreground"
+              }`}>
+                {tab.badge}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Actors tab ────────────────────────────────────────────────────────── */}
+      {activeTab === "actors" && (
+        <>
+          {/* Scoring framework */}
+          {showFramework && (
+            <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-foreground">Scoring Framework Reference</h3>
+                <button onClick={() => setShowFramework(false)} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
               </div>
-            ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {scoringFramework.filter(r => r.category).map((row, i) => (
+                  <div key={i} className="p-3 bg-muted/20 rounded-lg border border-border/50 space-y-2">
+                    <div className="text-xs font-semibold text-foreground">{row.category}</div>
+                    {row.intent && <div className="text-[11px] text-muted-foreground"><span className="text-amber-400 font-medium">Intent:</span> {row.intent} <span className="font-mono text-amber-400">[{row.intentScore}]</span></div>}
+                    {row.willingness && <div className="text-[11px] text-muted-foreground"><span className="text-purple-400 font-medium">Willingness:</span> {row.willingness} <span className="font-mono text-purple-400">[{row.willingnessScore}]</span></div>}
+                    {row.capability && <div className="text-[11px] text-muted-foreground"><span className="text-primary font-medium">Capability:</span> {row.capability} <span className="font-mono text-primary">[{row.capabilityScore}]</span></div>}
+                    {row.novelty && <div className="text-[11px] text-muted-foreground"><span className="text-green-400 font-medium">Novelty:</span> {row.novelty} <span className="font-mono text-green-400">[{row.noveltyScore}]</span></div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Filters */}
+          <div className="flex flex-wrap gap-3 items-center">
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search actors, aliases, malware, industry…"
+              className="bg-input border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring min-w-[250px]"
+            />
+            <select
+              value={originFilter}
+              onChange={e => setOriginFilter(e.target.value)}
+              className="bg-input border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="all">All Origins</option>
+              {allOrigins.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+            <select
+              value={typeFilter}
+              onChange={e => setTypeFilter(e.target.value)}
+              className="bg-input border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="all">All Types</option>
+              {["Espionage", "eCrime", "Destructive", "Disruptive"].map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={monitoredOnly} onChange={e => setMonitoredOnly(e.target.checked)} className="rounded" />
+              <span className="text-sm text-foreground">Monitored only</span>
+            </label>
+            {serverLoading && <span className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Loading…</span>}
+            <span className="text-xs text-muted-foreground ml-auto">{sorted.length} actors</span>
           </div>
-        </div>
+
+          {/* Table */}
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30">
+                    <th className="w-8 px-3 py-3" />
+                    <SortableTh col="name" sortKey={sortKey} sortDir={sortDir} toggle={toggle} className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actor</SortableTh>
+                    <SortableTh col="origins" sortKey={sortKey} sortDir={sortDir} toggle={toggle} className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Origin</SortableTh>
+                    <SortableTh col="actorType" sortKey={sortKey} sortDir={sortDir} toggle={toggle} className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Type</SortableTh>
+                    <SortableTh col="lastSeen" sortKey={sortKey} sortDir={sortDir} toggle={toggle} className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Last Seen</SortableTh>
+                    <SortableTh col="effectiveIntentScore" sortKey={sortKey} sortDir={sortDir} toggle={toggle} className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[140px]">Intent</SortableTh>
+                    <SortableTh col="effectiveCapabilityScore" sortKey={sortKey} sortDir={sortDir} toggle={toggle} className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[120px]">Capability</SortableTh>
+                    <th className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[120px]">Combined</th>
+                    <th className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-28">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sorted.map((actor: MergedActor) => (
+                    <ActorRow
+                      key={actor.name}
+                      actor={actor}
+                      onRefresh={refreshActor}
+                      onToggleMonitor={toggleMonitor}
+                      onDelete={actor.isCustom ? deleteActor : undefined}
+                      onSaveScores={saveScores}
+                      refreshing={refreshingNames.has(actor.name)}
+                    />
+                  ))}
+                  {sorted.length === 0 && !serverLoading && (
+                    <tr>
+                      <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground text-sm">
+                        No actors match the current filters.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Source: APT Groups &amp; Operations — Threat Model Update Q3 2027 · CrowdStrike Falcon Intel API.
+            Combined score = Effective Intent + Capability (max 13). Click the pencil icon to manually edit scores.
+          </p>
+        </>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search actors, aliases, malware, industry…"
-          className="bg-input border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring min-w-[250px]"
+      {/* ── PP-TAP tab ────────────────────────────────────────────────────────── */}
+      {activeTab === "pptap" && (
+        <ListPage
+          title="PP-TAP Priority List"
+          tagLabel="PP-TAP +1"
+          tagColor="bg-amber-500/15 text-amber-400 border border-amber-400/30"
+          bonus={1}
+          list={ppTapList}
+          allActors={mergedActors}
+          onAdd={addToPpTap}
+          onRemove={removeFromPpTap}
         />
-        <select
-          value={originFilter}
-          onChange={e => setOriginFilter(e.target.value)}
-          className="bg-input border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-        >
-          <option value="all">All Origins</option>
-          {allOrigins.map(o => <option key={o} value={o}>{o}</option>)}
-        </select>
-        <select
-          value={typeFilter}
-          onChange={e => setTypeFilter(e.target.value)}
-          className="bg-input border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-        >
-          <option value="all">All Types</option>
-          {["Espionage", "eCrime", "Destructive", "Disruptive"].map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" checked={monitoredOnly} onChange={e => setMonitoredOnly(e.target.checked)} className="rounded" />
-          <span className="text-sm text-foreground">Monitored only</span>
-        </label>
-        {serverLoading && <span className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Loading…</span>}
-        <span className="text-xs text-muted-foreground ml-auto">{sorted.length} actors</span>
-      </div>
+      )}
 
-      {/* Table */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/30">
-                <th className="w-8 px-3 py-3" />
-                <SortableTh col="name" sortKey={sortKey} sortDir={sortDir} toggle={toggle} className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actor</SortableTh>
-                <SortableTh col="origins" sortKey={sortKey} sortDir={sortDir} toggle={toggle} className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Origin</SortableTh>
-                <SortableTh col="actorType" sortKey={sortKey} sortDir={sortDir} toggle={toggle} className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Type</SortableTh>
-                <SortableTh col="lastSeen" sortKey={sortKey} sortDir={sortDir} toggle={toggle} className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Last Seen</SortableTh>
-                <SortableTh col="intentFinalScore" sortKey={sortKey} sortDir={sortDir} toggle={toggle} className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[120px]">Intent</SortableTh>
-                <SortableTh col="capabilityFinalScore" sortKey={sortKey} sortDir={sortDir} toggle={toggle} className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[120px]">Capability</SortableTh>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[120px]">Combined</th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-24">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((actor: MergedActor) => (
-                <ActorRow
-                  key={actor.name}
-                  actor={actor}
-                  onRefresh={refreshActor}
-                  onToggleMonitor={toggleMonitor}
-                  onDelete={actor.isCustom ? deleteActor : undefined}
-                  refreshing={refreshingNames.has(actor.name)}
-                />
-              ))}
-              {sorted.length === 0 && !serverLoading && (
-                <tr>
-                  <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground text-sm">
-                    No actors match the current filters.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <p className="text-xs text-muted-foreground">
-        Source: APT Groups &amp; Operations — Threat Model Update Q3 2027 · CrowdStrike Falcon Intel API.
-        Combined score = Intent + Capability (max 13). CS LIVE badge indicates actor data refreshed from CrowdStrike.
-      </p>
+      {/* ── SIRT tab ──────────────────────────────────────────────────────────── */}
+      {activeTab === "sirt" && (
+        <ListPage
+          title="SIRT Priority List"
+          tagLabel="SIRT +2"
+          tagColor="bg-red-500/15 text-red-400 border border-red-400/30"
+          bonus={2}
+          list={sirtList}
+          allActors={mergedActors}
+          onAdd={addToSirt}
+          onRemove={removeFromSirt}
+        />
+      )}
 
       {showAdd && (
         <AddActorModal

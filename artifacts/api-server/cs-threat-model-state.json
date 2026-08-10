@@ -54,6 +54,26 @@
         "description": "KNOCKOUT SPIDER is a targeted eCrime adversary that historically conducted multi-year operations exhibiting consistent tactics, techniques, and procedures (TTPs), but also the ability to develop and integrate new tools and tactics over time. The adversary has used custom malware tools such as EVILNK, EVILDR, and EVILPY to target entities in the financial, retail, and entertainment sectors.  Public...",
         "capabilityFinalScore": null
       }
+    },
+    "WICKED PANDA": {
+      "csEnriched": true,
+      "csLastRefreshed": "2026-08-10T16:25:15.159Z",
+      "csData": {
+        "origins": "",
+        "aliases": "BRONZE ATLAS, BARIUM, LEAD, GREF, APT41, Brass Typhoon, Leopard Typhoon, Winnti, Group 72, TG-2633",
+        "lastSeen": "2024-09-12",
+        "malware": "",
+        "countries": [],
+        "industries": [],
+        "motivation": "State-Sponsored",
+        "adversaryType": "",
+        "communityIds": "BRONZE ATLAS, BARIUM, LEAD, GREF, APT41, Brass Typhoon, Leopard Typhoon, Winnti, Group 72, TG-2633",
+        "description": "WICKED PANDA has been one the most prolific and effective China-based adversaries from the mid 2010s into the 2020s. They have consistently expanded their targeting scope as well as their tool suite while shifting from criminally focused operations to state-sponsored targeted intrusions that often align with Chinese Communist Party (CCP) objectives outlined in the 13th Five Year and the Made in Ch...",
+        "capabilityFinalScore": null
+      }
+    },
+    "ALPHA SPIDER": {
+      "inMonitoringList": true
     }
   }
 }

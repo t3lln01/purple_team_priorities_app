@@ -476,16 +476,28 @@ interface ThreatModelActor {
 interface ThreatModelState {
   customActors: ThreatModelActor[];
   /** Per-actor overrides keyed by actor name (UPPER CASE) — applied on top of base static data */
-  actorOverrides: Record<string, Partial<ThreatModelActor>>;
+  actorOverrides: Record<string, Partial<ThreatModelActor> & {
+    intentFinalScore?: number | null;
+    capabilityFinalScore?: number | null;
+  }>;
+  /** Malware/actor names whose presence in an actor's toolset grants +1 intent + PP-TAP tag */
+  ppTapList: string[];
+  /** Malware/actor names whose presence in an actor's toolset grants +2 intent + SIRT tag */
+  sirtList: string[];
 }
 
 async function loadTmState(): Promise<ThreatModelState> {
   try {
     const raw = await fs.readFile(TM_STATE_FILE, "utf-8");
     const parsed = JSON.parse(raw);
-    return { customActors: parsed.customActors ?? [], actorOverrides: parsed.actorOverrides ?? {} };
+    return {
+      customActors: parsed.customActors ?? [],
+      actorOverrides: parsed.actorOverrides ?? {},
+      ppTapList: parsed.ppTapList ?? [],
+      sirtList: parsed.sirtList ?? [],
+    };
   } catch {
-    return { customActors: [], actorOverrides: {} };
+    return { customActors: [], actorOverrides: {}, ppTapList: [], sirtList: [] };
   }
 }
 
@@ -605,15 +617,20 @@ csRouter.get("/cs/threat-model-state", async (_req, res) => {
   res.json({ ok: true, ...state });
 });
 
-/** POST /api/cs/threat-model-state — save custom actors + per-actor overrides */
+/** POST /api/cs/threat-model-state — save custom actors + per-actor overrides + PP-TAP/SIRT lists */
 csRouter.post("/cs/threat-model-state", async (req, res) => {
-  const { customActors, actorOverrides } = req.body ?? {};
+  const { customActors, actorOverrides, ppTapList, sirtList } = req.body ?? {};
   if (!Array.isArray(customActors) || typeof actorOverrides !== "object") {
     res.status(400).json({ ok: false, error: "customActors (array) and actorOverrides (object) are required" });
     return;
   }
   try {
-    await saveTmState({ customActors, actorOverrides });
+    await saveTmState({
+      customActors,
+      actorOverrides,
+      ppTapList: Array.isArray(ppTapList) ? ppTapList : [],
+      sirtList: Array.isArray(sirtList) ? sirtList : [],
+    });
     res.json({ ok: true });
   } catch (err: any) {
     res.status(500).json({ ok: false, error: err.message });

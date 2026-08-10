@@ -1,12 +1,32 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Link } from "wouter";
 import data from "@/data.json";
+import threatModelData from "@/threatModelData.json";
 import { useSortTable } from "@/hooks/useSortTable";
 import SortableTh from "@/components/SortableTh";
 import { Pencil, Check, X, RotateCcw, Trash2, Plus, Undo2, ChevronDown, ChevronUp, Shield, Activity, XCircle } from "lucide-react";
 import { useAppData } from "@/context/AppDataContext";
 import { toTitleCase } from "@/context/ViewContext";
 import { useDateWindow } from "@/context/DateWindowContext";
+
+const TM_API = "/api/cs/threat-model-state";
+const tmStaticActors = (threatModelData as any).threatModelActors as Array<{
+  name: string;
+  intentFinalScore: number | null;
+  capabilityFinalScore: number | null;
+  malware: string;
+}>;
+
+/** Returns true if the actor name or malware string matches any item in the list */
+function matchesTmList(actorName: string, malware: string, list: string[]): boolean {
+  if (!list.length) return false;
+  const nameUpper = actorName.toUpperCase();
+  const malwareUpper = (malware ?? "").toUpperCase();
+  return list.some(item => {
+    const t = item.trim().toUpperCase();
+    return t && (nameUpper === t || malwareUpper.includes(t));
+  });
+}
 
 type Actor = {
   name: string;
@@ -133,6 +153,39 @@ export default function ActorPrioritisation() {
   const [overrides, setOverrides]     = useState<Overrides>(loadOverrides);
   const [customActors, setCustomActors] = useState<CustomActor[]>(loadCustom);
 
+  // ── Threat Model effective scores (intent/capability synced from TM page) ──
+  const [tmScores, setTmScores] = useState<Record<string, { intent: number; capability: number }>>({});
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(TM_API);
+        const json = await res.json();
+        if (!json.ok) return;
+        const actorOverrides: Record<string, any> = json.actorOverrides ?? {};
+        const ppTapList: string[] = json.ppTapList ?? [];
+        const sirtList: string[]  = json.sirtList ?? [];
+
+        const map: Record<string, { intent: number; capability: number }> = {};
+        tmStaticActors.forEach(a => {
+          const ovr = actorOverrides[a.name] ?? {};
+          const baseIntent = (ovr.intentFinalScore !== undefined && ovr.intentFinalScore !== null)
+            ? ovr.intentFinalScore
+            : (ovr.csData?.intentFinalScore ?? a.intentFinalScore ?? 0);
+          const baseCap = (ovr.capabilityFinalScore !== undefined && ovr.capabilityFinalScore !== null)
+            ? ovr.capabilityFinalScore
+            : (ovr.csData?.capabilityFinalScore ?? a.capabilityFinalScore ?? 0);
+          const malware = ovr.csData?.malware ?? a.malware ?? "";
+          const inPpTap = matchesTmList(a.name, malware, ppTapList);
+          const inSirt  = matchesTmList(a.name, malware, sirtList);
+          const effectiveIntent = Math.min(7, baseIntent + (inPpTap ? 1 : 0) + (inSirt ? 2 : 0));
+          map[a.name.toUpperCase().trim()] = { intent: effectiveIntent, capability: baseCap };
+        });
+        setTmScores(map);
+      } catch { /* offline / no TM state yet */ }
+    })();
+  }, []);
+
   // ── date filter state ──────────────────────────────────────────────────────
   const { dateRange, fromMs, toMs } = useDateWindow();
 
@@ -195,15 +248,20 @@ export default function ActorPrioritisation() {
   // Build the live actor list with overrides applied and deleted actors removed.
   // ttpRisk for ALL actors is derived from the date-filtered ttpRiskMap so every
   // calculation (Priority, Risk %) reacts instantly to the date window change.
+  // Priority order for intent/capability:
+  //   1. Local override (this page's edit) — highest priority
+  //   2. Threat Model effective score (synced from TM page, includes PP-TAP/SIRT bonuses)
+  //   3. data.json base value
   const actors: Actor[] = useMemo(() => {
     const merged: Actor[] = [
-      // Base actors from data.json (Active Monitoring — intent/capability never overwritten by live sync)
+      // Base actors from data.json (Active Monitoring)
       ...baseActors
         .filter(a => !overrides[a.name]?.deleted)
         .map(a => {
           const ov = overrides[a.name] ?? {};
-          const intent = ov.intent ?? a.intent;
-          const capability = ov.capability ?? a.capability;
+          const tmKey = a.name.toUpperCase().trim();
+          const intent     = ov.intent     ?? tmScores[tmKey]?.intent     ?? a.intent;
+          const capability = ov.capability ?? tmScores[tmKey]?.capability ?? a.capability;
           const ttpRisk = ttpRiskMap[a.name.toUpperCase().trim()] ?? 0;
           return { ...a, intent, capability, ttpRisk, priority: 0, riskPct: 0 };
         }),
