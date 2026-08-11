@@ -18,6 +18,14 @@ const DAY = 86_400_000;
 const allProceduresData: Array<{ mitreId: string; date: number | null }> =
   (data as any).allProcedures ?? [];
 
+// Anchor time-window filters to the latest date in the dataset.
+// Using Date.now() causes all relative filters to return zero results
+// when the data is a historical snapshot older than the chosen window.
+const DATA_LATEST_MS: number = allProceduresData.reduce(
+  (max, p) => (p.date != null ? Math.max(max, p.date as number) : max),
+  0
+) || Date.now(); // fallback: real clock if the dataset has no dated records
+
 type DateWindowCtx = {
   dateRange: DateRange;
   setDateRange: (r: DateRange) => void;
@@ -46,11 +54,13 @@ export function DateWindowProvider({ children }: { children: ReactNode }) {
   const [customTo,   setCustomTo]   = useState("");
 
   const { fromMs, toMs } = useMemo(() => {
-    const now = Date.now();
-    if (dateRange === "3m") return { fromMs: now - 90  * DAY, toMs: now };
-    if (dateRange === "6m") return { fromMs: now - 180 * DAY, toMs: now };
-    if (dateRange === "9m") return { fromMs: now - 270 * DAY, toMs: now };
-    if (dateRange === "1y") return { fromMs: now - 365 * DAY, toMs: now };
+    // Anchor relative windows to the dataset's latest date, not the real clock.
+    // This ensures "Last 3 months" returns data even for historical snapshots.
+    const ref = DATA_LATEST_MS;
+    if (dateRange === "3m") return { fromMs: ref - 90  * DAY, toMs: ref };
+    if (dateRange === "6m") return { fromMs: ref - 180 * DAY, toMs: ref };
+    if (dateRange === "9m") return { fromMs: ref - 270 * DAY, toMs: ref };
+    if (dateRange === "1y") return { fromMs: ref - 365 * DAY, toMs: ref };
     if (dateRange === "custom") return {
       fromMs: customFrom ? new Date(customFrom).getTime()           : -Infinity,
       toMs:   customTo   ? new Date(customTo).getTime() + DAY - 1  :  Infinity,

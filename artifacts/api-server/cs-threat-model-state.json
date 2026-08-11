@@ -57,7 +57,7 @@
     },
     "WICKED PANDA": {
       "csEnriched": true,
-      "csLastRefreshed": "2026-08-10T16:25:15.159Z",
+      "csLastRefreshed": "2026-08-11T09:52:43.366Z",
       "csData": {
         "origins": "",
         "aliases": "BRONZE ATLAS, BARIUM, LEAD, GREF, APT41, Brass Typhoon, Leopard Typhoon, Winnti, Group 72, TG-2633",
@@ -86,6 +86,39 @@
       "noveltyModifier": 0
     }
   },
-  "ppTapList": [],
-  "sirtList": []
+  "ppTapList": [
+    "AVIATOR SPIDER",
+    "BITWISE SPIDER",
+    "CURLY SPIDER",
+    "FROZEN SPIDER",
+    "HAZARD SPIDER",
+    "IMPOSTER SPIDER",
+    "INDRIK SPIDER",
+    "KNOCKOUT SPIDER",
+    "NITRO SPIDER",
+    "ODYSSEY SPIDER",
+    "PRIMITIVE BEAR",
+    "PUNK SPIDER",
+    "RECESS SPIDER",
+    "RENAISSANCE SPIDER",
+    "SOLAR SPIDER",
+    "STATIC KITTEN",
+    "VELVET CHOLLIMA",
+    "VICE SPIDER"
+  ],
+  "sirtList": [
+    "BITWISE SPIDER",
+    "CORDIAL SPIDER",
+    "CURLY SPIDER",
+    "KNOCKOUT SPIDER",
+    "NITRO SPIDER",
+    "PRIMITIVE BEAR",
+    "PUNK SPIDER",
+    "RECESS SPIDER",
+    "RENAISSANCE SPIDER",
+    "SALTY SPIDER",
+    "SNARKY SPIDER",
+    "STATIC KITTEN",
+    "VICE SPIDER"
+  ]
 }
