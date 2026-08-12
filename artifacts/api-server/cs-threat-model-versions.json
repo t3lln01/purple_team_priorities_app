@@ -1,0 +1,134 @@
+{
+  "Q1 2025": {
+    "customActors": [],
+    "actorOverrides": {},
+    "ppTapList": [],
+    "sirtList": [],
+    "savedAt": null
+  },
+  "Q3 2026": {
+    "customActors": [],
+    "actorOverrides": {
+      "HOOK SPIDER": {
+        "csEnriched": true,
+        "csLastRefreshed": "2026-08-10T16:03:50.843Z",
+        "csData": {
+          "origins": "",
+          "aliases": "pirat-network, Big-Bro, crasty_bro, pirat, Pirat-Networks, BenjaminFranklin",
+          "actorType": "Cyber-Crime — attacks intended for near-term financial profit",
+          "lastSeen": "2026-08-06",
+          "malware": "",
+          "countries": [],
+          "industries": [],
+          "motivation": "Criminal",
+          "adversaryType": "",
+          "communityIds": "pirat-network, Big-Bro, crasty_bro, pirat, Pirat-Networks, BenjaminFranklin",
+          "description": "HOOK SPIDER is an access broker sells accesses individually and sometimes in bulk. They have highly likely facilitated ransomware operations for Big Game Hunting (BGH) operators and Ransomware-as-a-Service (RaaS) affiliates, including SCATTERED SPIDER, VICE SPIDER, ALPHA SPIDER, WANDERING SPIDER, and the operators of Nova RaaS. HOOK SPIDER’s Tactics, Techniques, and Procedures (TTPs) are relativel...",
+          "capabilityFinalScore": null
+        }
+      },
+      "RENAISSANCE SPIDER": {
+        "csEnriched": true,
+        "csLastRefreshed": "2026-08-10T16:05:07.516Z",
+        "csData": {
+          "origins": "",
+          "aliases": "Mercenary Akula, Fire Cells Group, UAC-0050, DaVinci",
+          "actorType": "Cyber-Crime — attacks intended for near-term financial profit",
+          "lastSeen": "2026-07-22",
+          "malware": "",
+          "countries": [],
+          "industries": [],
+          "motivation": "State-Sponsored, Criminal, Hacktivism",
+          "adversaryType": "",
+          "communityIds": "Mercenary Akula, Fire Cells Group, UAC-0050, DaVinci",
+          "description": "RENAISSANCE SPIDER is a Russia-based eCrime adversary that conducts high-volume eCrime and targeted intrusion campaigns, primarily targeting Ukraine and Eastern Europe. The adversary likely has dual financial and intelligence gathering motivations. Since 2024, RENAISSANCE SPIDER has also conducted influence operations (IO) that include sending email-based bomb threats, inauthentic hacktivism, and ...",
+          "capabilityFinalScore": null
+        }
+      },
+      "KNOCKOUT SPIDER": {
+        "csEnriched": true,
+        "csLastRefreshed": "2026-08-10T16:06:06.921Z",
+        "csData": {
+          "origins": "",
+          "aliases": "Evilnum, DeathStalker, TA4563",
+          "actorType": "Cyber-Crime — attacks intended for near-term financial profit",
+          "lastSeen": "2023-09-13",
+          "malware": "",
+          "countries": [],
+          "industries": [],
+          "motivation": "Criminal",
+          "adversaryType": "",
+          "communityIds": "Evilnum, DeathStalker, TA4563",
+          "description": "KNOCKOUT SPIDER is a targeted eCrime adversary that historically conducted multi-year operations exhibiting consistent tactics, techniques, and procedures (TTPs), but also the ability to develop and integrate new tools and tactics over time. The adversary has used custom malware tools such as EVILNK, EVILDR, and EVILPY to target entities in the financial, retail, and entertainment sectors.  Public...",
+          "capabilityFinalScore": null
+        }
+      },
+      "WICKED PANDA": {
+        "csEnriched": true,
+        "csLastRefreshed": "2026-08-11T09:52:43.366Z",
+        "csData": {
+          "origins": "",
+          "aliases": "BRONZE ATLAS, BARIUM, LEAD, GREF, APT41, Brass Typhoon, Leopard Typhoon, Winnti, Group 72, TG-2633",
+          "lastSeen": "2024-09-12",
+          "malware": "",
+          "countries": [],
+          "industries": [],
+          "motivation": "State-Sponsored",
+          "adversaryType": "",
+          "communityIds": "BRONZE ATLAS, BARIUM, LEAD, GREF, APT41, Brass Typhoon, Leopard Typhoon, Winnti, Group 72, TG-2633",
+          "description": "WICKED PANDA has been one the most prolific and effective China-based adversaries from the mid 2010s into the 2020s. They have consistently expanded their targeting scope as well as their tool suite while shifting from criminally focused operations to state-sponsored targeted intrusions that often align with Chinese Communist Party (CCP) objectives outlined in the 13th Five Year and the Made in Ch...",
+          "capabilityFinalScore": null
+        }
+      },
+      "ALPHA SPIDER": {
+        "inMonitoringList": true,
+        "intentFinalScore": 5,
+        "capabilityFinalScore": 5,
+        "intentRationale": "Target-Specific Data: $ACTOR targets $ORG based on an objective that can only be achieved within $ORG’s network",
+        "willingnessRationale": "Strained diplomatic relations/previous hostilities/significant economic disruption perceived by $ACTOR from $ORG’s operations",
+        "capabilityRationale": "Significant Capability: Significant evidence that $ACTOR previously conducted this type of activity; multiple trusted sources confirmed",
+        "noveltyRationale": "Custom toolset per campaign with demonstrated living off the land capability",
+        "intentBaseScore": 5,
+        "willingnessModifier": 0,
+        "capabilityBaseScore": 5,
+        "noveltyModifier": 0
+      }
+    },
+    "ppTapList": [
+      "AVIATOR SPIDER",
+      "BITWISE SPIDER",
+      "CURLY SPIDER",
+      "FROZEN SPIDER",
+      "HAZARD SPIDER",
+      "IMPOSTER SPIDER",
+      "INDRIK SPIDER",
+      "KNOCKOUT SPIDER",
+      "NITRO SPIDER",
+      "ODYSSEY SPIDER",
+      "PRIMITIVE BEAR",
+      "PUNK SPIDER",
+      "RECESS SPIDER",
+      "RENAISSANCE SPIDER",
+      "SOLAR SPIDER",
+      "STATIC KITTEN",
+      "VELVET CHOLLIMA",
+      "VICE SPIDER"
+    ],
+    "sirtList": [
+      "BITWISE SPIDER",
+      "CORDIAL SPIDER",
+      "CURLY SPIDER",
+      "KNOCKOUT SPIDER",
+      "NITRO SPIDER",
+      "PRIMITIVE BEAR",
+      "PUNK SPIDER",
+      "RECESS SPIDER",
+      "RENAISSANCE SPIDER",
+      "SALTY SPIDER",
+      "SNARKY SPIDER",
+      "STATIC KITTEN",
+      "VICE SPIDER"
+    ],
+    "savedAt": "2026-08-12T16:00:55.540Z"
+  }
+}

@@ -448,7 +448,23 @@ csRouter.get("/cs/sync-result", async (_req, res) => {
 
 // ── Threat Model custom state ──────────────────────────────────────────────────
 
-const TM_STATE_FILE = path.join(ROOT, "cs-threat-model-state.json");
+const TM_STATE_FILE    = path.join(ROOT, "cs-threat-model-state.json");
+const TM_VERSIONS_FILE = path.join(ROOT, "cs-threat-model-versions.json");
+
+/** Returns "Q1 2025" etc. based on fiscal quarters starting Feb/May/Aug/Nov */
+function currentQuarterLabel(): string {
+  const now   = new Date();
+  const month = now.getMonth() + 1;
+  const year  = now.getFullYear();
+  let q: number;
+  let qYear = year;
+  if (month === 1)       { q = 4; qYear = year - 1; }
+  else if (month <= 4)   { q = 1; }
+  else if (month <= 7)   { q = 2; }
+  else if (month <= 10)  { q = 3; }
+  else                   { q = 4; }
+  return `Q${q} ${qYear}`;
+}
 
 interface ThreatModelActor {
   name: string;
@@ -486,6 +502,13 @@ interface ThreatModelState {
   sirtList: string[];
 }
 
+const EMPTY_TM_STATE = (): ThreatModelState => ({
+  customActors: [],
+  actorOverrides: {},
+  ppTapList: [],
+  sirtList: [],
+});
+
 async function loadTmState(): Promise<ThreatModelState> {
   try {
     const raw = await fs.readFile(TM_STATE_FILE, "utf-8");
@@ -497,12 +520,67 @@ async function loadTmState(): Promise<ThreatModelState> {
       sirtList: parsed.sirtList ?? [],
     };
   } catch {
-    return { customActors: [], actorOverrides: {}, ppTapList: [], sirtList: [] };
+    return EMPTY_TM_STATE();
   }
 }
 
 async function saveTmState(state: ThreatModelState): Promise<void> {
   await fs.writeFile(TM_STATE_FILE, JSON.stringify(state, null, 2));
+}
+
+// ── Versioned threat model snapshots (one state blob per quarter) ──────────────
+
+interface VersionedEntry extends ThreatModelState {
+  savedAt: string | null;
+}
+
+type VersionStore = Record<string, VersionedEntry>;
+
+/** Load the versions file, migrating from the legacy single-state file if needed. */
+async function loadVersionStore(): Promise<VersionStore> {
+  try {
+    const raw = await fs.readFile(TM_VERSIONS_FILE, "utf-8");
+    return JSON.parse(raw) as VersionStore;
+  } catch {
+    // First run: migrate the live single-state file → current quarter entry
+    // and seed Q1 2025 as an empty baseline.
+    const live    = await loadTmState();
+    const curQ    = currentQuarterLabel();
+    const store: VersionStore = {
+      "Q1 2025": { ...EMPTY_TM_STATE(), savedAt: null },
+    };
+    if (curQ !== "Q1 2025") {
+      store[curQ] = { ...live, savedAt: new Date().toISOString() };
+    }
+    await fs.writeFile(TM_VERSIONS_FILE, JSON.stringify(store, null, 2));
+    return store;
+  }
+}
+
+async function saveVersionStore(store: VersionStore): Promise<void> {
+  await fs.writeFile(TM_VERSIONS_FILE, JSON.stringify(store, null, 2));
+}
+
+async function loadTmVersion(quarter: string): Promise<ThreatModelState> {
+  const store = await loadVersionStore();
+  const entry = store[quarter];
+  if (!entry) return EMPTY_TM_STATE();
+  return {
+    customActors:   entry.customActors   ?? [],
+    actorOverrides: entry.actorOverrides ?? {},
+    ppTapList:      entry.ppTapList      ?? [],
+    sirtList:       entry.sirtList       ?? [],
+  };
+}
+
+async function saveTmVersion(quarter: string, state: ThreatModelState): Promise<void> {
+  const store = await loadVersionStore();
+  store[quarter] = { ...state, savedAt: new Date().toISOString() };
+  await saveVersionStore(store);
+  // Also keep the legacy single-state file in sync when saving the current quarter
+  if (quarter === currentQuarterLabel()) {
+    await saveTmState(state);
+  }
 }
 
 /** Normalise a CS combined-actors resource into our ThreatModelActor shape */
@@ -611,27 +689,51 @@ csRouter.get("/cs/actor", async (req, res) => {
   }
 });
 
-/** GET /api/cs/threat-model-state — load custom actors + per-actor overrides */
-csRouter.get("/cs/threat-model-state", async (_req, res) => {
-  const state = await loadTmState();
-  res.json({ ok: true, ...state });
+/** GET /api/cs/threat-model-versions — list all saved quarter snapshots */
+csRouter.get("/cs/threat-model-versions", async (_req, res) => {
+  try {
+    const store = await loadVersionStore();
+    const versions = Object.entries(store).map(([quarter, entry]) => ({
+      quarter,
+      savedAt:     entry.savedAt ?? null,
+      actorCount:  (entry.customActors?.length ?? 0),
+      overrideCount: Object.keys(entry.actorOverrides ?? {}).length,
+      hasPpTap:    (entry.ppTapList?.length ?? 0) > 0,
+      hasSirt:     (entry.sirtList?.length  ?? 0) > 0,
+    }));
+    res.json({ ok: true, versions });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
-/** POST /api/cs/threat-model-state — save custom actors + per-actor overrides + PP-TAP/SIRT lists */
+/** GET /api/cs/threat-model-state — load state for a quarter (defaults to current quarter) */
+csRouter.get("/cs/threat-model-state", async (req, res) => {
+  const quarter = (req.query.quarter as string | undefined)?.trim() || currentQuarterLabel();
+  try {
+    const state = await loadTmVersion(quarter);
+    res.json({ ok: true, quarter, ...state });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/** POST /api/cs/threat-model-state — save state for a quarter (body.quarter or current quarter) */
 csRouter.post("/cs/threat-model-state", async (req, res) => {
-  const { customActors, actorOverrides, ppTapList, sirtList } = req.body ?? {};
+  const { customActors, actorOverrides, ppTapList, sirtList, quarter: bodyQuarter } = req.body ?? {};
   if (!Array.isArray(customActors) || typeof actorOverrides !== "object") {
     res.status(400).json({ ok: false, error: "customActors (array) and actorOverrides (object) are required" });
     return;
   }
+  const quarter = (bodyQuarter as string | undefined)?.trim() || currentQuarterLabel();
   try {
-    await saveTmState({
+    await saveTmVersion(quarter, {
       customActors,
       actorOverrides,
       ppTapList: Array.isArray(ppTapList) ? ppTapList : [],
-      sirtList: Array.isArray(sirtList) ? sirtList : [],
+      sirtList:  Array.isArray(sirtList)  ? sirtList  : [],
     });
-    res.json({ ok: true });
+    res.json({ ok: true, quarter });
   } catch (err: any) {
     res.status(500).json({ ok: false, error: err.message });
   }

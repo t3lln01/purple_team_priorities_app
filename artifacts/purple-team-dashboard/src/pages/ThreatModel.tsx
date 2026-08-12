@@ -6,6 +6,7 @@ import {
   ChevronDown, ChevronRight, Shield, Target, Zap, Globe, X,
   RefreshCw, Plus, Check, AlertCircle, Search, Eye, EyeOff,
   Loader2, Trash2, Edit2, BookOpen, Pencil, Tag, ListX, ArrowUp,
+  History, ChevronDown as ChevronDownSm, Save,
 } from "lucide-react";
 
 const CS_API = "/api";
@@ -196,6 +197,24 @@ function currentQuarterLabel(): string {
 }
 
 const QUARTER_LABEL = currentQuarterLabel();
+
+/** Generate every quarter from Q1 2025 up to (and including) the current quarter */
+function generateAllQuarters(): string[] {
+  const quarters: string[] = [];
+  const match = QUARTER_LABEL.match(/Q(\d) (\d+)/);
+  if (!match) return [QUARTER_LABEL];
+  const curQ    = parseInt(match[1], 10);
+  const curYear = parseInt(match[2], 10);
+  let q = 1; let year = 2025;
+  while (year < curYear || (year === curYear && q <= curQ)) {
+    quarters.push(`Q${q} ${year}`);
+    q++;
+    if (q > 4) { q = 1; year++; }
+  }
+  return quarters;
+}
+
+const ALL_QUARTERS = generateAllQuarters();
 
 const LS_KEY = "tm-state-v1";
 function saveToLocalStorage(state: {
@@ -1226,6 +1245,14 @@ function AddActorModal({
 type TabId = "actors" | "pptap" | "sirt";
 
 export default function ThreatModel() {
+  // Quarter versioning
+  const [selectedQuarter, setSelectedQuarter] = useState<string>(QUARTER_LABEL);
+  const [savedVersions, setSavedVersions]     = useState<Array<{
+    quarter: string; savedAt: string | null; actorCount: number; overrideCount: number;
+  }>>([]);
+  const [quarterOpen, setQuarterOpen] = useState(false);
+  const quarterRef = useRef<HTMLDivElement>(null);
+
   // Server-persisted state
   const [customActors, setCustomActors]     = useState<CustomActor[]>([]);
   const [actorOverrides, setActorOverrides] = useState<Record<string, ActorOverride>>({});
@@ -1252,33 +1279,55 @@ export default function ThreatModel() {
     msgTimer.current = setTimeout(() => setRefreshMsg(null), 4000);
   }
 
-  // ── Load state from server (with localStorage fallback) ───────────────────
+  // ── Close quarter dropdown on outside click ───────────────────────────────
   useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (quarterRef.current && !quarterRef.current.contains(e.target as Node)) {
+        setQuarterOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  // ── Load state from server for the selected quarter ───────────────────────
+  useEffect(() => {
+    setServerLoading(true);
     (async () => {
       let loaded = false;
       try {
-        const res = await fetch(`${CS_API}/cs/threat-model-state`);
-        const data = await res.json();
+        const [versionsRes, stateRes] = await Promise.all([
+          fetch(`${CS_API}/cs/threat-model-versions`),
+          fetch(`${CS_API}/cs/threat-model-state?quarter=${encodeURIComponent(selectedQuarter)}`),
+        ]);
+        const versionsData = await versionsRes.json();
+        if (versionsData.ok) setSavedVersions(versionsData.versions ?? []);
+
+        const data = await stateRes.json();
         if (data.ok) {
           setCustomActors(data.customActors ?? []);
           setActorOverrides(data.actorOverrides ?? {});
           const loadedPpTap: string[] = data.ppTapList ?? [];
           const loadedSirt: string[]  = data.sirtList ?? [];
-          setPpTapList(loadedPpTap.length > 0 ? loadedPpTap : SEED_PPTAP);
-          setSirtList(loadedSirt.length > 0 ? loadedSirt : SEED_SIRT);
-          // Mirror to localStorage so we always have a fresh copy
-          saveToLocalStorage({
-            customActors: data.customActors ?? [],
-            actorOverrides: data.actorOverrides ?? {},
-            ppTapList: loadedPpTap.length > 0 ? loadedPpTap : SEED_PPTAP,
-            sirtList: loadedSirt.length > 0 ? loadedSirt : SEED_SIRT,
-          });
+          // Seed defaults only for the current quarter
+          const isCurrent = selectedQuarter === QUARTER_LABEL;
+          setPpTapList(loadedPpTap.length > 0 ? loadedPpTap : (isCurrent ? SEED_PPTAP : []));
+          setSirtList(loadedSirt.length > 0  ? loadedSirt  : (isCurrent ? SEED_SIRT  : []));
+          // Mirror current quarter to localStorage for offline fallback
+          if (isCurrent) {
+            saveToLocalStorage({
+              customActors: data.customActors ?? [],
+              actorOverrides: data.actorOverrides ?? {},
+              ppTapList: loadedPpTap.length > 0 ? loadedPpTap : SEED_PPTAP,
+              sirtList:  loadedSirt.length  > 0 ? loadedSirt  : SEED_SIRT,
+            });
+          }
           loaded = true;
         }
-      } catch { /* offline — fall through to localStorage */ }
+      } catch { /* offline — fall through */ }
 
-      if (!loaded) {
-        // API unavailable: restore last-known state from localStorage
+      if (!loaded && selectedQuarter === QUARTER_LABEL) {
+        // API unavailable: restore last-known current state from localStorage
         const ls = loadFromLocalStorage();
         if (ls) {
           setCustomActors(ls.customActors ?? []);
@@ -1286,12 +1335,18 @@ export default function ThreatModel() {
           const lsPpTap: string[] = ls.ppTapList ?? [];
           const lsSirt: string[]  = ls.sirtList ?? [];
           setPpTapList(lsPpTap.length > 0 ? lsPpTap : SEED_PPTAP);
-          setSirtList(lsSirt.length > 0 ? lsSirt : SEED_SIRT);
+          setSirtList(lsSirt.length > 0  ? lsSirt  : SEED_SIRT);
         }
+      } else if (!loaded) {
+        // Historical quarter + offline → show empty
+        setCustomActors([]);
+        setActorOverrides({});
+        setPpTapList([]);
+        setSirtList([]);
       }
       setServerLoading(false);
     })();
-  }, []);
+  }, [selectedQuarter]);
 
   // ── Persist state to server + localStorage ────────────────────────────────
   const persistState = useCallback(async (
@@ -1306,16 +1361,27 @@ export default function ThreatModel() {
     const ovr   = next.actorOverrides ?? actorOverrides;
     const pptap = next.ppTapList      ?? ppTapList;
     const sirt  = next.sirtList       ?? sirtList;
-    // Always write to localStorage immediately — survives offline and page reloads
-    saveToLocalStorage({ customActors: ca, actorOverrides: ovr, ppTapList: pptap, sirtList: sirt });
+    // Mirror current quarter to localStorage for offline fallback
+    if (selectedQuarter === QUARTER_LABEL) {
+      saveToLocalStorage({ customActors: ca, actorOverrides: ovr, ppTapList: pptap, sirtList: sirt });
+    }
     try {
-      await fetch(`${CS_API}/cs/threat-model-state`, {
+      const res = await fetch(`${CS_API}/cs/threat-model-state`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customActors: ca, actorOverrides: ovr, ppTapList: pptap, sirtList: sirt }),
+        body: JSON.stringify({ customActors: ca, actorOverrides: ovr, ppTapList: pptap, sirtList: sirt, quarter: selectedQuarter }),
       });
+      const data = await res.json();
+      if (data.ok) {
+        // Keep versions list fresh after a save
+        setSavedVersions(prev => {
+          const exists = prev.find(v => v.quarter === selectedQuarter);
+          const entry = { quarter: selectedQuarter, savedAt: new Date().toISOString(), actorCount: ca.length, overrideCount: Object.keys(ovr).length };
+          return exists ? prev.map(v => v.quarter === selectedQuarter ? entry : v) : [...prev, entry];
+        });
+      }
     } catch { /* offline — localStorage copy already saved above */ }
-  }, [customActors, actorOverrides, ppTapList, sirtList]);
+  }, [customActors, actorOverrides, ppTapList, sirtList, selectedQuarter]);
 
   // ── Merge static + custom actors, compute effective scores ────────────────
   const mergedActors = useMemo((): MergedActor[] => {
@@ -1632,14 +1698,83 @@ export default function ThreatModel() {
     { id: "sirt",   label: "SIRT",    badge: sirtCount,  badgeColor: "bg-red-400/20 text-red-400" },
   ];
 
+  const isCurrentQuarter = selectedQuarter === QUARTER_LABEL;
+  const selectedVersionMeta = savedVersions.find(v => v.quarter === selectedQuarter);
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Threat Model — {QUARTER_LABEL}</h1>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-2xl font-bold text-foreground">Threat Model</h1>
+
+            {/* Quarter selector */}
+            <div className="relative" ref={quarterRef}>
+              <button
+                onClick={() => setQuarterOpen(v => !v)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-semibold transition-colors ${
+                  isCurrentQuarter
+                    ? "border-primary/50 bg-primary/10 text-primary hover:bg-primary/20"
+                    : "border-amber-400/40 bg-amber-400/10 text-amber-400 hover:bg-amber-400/15"
+                }`}
+              >
+                <History className="w-3.5 h-3.5" />
+                {selectedQuarter}
+                {isCurrentQuarter && <span className="text-[10px] font-normal opacity-70">(current)</span>}
+                <ChevronDownSm className={`w-3 h-3 opacity-60 transition-transform ${quarterOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {quarterOpen && (
+                <div className="absolute left-0 top-full mt-1 z-50 bg-card border border-border rounded-xl shadow-2xl min-w-[200px] py-1 overflow-hidden">
+                  <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-b border-border mb-1">
+                    Select quarter
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {[...ALL_QUARTERS].reverse().map(q => {
+                      const isCur  = q === QUARTER_LABEL;
+                      const isSel  = q === selectedQuarter;
+                      const meta   = savedVersions.find(v => v.quarter === q);
+                      const hasSave = !!meta?.savedAt;
+                      return (
+                        <button
+                          key={q}
+                          onClick={() => { setSelectedQuarter(q); setQuarterOpen(false); }}
+                          className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-sm text-left transition-colors ${
+                            isSel
+                              ? "bg-primary/15 text-foreground"
+                              : "text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+                          }`}
+                        >
+                          <span className="font-medium">
+                            {q}
+                            {isCur && <span className="ml-1.5 text-[10px] text-primary opacity-80">current</span>}
+                          </span>
+                          {hasSave
+                            ? <span className="flex items-center gap-1 text-[10px] text-emerald-400/80"><Save className="w-2.5 h-2.5" />saved</span>
+                            : <span className="text-[10px] text-muted-foreground/50">unsaved</span>
+                          }
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {!isCurrentQuarter && (
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-400 text-[11px] font-medium">
+                <History className="w-3 h-3" /> Historical view
+              </span>
+            )}
+          </div>
           <p className="text-muted-foreground text-sm mt-1">
             {mergedActors.length} actors assessed · {csEnriched} enriched from CrowdStrike · {customActors.length} custom
+            {selectedVersionMeta?.savedAt && (
+              <span className="ml-2 text-[11px] text-muted-foreground/60">
+                · saved {new Date(selectedVersionMeta.savedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
