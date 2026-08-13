@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   Copy, Check, ChevronDown, ChevronRight, ExternalLink,
-  Terminal, BookOpen, Zap, Filter, FileJson, FileText,
+  Terminal, BookOpen, Zap, Filter, FileJson, FileText, Download,
 } from "lucide-react";
 
 const API_BASE = "/api";
@@ -195,6 +195,48 @@ function useCopy(text: string, ms = 1500) {
   return { copied, copy };
 }
 
+function useDownloadSpec() {
+  const [loading, setLoading] = useState(false);
+  async function download() {
+    setLoading(true);
+    try {
+      const res  = await fetch("/api/export/openapi.json");
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href     = url;
+      a.download = "purple-team-export-api.openapi.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch { /* silently ignore */ }
+    setLoading(false);
+  }
+  return { loading, download };
+}
+
+function buildCurl(origin: string, examplePath: string): string {
+  return `curl -s "${origin}${examplePath}"`;
+}
+
+function DownloadSpecButton() {
+  const { loading, download } = useDownloadSpec();
+  return (
+    <button
+      onClick={download}
+      disabled={loading}
+      title="Download OpenAPI 3.0 spec — import into Postman, Insomnia or openapi-typescript"
+      className="flex items-center gap-1.5 shrink-0 px-3 py-2 rounded-lg border border-border bg-card text-xs font-medium text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-primary/5 transition-colors disabled:opacity-50"
+    >
+      {loading ? (
+        <span className="w-3.5 h-3.5 border border-current border-t-transparent rounded-full animate-spin" />
+      ) : (
+        <Download className="w-3.5 h-3.5" />
+      )}
+      Download OpenAPI spec
+    </button>
+  );
+}
+
 function MethodBadge({ method }: { method: string }) {
   return (
     <span className="px-2 py-0.5 rounded text-[11px] font-bold tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
@@ -315,8 +357,11 @@ function TryItPanel({ section }: { section: typeof SECTIONS[0] }) {
 // ── Endpoint card ──────────────────────────────────────────────────────────────
 
 function EndpointCard({ section }: { section: typeof SECTIONS[0] }) {
-  const fullExample = `${typeof window !== "undefined" ? window.location.origin : ""}${section.example}`;
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const fullExample = `${origin}${section.example}`;
+  const curlCmd = buildCurl(origin, section.example);
   const { copied, copy } = useCopy(fullExample);
+  const { copied: curlCopied, copy: copyCurl } = useCopy(curlCmd);
 
   return (
     <div id={section.id} className="rounded-xl border border-border bg-card overflow-hidden scroll-mt-6">
@@ -326,6 +371,14 @@ function EndpointCard({ section }: { section: typeof SECTIONS[0] }) {
         <code className="text-sm font-mono text-foreground font-semibold flex-1 min-w-0 truncate">
           {section.path}
         </code>
+        <button
+          onClick={copyCurl}
+          title="Copy as curl command"
+          className="flex items-center gap-1 px-2 py-1 rounded text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors shrink-0"
+        >
+          {curlCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Terminal className="w-3.5 h-3.5" />}
+          {curlCopied ? "Copied!" : "Copy curl"}
+        </button>
         <span className="text-[11px] text-muted-foreground shrink-0">{section.rowCount}</span>
       </div>
 
@@ -469,15 +522,18 @@ export default function ApiDocs() {
 
           {/* Page header */}
           <div className="space-y-4">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground flex items-center gap-2.5">
-                <BookOpen className="w-6 h-6 text-primary" />
-                Export API
-              </h1>
-              <p className="text-muted-foreground text-sm mt-1.5 leading-relaxed">
-                Every section of the Purple Team dashboard is queryable as JSON or CSV.
-                All endpoints are read-only and require no authentication.
-              </p>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-foreground flex items-center gap-2.5">
+                  <BookOpen className="w-6 h-6 text-primary" />
+                  Export API
+                </h1>
+                <p className="text-muted-foreground text-sm mt-1.5 leading-relaxed">
+                  Every section of the Purple Team dashboard is queryable as JSON or CSV.
+                  All endpoints are read-only and require no authentication.
+                </p>
+              </div>
+              <DownloadSpecButton />
             </div>
 
             {/* Base URL */}

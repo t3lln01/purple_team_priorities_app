@@ -640,6 +640,530 @@ exportRouter.get("/export/scoring-framework", async (req, res) => {
 
 // ── /export/risk-rate ─────────────────────────────────────────────────────────
 
+// ── /export/openapi.json ──────────────────────────────────────────────────────
+
+exportRouter.get("/export/openapi.json", (_req, res) => {
+  const spec = {
+    openapi: "3.0.3",
+    info: {
+      title: "Purple Team Dashboard — Export API",
+      version: "1.0.0",
+      description:
+        "Every section of the Purple Team dashboard is queryable as JSON or CSV. All endpoints are read-only and require no authentication.",
+      contact: { name: "Purple Team" },
+    },
+    servers: [{ url: "/api", description: "Dashboard API server" }],
+    tags: [
+      { name: "Discovery",       description: "API index and discovery" },
+      { name: "Actors",          description: "Actor prioritisation and threat model" },
+      { name: "Risk",            description: "Risk calculation, impact and likelihood tables" },
+      { name: "Assets",          description: "High-value assets" },
+      { name: "Techniques",      description: "TID priority, tactic scores, procedures" },
+      { name: "Reference",       description: "Static reference tables and scoring frameworks" },
+    ],
+    paths: {
+      "/export": {
+        get: {
+          operationId: "getExportIndex",
+          tags: ["Discovery"],
+          summary: "Export API index",
+          description: "Lists all available export endpoints with descriptions and parameter info.",
+          responses: {
+            "200": {
+              description: "Index of all export endpoints",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/DiscoveryResponse" },
+                  example: {
+                    ok: true,
+                    description: "Purple Team Dashboard — Export API. Every section of the dashboard is queryable as JSON or CSV.",
+                    generatedAt: "2026-08-13T12:00:00.000Z",
+                    endpoints: [],
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/export/actor-prioritisation": {
+        get: {
+          operationId: "getActorPrioritisation",
+          tags: ["Actors"],
+          summary: "Actor priority rankings",
+          description: "Actor priority rankings with intent, capability, TTP risk score, priority score and risk percentile. Rows are sorted by priority score descending.",
+          parameters: [
+            { $ref: "#/components/parameters/format" },
+          ],
+          responses: {
+            "200": {
+              description: "List of ~34 actors with priority data",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/DataResponse" },
+                  example: {
+                    ok: true,
+                    meta: { endpoint: "/export/actor-prioritisation", count: 34, generatedAt: "2026-08-13T12:00:00.000Z" },
+                    data: [{ name: "APT29", intent: 6, capability: 7, ttpRisk: 85, priority: 92, riskPct: 97 }],
+                  },
+                },
+                "text/csv": { schema: { type: "string" } },
+              },
+            },
+            "500": { $ref: "#/components/responses/Error" },
+          },
+        },
+      },
+      "/export/threat-model": {
+        get: {
+          operationId: "getThreatModel",
+          tags: ["Actors"],
+          summary: "Full quarterly threat model",
+          description: "Full threat model for a quarter: all actors (static + custom) with effective intent/capability scores after applying rubric overrides, PP-TAP (+1) and SIRT (+2) bonuses.",
+          parameters: [
+            {
+              name: "quarter",
+              in: "query",
+              schema: { type: "string", example: "Q3 2026" },
+              description: "Quarter label, e.g. 'Q3 2026'. Defaults to the current quarter.",
+            },
+            { $ref: "#/components/parameters/format" },
+          ],
+          responses: {
+            "200": {
+              description: "Threat model payload with ~89 actors",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/DataResponse" },
+                  example: {
+                    ok: true,
+                    meta: { endpoint: "/export/threat-model", quarter: "Q3 2026", count: 89, generatedAt: "2026-08-13T12:00:00.000Z", filters: { quarter: "Q3 2026" } },
+                    data: { quarter: "Q3 2026", savedAt: null, ppTapList: [], sirtList: [], actors: [] },
+                  },
+                },
+                "text/csv": { schema: { type: "string" } },
+              },
+            },
+            "500": { $ref: "#/components/responses/Error" },
+          },
+        },
+      },
+      "/export/threat-model/versions": {
+        get: {
+          operationId: "getThreatModelVersions",
+          tags: ["Actors"],
+          summary: "List saved threat model quarter snapshots",
+          description: "Lists all saved quarterly threat model snapshots with metadata: saved timestamp, source quarter, actor and override counts.",
+          parameters: [],
+          responses: {
+            "200": {
+              description: "One row per saved quarter",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/DataResponse" },
+                  example: {
+                    ok: true,
+                    meta: { generatedAt: "2026-08-13T12:00:00.000Z", count: 1 },
+                    data: [{ quarter: "Q3 2026", savedAt: "2026-08-01T00:00:00.000Z", seededFrom: null, customActors: 0, actorOverrides: 2, ppTapCount: 5, sirtCount: 3 }],
+                  },
+                },
+              },
+            },
+            "500": { $ref: "#/components/responses/Error" },
+          },
+        },
+      },
+      "/export/risk-calculation": {
+        get: {
+          operationId: "getRiskCalculation",
+          tags: ["Risk"],
+          summary: "Full risk calculation table",
+          description: "Full risk calculation table: TID, technique name, tactic, CIA scores, impact score/rate, likelihood score/rate, risk rate and composite risk score.",
+          parameters: [
+            { $ref: "#/components/parameters/tactic" },
+            { $ref: "#/components/parameters/tid" },
+            { $ref: "#/components/parameters/format" },
+          ],
+          responses: {
+            "200": {
+              description: "200 rows (unfiltered)",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/DataResponse" },
+                  example: {
+                    ok: true,
+                    meta: { endpoint: "/export/risk-calculation", count: 200, generatedAt: "2026-08-13T12:00:00.000Z", filters: { tactic: null, tid: null } },
+                    data: [{ tid: "T1566", technique: "Phishing", tactic: "Initial Access", ciaScore: 6, impactScore: 8, impactRate: "High", likelihoodScore: 7, likelihoodRate: "High", riskRate: 16, riskScore: "High" }],
+                  },
+                },
+                "text/csv": { schema: { type: "string" } },
+              },
+            },
+            "500": { $ref: "#/components/responses/Error" },
+          },
+        },
+      },
+      "/export/impact-table": {
+        get: {
+          operationId: "getImpactTable",
+          tags: ["Risk"],
+          summary: "Technique-level CIA impact table",
+          description: "Technique-level CIA ratings (Confidentiality, Integrity, Availability), TTP extent scoring, HVA flags and computed impact score.",
+          parameters: [
+            { $ref: "#/components/parameters/tactic" },
+            { $ref: "#/components/parameters/tid" },
+            { $ref: "#/components/parameters/format" },
+          ],
+          responses: {
+            "200": {
+              description: "656 rows (unfiltered)",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/DataResponse" },
+                  example: {
+                    ok: true,
+                    meta: { endpoint: "/export/impact-table", count: 656, generatedAt: "2026-08-13T12:00:00.000Z" },
+                    data: [{ id: "T1059", name: "Command and Scripting Interpreter", platforms: "Windows, Linux, macOS", tactics: "Execution", confidentiality: "High", integrity: "High", availability: "Medium", finalTTPExtent: 4 }],
+                  },
+                },
+                "text/csv": { schema: { type: "string" } },
+              },
+            },
+            "500": { $ref: "#/components/responses/Error" },
+          },
+        },
+      },
+      "/export/likelihood-table": {
+        get: {
+          operationId: "getLikelihoodTable",
+          tags: ["Risk"],
+          summary: "Technique likelihood table",
+          description: "Likelihood view derived from the risk calculation dataset: TID, technique, tactic, last occurrence, confidence, and likelihood score/rate.",
+          parameters: [
+            { $ref: "#/components/parameters/tactic" },
+            { $ref: "#/components/parameters/tid" },
+            { $ref: "#/components/parameters/format" },
+          ],
+          responses: {
+            "200": {
+              description: "200 rows (unfiltered)",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/DataResponse" },
+                  example: {
+                    ok: true,
+                    meta: { endpoint: "/export/likelihood-table", count: 200, generatedAt: "2026-08-13T12:00:00.000Z" },
+                    data: [{ tid: "T1566", technique: "Phishing", tactic: "Initial Access", lastOccurrence: "2026-06-10", confidence: "High", likelihoodScore: 7, likelihoodRate: "High" }],
+                  },
+                },
+                "text/csv": { schema: { type: "string" } },
+              },
+            },
+            "500": { $ref: "#/components/responses/Error" },
+          },
+        },
+      },
+      "/export/high-value-assets": {
+        get: {
+          operationId: "getHighValueAssets",
+          tags: ["Assets"],
+          summary: "High-value asset risk data",
+          description: "High-value asset rows (target × TID) with risk, likelihood, impact and composite risk score. Response shape: { data: { assets: [...], aggregates: [...] } }",
+          parameters: [
+            {
+              name: "target",
+              in: "query",
+              schema: { type: "string", example: "Domain Controller" },
+              description: "Filter by target name (case-insensitive partial match).",
+            },
+            { $ref: "#/components/parameters/tid" },
+            { $ref: "#/components/parameters/format" },
+          ],
+          responses: {
+            "200": {
+              description: "~62 HVA rows + 6 aggregate rows",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/DataResponse" },
+                  example: {
+                    ok: true,
+                    meta: { endpoint: "/export/high-value-assets", hvaCount: 62, aggregateCount: 6, generatedAt: "2026-08-13T12:00:00.000Z" },
+                    data: { assets: [{ target: "Domain Controller", tid: "T1078", tidName: "Valid Accounts", risk: 20, likelihood: 7, impact: 9, riskScore: 16 }], aggregates: [] },
+                  },
+                },
+                "text/csv": { schema: { type: "string" } },
+              },
+            },
+            "500": { $ref: "#/components/responses/Error" },
+          },
+        },
+      },
+      "/export/tid-priority": {
+        get: {
+          operationId: "getTidPriority",
+          tags: ["Techniques"],
+          summary: "TID occurrence priority list",
+          description: "Technique occurrence priority list: TID, procedure occurrence count, last observation date, and risk label.",
+          parameters: [
+            {
+              name: "minCount",
+              in: "query",
+              schema: { type: "integer", minimum: 0, example: 5 },
+              description: "Minimum occurrence count inclusive.",
+            },
+            { $ref: "#/components/parameters/tid" },
+            { $ref: "#/components/parameters/format" },
+          ],
+          responses: {
+            "200": {
+              description: "150 rows (unfiltered)",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/DataResponse" },
+                  example: {
+                    ok: true,
+                    meta: { endpoint: "/export/tid-priority", count: 150, generatedAt: "2026-08-13T12:00:00.000Z" },
+                    data: [{ tid: "T1059", count: 42, lastObs: "2026-06-10", risk: "High" }],
+                  },
+                },
+                "text/csv": { schema: { type: "string" } },
+              },
+            },
+            "500": { $ref: "#/components/responses/Error" },
+          },
+        },
+      },
+      "/export/tactics-scores": {
+        get: {
+          operationId: "getTacticsScores",
+          tags: ["Techniques"],
+          summary: "Tactic-level CIA and extent scores",
+          description: "Tactic-level CIA impact ratings and TTP extent scores across all 14 MITRE ATT&CK tactics.",
+          parameters: [
+            { $ref: "#/components/parameters/tactic" },
+            { $ref: "#/components/parameters/format" },
+          ],
+          responses: {
+            "200": {
+              description: "14 rows (one per MITRE tactic)",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/DataResponse" },
+                  example: {
+                    ok: true,
+                    meta: { endpoint: "/export/tactics-scores", count: 14, generatedAt: "2026-08-13T12:00:00.000Z" },
+                    data: [{ tactic: "Initial Access", conf: "High", integrity: "Medium", avail: "Low", extent: 4 }],
+                  },
+                },
+                "text/csv": { schema: { type: "string" } },
+              },
+            },
+            "500": { $ref: "#/components/responses/Error" },
+          },
+        },
+      },
+      "/export/all-procedures": {
+        get: {
+          operationId: "getAllProcedures",
+          tags: ["Techniques"],
+          summary: "All observed ATT&CK procedures",
+          description: "All ATT&CK procedures observed, enriched with resolved technique name and tactic(s). Supports filtering by actor, TID, tactic, date range and row limit.",
+          parameters: [
+            {
+              name: "actor",
+              in: "query",
+              schema: { type: "string", example: "fancy bear" },
+              description: "Filter by actor name (case-insensitive partial match).",
+            },
+            { $ref: "#/components/parameters/tid" },
+            { $ref: "#/components/parameters/tactic" },
+            {
+              name: "dateFrom",
+              in: "query",
+              schema: { type: "string", example: "2025-01-01" },
+              description: "Include procedures on or after this date (ISO date string or unix ms).",
+            },
+            {
+              name: "dateTo",
+              in: "query",
+              schema: { type: "string", example: "2026-08-13" },
+              description: "Include procedures on or before this date (ISO date string or unix ms).",
+            },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", default: 5000, maximum: 10000, example: 100 },
+              description: "Maximum number of rows to return (hard cap 10,000).",
+            },
+            { $ref: "#/components/parameters/format" },
+          ],
+          responses: {
+            "200": {
+              description: "Up to 5000 procedure rows (unfiltered default)",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/DataResponse" },
+                  example: {
+                    ok: true,
+                    meta: { endpoint: "/export/all-procedures", count: 50, generatedAt: "2026-08-13T12:00:00.000Z", filters: { actor: "cozy bear", limit: 50 } },
+                    data: [{ actor: "Cozy Bear", mitreId: "T1566", technique: "Phishing", tactics: "Initial Access", externalRef: "https://attack.mitre.org/techniques/T1566", procedure: "Sent spear-phishing emails...", dateMs: 1700000000000, date: "2023-11-14", riskScore: 16 }],
+                  },
+                },
+                "text/csv": { schema: { type: "string" } },
+              },
+            },
+            "500": { $ref: "#/components/responses/Error" },
+          },
+        },
+      },
+      "/export/scoring-framework": {
+        get: {
+          operationId: "getScoringFramework",
+          tags: ["Reference"],
+          summary: "Threat model scoring rubric",
+          description: "Threat model scoring rubric: intent, willingness, capability and novelty option definitions with their numeric values used to compute actor scores.",
+          parameters: [
+            { $ref: "#/components/parameters/format" },
+          ],
+          responses: {
+            "200": {
+              description: "5 rows (one per rubric level)",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/DataResponse" },
+                  example: {
+                    ok: true,
+                    meta: { endpoint: "/export/scoring-framework", count: 5, generatedAt: "2026-08-13T12:00:00.000Z" },
+                    data: [{ category: "High", intent: "Sophisticated targeting", intentScore: 3, willingness: "Active operations", willingnessScore: 2, capability: "Advanced tooling", capabilityScore: 3 }],
+                  },
+                },
+                "text/csv": { schema: { type: "string" } },
+              },
+            },
+            "500": { $ref: "#/components/responses/Error" },
+          },
+        },
+      },
+      "/export/risk-rate": {
+        get: {
+          operationId: "getRiskRate",
+          tags: ["Reference"],
+          summary: "Risk rate matrix and classification tables",
+          description: "Static risk reference tables: 5×5 impact/likelihood risk matrix, impact level bands, likelihood level bands, and risk score classification table.",
+          parameters: [],
+          responses: {
+            "200": {
+              description: "Static risk matrix and classification tables",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/DataResponse" },
+                  example: {
+                    ok: true,
+                    meta: { endpoint: "/api/export/risk-rate", generatedAt: "2026-08-13T12:00:00.000Z" },
+                    data: { riskMatrix: [{ impactLevel: "Very High", likelihood: "Very High", riskRate: 25 }], impactLevels: [], likelihoodLevels: [], riskScoreTable: [] },
+                  },
+                },
+              },
+            },
+            "500": { $ref: "#/components/responses/Error" },
+          },
+        },
+      },
+      "/export/openapi.json": {
+        get: {
+          operationId: "getOpenApiSpec",
+          tags: ["Discovery"],
+          summary: "This OpenAPI 3.0 specification",
+          description: "Returns this OpenAPI 3.0 specification as JSON — suitable for import into Postman, Insomnia, or code generators.",
+          parameters: [],
+          responses: {
+            "200": {
+              description: "OpenAPI 3.0 specification document",
+              content: {
+                "application/json": {
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    components: {
+      parameters: {
+        format: {
+          name: "format",
+          in: "query",
+          schema: { type: "string", enum: ["json", "csv"], default: "json" },
+          description: "Response format. Use 'csv' to receive a file download with Content-Disposition headers.",
+        },
+        tactic: {
+          name: "tactic",
+          in: "query",
+          schema: { type: "string", example: "initial access" },
+          description: "Filter by tactic name (case-insensitive partial match).",
+        },
+        tid: {
+          name: "tid",
+          in: "query",
+          schema: { type: "string", example: "T1566,T1190" },
+          description: "Filter by one or more MITRE ATT&CK technique IDs (comma-separated).",
+        },
+      },
+      schemas: {
+        DiscoveryResponse: {
+          type: "object",
+          properties: {
+            ok:          { type: "boolean" },
+            description: { type: "string" },
+            generatedAt: { type: "string", format: "date-time" },
+            endpoints:   { type: "array", items: { type: "object" } },
+          },
+        },
+        DataResponse: {
+          type: "object",
+          properties: {
+            ok:   { type: "boolean", example: true },
+            meta: {
+              type: "object",
+              properties: {
+                endpoint:         { type: "string" },
+                count:            { type: "integer" },
+                generatedAt:      { type: "string", format: "date-time" },
+                filters:          { type: "object" },
+                availableFilters: { type: "array", items: { type: "string" } },
+              },
+            },
+            data: { oneOf: [{ type: "array", items: { type: "object" } }, { type: "object" }] },
+          },
+        },
+        ErrorResponse: {
+          type: "object",
+          properties: {
+            ok:    { type: "boolean", example: false },
+            error: { type: "string" },
+          },
+        },
+      },
+      responses: {
+        Error: {
+          description: "Internal server error",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ErrorResponse" },
+            },
+          },
+        },
+      },
+    },
+  };
+
+  res.setHeader("Content-Disposition", 'attachment; filename="purple-team-export-api.openapi.json"');
+  res.json(spec);
+});
+
+// ── /export/risk-rate ─────────────────────────────────────────────────────────
+
 exportRouter.get("/export/risk-rate", (_req, res) => {
   // Embedded risk matrix from RiskRate.tsx — static reference tables
   const riskMatrix = [
