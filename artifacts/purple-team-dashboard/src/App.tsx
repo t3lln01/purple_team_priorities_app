@@ -18,10 +18,11 @@ import { AppDataProvider, useAppData } from "@/context/AppDataContext";
 import { ImpactOverridesProvider }  from "@/context/ImpactOverridesContext";
 import { HVAScoresProvider }        from "@/context/HVAScoresContext";
 import { DateWindowProvider, useDateWindow, DATE_RANGE_LABELS, type DateRange } from "@/context/DateWindowContext";
-import { Shield, Users, Activity, Target, ChartBar, AlertTriangle, List, Database, Table2, TrendingUp, CalendarRange, ChevronDown, Crosshair } from "lucide-react";
+import { Shield, Users, Activity, Target, ChartBar, AlertTriangle, List, Database, Table2, TrendingUp, CalendarRange, ChevronDown, Crosshair, BookOpen } from "lucide-react";
 import ImpactTable       from "@/pages/ImpactTable";
 import LikelihoodTable   from "@/pages/LikelihoodTable";
 import ThreatModel       from "@/pages/ThreatModel";
+import ApiDocs           from "@/pages/ApiDocs";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ const navItems = [
   { path: "/risk-rate", label: "Risk Rate", icon: Shield },
   { path: "/all-procedures", label: "All Procedures", icon: List },
   { path: "/data-sources", label: "Data Sources", icon: Database },
+  { path: "/api-docs",     label: "API",          icon: BookOpen },
 ];
 
 function DatePickerWidget() {
@@ -205,6 +207,7 @@ function Router() {
         <Route path="/risk-rate" component={RiskRate} />
         <Route path="/all-procedures" component={AllProcedures} />
         <Route path="/data-sources" component={DataSources} />
+        <Route path="/api-docs"     component={ApiDocs} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

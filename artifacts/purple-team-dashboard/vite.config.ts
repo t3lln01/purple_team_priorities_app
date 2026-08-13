@@ -52,7 +52,8 @@ export default defineConfig({
       deny: ["**/.*"],
     },
     proxy: {
-      "/api": {
+      // Match /api/ but NOT /api-docs or other /api-* SPA routes
+      "^/api/": {
         target: `http://127.0.0.1:${process.env.API_SERVER_PORT ?? 8080}`,
         changeOrigin: true,
         configure: (proxy) => {
