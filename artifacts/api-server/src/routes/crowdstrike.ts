@@ -531,37 +531,88 @@ async function saveTmState(state: ThreatModelState): Promise<void> {
 // ── Versioned threat model snapshots (one state blob per quarter) ──────────────
 
 interface VersionedEntry extends ThreatModelState {
-  savedAt: string | null;
+  savedAt:    string | null;
+  seededFrom?: string;       // which quarter this was auto-copied from
 }
 
 type VersionStore = Record<string, VersionedEntry>;
 
-/** Load the versions file, migrating from the legacy single-state file if needed. */
+/**
+ * Convert "Q3 2026" → numeric sort key 20263 so quarters can be ordered
+ * chronologically regardless of insertion order.
+ */
+function quarterSortKey(label: string): number {
+  const m = label.match(/Q(\d)\s+(\d{4})/);
+  if (!m) return 0;
+  return parseInt(m[2], 10) * 10 + parseInt(m[1], 10);
+}
+
+/**
+ * Given a store, return the label of the most recently saved quarter that is
+ * strictly earlier than (or equal to) `before`.  Returns null if none found.
+ */
+function latestSavedBefore(store: VersionStore, before: string): string | null {
+  const beforeKey = quarterSortKey(before);
+  const candidates = Object.keys(store)
+    .filter(q => store[q].savedAt !== null && quarterSortKey(q) <= beforeKey)
+    .sort((a, b) => quarterSortKey(b) - quarterSortKey(a)); // descending
+  return candidates[0] ?? null;
+}
+
+/** Load the versions file, migrating from the legacy single-state file if needed.
+ *  Always ensures the current quarter entry exists, seeding from the most recent
+ *  saved quarter when creating it for the first time.
+ */
 async function loadVersionStore(): Promise<VersionStore> {
+  let store: VersionStore;
+
   try {
     const raw = await fs.readFile(TM_VERSIONS_FILE, "utf-8");
-    return JSON.parse(raw) as VersionStore;
+    store = JSON.parse(raw) as VersionStore;
   } catch {
     // First run: migrate the live single-state file → current quarter entry
     // and seed Q1 2025 as an empty baseline.
-    const live    = await loadTmState();
-    const curQ    = currentQuarterLabel();
-    const store: VersionStore = {
-      "Q1 2025": { ...EMPTY_TM_STATE(), savedAt: null },
-    };
+    const live = await loadTmState();
+    const curQ = currentQuarterLabel();
+    store = { "Q1 2025": { ...EMPTY_TM_STATE(), savedAt: null } };
     if (curQ !== "Q1 2025") {
       store[curQ] = { ...live, savedAt: new Date().toISOString() };
     }
     await fs.writeFile(TM_VERSIONS_FILE, JSON.stringify(store, null, 2));
     return store;
   }
+
+  // ── Auto-seed the current quarter if it doesn't exist yet ─────────────────
+  const curQ = currentQuarterLabel();
+  if (!store[curQ]) {
+    const sourceLabel = latestSavedBefore(store, curQ);
+    if (sourceLabel) {
+      const source = store[sourceLabel];
+      store[curQ] = {
+        customActors:   source.customActors   ?? [],
+        actorOverrides: source.actorOverrides ?? {},
+        ppTapList:      source.ppTapList      ?? [],
+        sirtList:       source.sirtList       ?? [],
+        savedAt:        new Date().toISOString(),
+        seededFrom:     sourceLabel,
+      };
+      console.log(`[TM] Auto-seeded ${curQ} from ${sourceLabel}`);
+    } else {
+      // No prior quarter found — start empty
+      store[curQ] = { ...EMPTY_TM_STATE(), savedAt: null };
+      console.log(`[TM] Initialised ${curQ} as empty (no prior quarter found)`);
+    }
+    await fs.writeFile(TM_VERSIONS_FILE, JSON.stringify(store, null, 2));
+  }
+
+  return store;
 }
 
 async function saveVersionStore(store: VersionStore): Promise<void> {
   await fs.writeFile(TM_VERSIONS_FILE, JSON.stringify(store, null, 2));
 }
 
-async function loadTmVersion(quarter: string): Promise<ThreatModelState> {
+async function loadTmVersion(quarter: string): Promise<ThreatModelState & { seededFrom?: string }> {
   const store = await loadVersionStore();
   const entry = store[quarter];
   if (!entry) return EMPTY_TM_STATE();
@@ -570,12 +621,19 @@ async function loadTmVersion(quarter: string): Promise<ThreatModelState> {
     actorOverrides: entry.actorOverrides ?? {},
     ppTapList:      entry.ppTapList      ?? [],
     sirtList:       entry.sirtList       ?? [],
+    seededFrom:     entry.seededFrom,
   };
 }
 
 async function saveTmVersion(quarter: string, state: ThreatModelState): Promise<void> {
   const store = await loadVersionStore();
-  store[quarter] = { ...state, savedAt: new Date().toISOString() };
+  const existing = store[quarter];
+  store[quarter] = {
+    ...state,
+    savedAt:    new Date().toISOString(),
+    // preserve seededFrom so the audit trail is never lost
+    seededFrom: existing?.seededFrom,
+  };
   await saveVersionStore(store);
   // Also keep the legacy single-state file in sync when saving the current quarter
   if (quarter === currentQuarterLabel()) {
@@ -693,14 +751,17 @@ csRouter.get("/cs/actor", async (req, res) => {
 csRouter.get("/cs/threat-model-versions", async (_req, res) => {
   try {
     const store = await loadVersionStore();
-    const versions = Object.entries(store).map(([quarter, entry]) => ({
-      quarter,
-      savedAt:     entry.savedAt ?? null,
-      actorCount:  (entry.customActors?.length ?? 0),
-      overrideCount: Object.keys(entry.actorOverrides ?? {}).length,
-      hasPpTap:    (entry.ppTapList?.length ?? 0) > 0,
-      hasSirt:     (entry.sirtList?.length  ?? 0) > 0,
-    }));
+    const versions = Object.entries(store)
+      .sort((a, b) => quarterSortKey(a[0]) - quarterSortKey(b[0]))
+      .map(([quarter, entry]) => ({
+        quarter,
+        savedAt:       entry.savedAt ?? null,
+        seededFrom:    entry.seededFrom ?? null,
+        actorCount:    entry.customActors?.length ?? 0,
+        overrideCount: Object.keys(entry.actorOverrides ?? {}).length,
+        hasPpTap:      (entry.ppTapList?.length ?? 0) > 0,
+        hasSirt:       (entry.sirtList?.length  ?? 0) > 0,
+      }));
     res.json({ ok: true, versions });
   } catch (err: any) {
     res.status(500).json({ ok: false, error: err.message });

@@ -1248,7 +1248,8 @@ export default function ThreatModel() {
   // Quarter versioning
   const [selectedQuarter, setSelectedQuarter] = useState<string>(QUARTER_LABEL);
   const [savedVersions, setSavedVersions]     = useState<Array<{
-    quarter: string; savedAt: string | null; actorCount: number; overrideCount: number;
+    quarter: string; savedAt: string | null; seededFrom: string | null;
+    actorCount: number; overrideCount: number;
   }>>([]);
   const [quarterOpen, setQuarterOpen] = useState(false);
   const quarterRef = useRef<HTMLDivElement>(null);
@@ -1700,6 +1701,7 @@ export default function ThreatModel() {
 
   const isCurrentQuarter = selectedQuarter === QUARTER_LABEL;
   const selectedVersionMeta = savedVersions.find(v => v.quarter === selectedQuarter);
+  const seededFrom = selectedVersionMeta?.seededFrom ?? null;
 
   return (
     <div className="p-6 space-y-6">
@@ -1732,27 +1734,33 @@ export default function ThreatModel() {
                   </div>
                   <div className="max-h-64 overflow-y-auto">
                     {[...ALL_QUARTERS].reverse().map(q => {
-                      const isCur  = q === QUARTER_LABEL;
-                      const isSel  = q === selectedQuarter;
-                      const meta   = savedVersions.find(v => v.quarter === q);
+                      const isCur   = q === QUARTER_LABEL;
+                      const isSel   = q === selectedQuarter;
+                      const meta    = savedVersions.find(v => v.quarter === q);
                       const hasSave = !!meta?.savedAt;
+                      const fromQ   = meta?.seededFrom ?? null;
                       return (
                         <button
                           key={q}
                           onClick={() => { setSelectedQuarter(q); setQuarterOpen(false); }}
-                          className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-sm text-left transition-colors ${
+                          className={`w-full flex items-start justify-between gap-3 px-3 py-2 text-sm text-left transition-colors ${
                             isSel
                               ? "bg-primary/15 text-foreground"
                               : "text-muted-foreground hover:bg-accent/40 hover:text-foreground"
                           }`}
                         >
-                          <span className="font-medium">
-                            {q}
-                            {isCur && <span className="ml-1.5 text-[10px] text-primary opacity-80">current</span>}
+                          <span className="flex flex-col">
+                            <span className="font-medium">
+                              {q}
+                              {isCur && <span className="ml-1.5 text-[10px] text-primary opacity-80">current</span>}
+                            </span>
+                            {fromQ && (
+                              <span className="text-[10px] text-amber-400/60 italic">copied from {fromQ}</span>
+                            )}
                           </span>
                           {hasSave
-                            ? <span className="flex items-center gap-1 text-[10px] text-emerald-400/80"><Save className="w-2.5 h-2.5" />saved</span>
-                            : <span className="text-[10px] text-muted-foreground/50">unsaved</span>
+                            ? <span className="flex items-center gap-1 text-[10px] text-emerald-400/80 mt-0.5 flex-shrink-0"><Save className="w-2.5 h-2.5" />saved</span>
+                            : <span className="text-[10px] text-muted-foreground/50 mt-0.5 flex-shrink-0">unsaved</span>
                           }
                         </button>
                       );
@@ -1773,6 +1781,11 @@ export default function ThreatModel() {
             {selectedVersionMeta?.savedAt && (
               <span className="ml-2 text-[11px] text-muted-foreground/60">
                 · saved {new Date(selectedVersionMeta.savedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+              </span>
+            )}
+            {seededFrom && (
+              <span className="ml-2 text-[11px] text-amber-400/70 italic">
+                · copied from {seededFrom}
               </span>
             )}
           </p>
