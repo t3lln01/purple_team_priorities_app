@@ -690,12 +690,16 @@ function normalizeCSActor(r: any): ThreatModelActor {
   else if (capVal.includes("medium") || capVal.includes("moderate")) capScore = 3;
   else if (capVal.includes("low") || capVal.includes("limited")) capScore = 2;
 
-  // Last activity date (unix seconds → ISO string)
-  let lastSeen: string | null = null;
-  if (r.last_activity_date) {
-    const ms = r.last_activity_date > 1e10 ? r.last_activity_date : r.last_activity_date * 1000;
-    lastSeen = new Date(ms).toISOString().slice(0, 10);
-  }
+  // CrowdStrike's actor portal labels this value "Last Active". The combined
+  // actor response has used both `last_active` and `last_active_date` across
+  // API versions, so prefer those fields and retain the older activity field
+  // only as a compatibility fallback.
+  const lastActiveValue =
+    r.last_active ??
+    r.last_active_date ??
+    r.last_activity_date ??
+    r.lastActivityDate;
+  const lastSeen = normalizeCSDate(lastActiveValue);
 
   return {
     name: (r.name ?? "").toUpperCase(),
@@ -719,6 +723,28 @@ function normalizeCSActor(r: any): ThreatModelActor {
     csRawData: r,
     description: r.short_description ?? r.description ?? "",
   };
+}
+
+/** Convert CrowdStrike epoch (seconds/ms) or ISO date values to YYYY-MM-DD. */
+function normalizeCSDate(value: unknown): string | null {
+  if (value === null || value === undefined || value === "") return null;
+
+  // Some API responses wrap date values in an object.
+  if (typeof value === "object" && value !== null) {
+    const wrapped = value as Record<string, unknown>;
+    return normalizeCSDate(wrapped.value ?? wrapped.date ?? wrapped.timestamp);
+  }
+
+  if (typeof value === "number" || (typeof value === "string" && /^数字$/.test(value))) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return null;
+    const ms = numeric > 1e11 ? numeric : numeric * 1000;
+    const date = new Date(ms);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+  }
+
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
 }
 
 /** GET /api/cs/actor?q=NAME — search CS intel combined actors endpoint */
