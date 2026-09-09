@@ -735,7 +735,7 @@ function normalizeCSDate(value: unknown): string | null {
     return normalizeCSDate(wrapped.value ?? wrapped.date ?? wrapped.timestamp);
   }
 
-  if (typeof value === "number" || (typeof value === "string" && /^数字$/.test(value))) {
+  if (typeof value === "number" || (typeof value === "string" && /^\d+$/.test(value))) {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return null;
     const ms = numeric > 1e11 ? numeric : numeric * 1000;
@@ -745,6 +745,46 @@ function normalizeCSDate(value: unknown): string | null {
 
   const date = new Date(String(value));
   return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+}
+
+type LastActiveActor = {
+  name: string;
+  aliases: string[];
+  lastActive: string | null;
+};
+
+const LAST_ACTIVE_CACHE_TTL_MS = 60 * 60 * 1000;
+let lastActiveCache: { fetchedAt: number; actors: LastActiveActor[] } | null = null;
+
+/**
+ * Fetch the authoritative CrowdStrike actor directory once, then cache it for
+ * an hour. This avoids issuing one portal query per Threat Model row.
+ */
+async function getActorLastActiveDirectory(): Promise<LastActiveActor[]> {
+  if (
+    lastActiveCache &&
+    Date.now() - lastActiveCache.fetchedAt < LAST_ACTIVE_CACHE_TTL_MS
+  ) {
+    return lastActiveCache.actors;
+  }
+
+  const token = await getToken();
+  const ids = await fetchAllActorIds(token);
+  const resources = await fetchActorDetails(token, ids);
+  const actors = resources.map(resource => {
+    const normalized = normalizeCSActor(resource);
+    return {
+      name: normalized.name,
+      aliases: normalized.aliases
+        .split(",")
+        .map(alias => alias.trim())
+        .filter(Boolean),
+      lastActive: normalized.lastSeen,
+    };
+  });
+
+  lastActiveCache = { fetchedAt: Date.now(), actors };
+  return actors;
 }
 
 /** GET /api/cs/actor?q=NAME — search CS intel combined actors endpoint */
@@ -768,6 +808,20 @@ csRouter.get("/cs/actor", async (req, res) => {
     const data = await r.json() as any;
     const resources: any[] = data.resources ?? [];
     res.json({ ok: true, actors: resources.map(normalizeCSActor), raw: resources });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/** GET /api/cs/actors/last-active — live CrowdStrike Last Active dates */
+csRouter.get("/cs/actors/last-active", async (_req, res) => {
+  try {
+    const actors = await getActorLastActiveDirectory();
+    res.json({
+      ok: true,
+      fetchedAt: new Date(lastActiveCache?.fetchedAt ?? Date.now()).toISOString(),
+      actors,
+    });
   } catch (err: any) {
     res.status(500).json({ ok: false, error: err.message });
   }

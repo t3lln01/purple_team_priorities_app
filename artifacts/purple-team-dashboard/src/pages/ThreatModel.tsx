@@ -178,7 +178,11 @@ function scoreBar(value: number, max: number = 6, color = "bg-primary") {
 
 function fmtDate(iso: string | null) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 /** Returns "Q1 2026" etc. based on fiscal quarters starting Feb/May/Aug/Nov */
@@ -1090,7 +1094,7 @@ function AddActorModal({
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400 border border-cyan-400/30">CS LIVE</span>
                       </div>
                       <div className="text-xs text-muted-foreground mt-0.5">
-                        {originFlag(a.origins)} {a.origins || "Unknown"} · Last seen: {fmtDate(a.lastSeen)}
+                        {originFlag(a.origins)} {a.origins || "Unknown"} · Last active: {fmtDate(a.lastSeen)}
                       </div>
                       {a.aliases && <div className="text-[11px] text-muted-foreground/70 mt-0.5 truncate">{a.aliases}</div>}
                     </button>
@@ -1128,7 +1132,7 @@ function AddActorModal({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Last Seen</label>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Last Active</label>
                   <input
                     type="date"
                     value={form.lastSeen ?? ""}
@@ -1259,6 +1263,7 @@ export default function ThreatModel() {
   const [actorOverrides, setActorOverrides] = useState<Record<string, ActorOverride>>({});
   const [ppTapList, setPpTapList]           = useState<string[]>([]);
   const [sirtList, setSirtList]             = useState<string[]>([]);
+  const [liveLastActive, setLiveLastActive] = useState<Record<string, string>>({});
   const [serverLoading, setServerLoading]   = useState(true);
 
   // UI state
@@ -1349,6 +1354,38 @@ export default function ThreatModel() {
     })();
   }, [selectedQuarter]);
 
+  // Current-quarter Last Active dates always come from the live CrowdStrike
+  // actor directory. Historical quarters retain the values saved in snapshots.
+  useEffect(() => {
+    if (selectedQuarter !== QUARTER_LABEL) {
+      setLiveLastActive({});
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${CS_API}/cs/actors/last-active`);
+        const data = await res.json();
+        if (!data.ok || cancelled) return;
+
+        const directory: Record<string, string> = {};
+        for (const actor of data.actors ?? []) {
+          if (!actor.lastActive) continue;
+          directory[String(actor.name).toUpperCase()] = actor.lastActive;
+          for (const alias of actor.aliases ?? []) {
+            directory[String(alias).toUpperCase()] = actor.lastActive;
+          }
+        }
+        setLiveLastActive(directory);
+      } catch {
+        // Keep the saved snapshot value if CrowdStrike is unavailable.
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [selectedQuarter]);
+
   // ── Persist state to server + localStorage ────────────────────────────────
   const persistState = useCallback(async (
     next: {
@@ -1414,6 +1451,7 @@ export default function ThreatModel() {
         ...csData,
         // preserve name and malware from CS if available
         malware: mergedMalware,
+        lastSeen: liveLastActive[a.name.toUpperCase()] ?? csData.lastSeen ?? a.lastSeen,
         intentFinalScore: baseIntent,
         capabilityFinalScore: baseCap,
         isCustom: false,
@@ -1444,6 +1482,7 @@ export default function ThreatModel() {
       const effectiveCapabilityScore = a.capabilityFinalScore ?? 0;
       return {
         ...(a as any),
+        lastSeen: liveLastActive[a.name.toUpperCase()] ?? a.lastSeen,
         intent: "",
         intentScore: null,
         willingness: "",
@@ -1470,7 +1509,7 @@ export default function ThreatModel() {
     });
 
     return [...staticMerged, ...customMerged];
-  }, [staticActors, customActors, actorOverrides, ppTapList, sirtList]);
+  }, [staticActors, customActors, actorOverrides, ppTapList, sirtList, liveLastActive]);
 
   // ── Save intent/capability scores for an actor ────────────────────────────
   async function saveScores(name: string, scores: {
@@ -1939,7 +1978,7 @@ export default function ThreatModel() {
                     <SortableTh col="name" sortKey={sortKey} sortDir={sortDir} toggle={toggle} className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actor</SortableTh>
                     <SortableTh col="origins" sortKey={sortKey} sortDir={sortDir} toggle={toggle} className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Origin</SortableTh>
                     <SortableTh col="actorType" sortKey={sortKey} sortDir={sortDir} toggle={toggle} className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Type</SortableTh>
-                    <SortableTh col="lastSeen" sortKey={sortKey} sortDir={sortDir} toggle={toggle} className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Last Seen</SortableTh>
+                    <SortableTh col="lastSeen" sortKey={sortKey} sortDir={sortDir} toggle={toggle} className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Last Active</SortableTh>
                     <SortableTh col="effectiveIntentScore" sortKey={sortKey} sortDir={sortDir} toggle={toggle} className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[140px]">Intent</SortableTh>
                     <SortableTh col="effectiveCapabilityScore" sortKey={sortKey} sortDir={sortDir} toggle={toggle} className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[120px]">Capability</SortableTh>
                     <th className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[120px]">Combined</th>
