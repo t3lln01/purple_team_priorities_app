@@ -1,0 +1,40 @@
+ workspace@0.0.0 dev /home/yazor/tools/purple_team_priorities_app
+> pnpm --parallel --filter @workspace/api-server --filter @workspace/purple-team-dashboard run dev
+
+Scope: 2 of 9 workspace projects
+artifacts/api-server dev$ NODE_ENV=development tsx ./src/index.ts
+artifacts/purple-team-dashboard dev$ vite --config vite.config.ts --host 0.0.0.0
+artifacts/purple-team-dashboard dev: (node:114942) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+artifacts/purple-team-dashboard dev: (Use `node --trace-deprecation ...` to show where the warning was created)
+artifacts/purple-team-dashboard dev: Port 5173 is in use, trying another one...
+artifacts/purple-team-dashboard dev:   VITE v7.3.1  ready in 242 ms
+artifacts/purple-team-dashboard dev:   ➜  Local:   http://localhost:5174/
+artifacts/purple-team-dashboard dev:   ➜  Network: http://10.255.255.254:5174/
+artifacts/purple-team-dashboard dev:   ➜  Network: http://192.168.0.61:5174/
+artifacts/purple-team-dashboard dev:   ➜  Network: http://172.19.0.1:5174/
+artifacts/purple-team-dashboard dev:   ➜  Network: http://172.20.0.1:5174/
+artifacts/purple-team-dashboard dev:   ➜  Network: http://172.18.0.1:5174/
+artifacts/api-server dev: (node:114965) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+artifacts/api-server dev: (Use `node --trace-deprecation ...` to show where the warning was created)
+artifacts/api-server dev: Server listening on port 8080
+artifacts/purple-team-dashboard dev: 5:49:43 PM [vite] http proxy error: /api/cs/status
+artifacts/purple-team-dashboard dev: Error: socket hang up
+artifacts/purple-team-dashboard dev:     at Socket.socketOnEnd (node:_http_client:792:25)
+artifacts/purple-team-dashboard dev:     at Socket.emit (node:events:526:24)
+artifacts/purple-team-dashboard dev:     at endReadableNT (node:internal/streams/readable:1772:12)
+artifacts/purple-team-dashboard dev:     at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+artifacts/purple-team-dashboard dev: 5:49:43 PM [vite] http proxy error: /api/cs/credentials
+artifacts/purple-team-dashboard dev: Error: socket hang up
+artifacts/purple-team-dashboard dev:     at Socket.socketOnEnd (node:_http_client:792:25)
+artifacts/purple-team-dashboard dev:     at Socket.emit (node:events:526:24)
+artifacts/purple-team-dashboard dev:     at endReadableNT (node:internal/streams/readable:1772:12)
+artifacts/purple-team-dashboard dev:     at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+artifacts/purple-team-dashboard dev: 5:50:06 PM [vite] http proxy error: /api/cs/credentials
+artifacts/purple-team-dashboard dev: Error: read ECONNRESET
+artifacts/purple-team-dashboard dev:     at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
+artifacts/purple-team-dashboard dev: 5:50:07 PM [vite] http proxy error: /api/cs/credentials
+artifacts/purple-team-dashboard dev: Error: read ECONNRESET
+artifacts/purple-team-dashboard dev:     at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
+artifacts/purple-team-dashboard dev: 5:50:07 PM [vite] http proxy error: /api/cs/credentials
+artifacts/purple-team-dashboard dev: Error: read ECONNRESET
+artifacts/purple-team-dashboard dev:     at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
