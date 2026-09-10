@@ -30,6 +30,23 @@ export type AutoAssessment = {
   reviewedAt?: string;
   previousIntentScore?: number;
   previousCapabilityScore?: number;
+  scoringContext?: ScoringContext;
+  contextMatches?: ContextMatches;
+  contextIntentModifier?: number;
+  contextCapabilityModifier?: number;
+};
+
+export type ScoringContext = {
+  industries: string[];
+  technologies: string[];
+  countries: string[];
+};
+
+export type ContextMatches = {
+  industries: string[];
+  technologies: string[];
+  countries: string[];
+  sources: string[];
 };
 
 type ActorForScoring = {
@@ -38,6 +55,9 @@ type ActorForScoring = {
   malware: string;
   actorType: string;
   motivation: string;
+  countries?: string[];
+  industries?: string[];
+  description?: string;
   effectiveIntentScore?: number;
   effectiveCapabilityScore?: number;
 };
@@ -112,10 +132,20 @@ function rationale(kind: "intent" | "willingness" | "capability" | "novelty", sc
   return score === 0 ? labels.novelty[0] : score === -1 ? labels.novelty[1] : labels.novelty[2];
 }
 
+function normalizedTerms(values: string[]): string[] {
+  return [...new Set(values.map(value => value.trim().toLowerCase()).filter(Boolean))];
+}
+
+function matchingTerms(values: string[], text: string): string[] {
+  const haystack = text.toLowerCase();
+  return normalizedTerms(values).filter(value => haystack.includes(value));
+}
+
 export function generateQuarterlyAssessments(
   quarter: string,
   actors: ActorForScoring[],
   liveData: LiveActorData | null,
+  scoringContext: ScoringContext = { industries: [], technologies: [], countries: [] },
 ): AutoAssessment[] {
   const bounds = quarterBounds(quarter);
   if (!bounds || !liveData) return [];
@@ -134,12 +164,41 @@ export function generateQuarterlyAssessments(
     let capability = 1;
     let novelty = -2;
     const evidence: AssessmentEvidence[] = [];
+    const profileText = [
+      ...(actor.countries ?? []),
+      ...(actor.industries ?? []),
+      actor.malware,
+      actor.description ?? "",
+    ].join(" ");
+    const procedureContextText = procedures.map(procedure => [
+      procedure.tacticName,
+      procedure.techniqueName,
+      procedure.procedure,
+      procedure.externalRef,
+      ...procedure.reportRefs,
+    ].join(" ")).join(" ");
+    const industryMatches = [...new Set([
+      ...matchingTerms(scoringContext.industries, profileText),
+      ...matchingTerms(scoringContext.industries, procedureContextText),
+    ])];
+    const countryMatches = [...new Set([
+      ...matchingTerms(scoringContext.countries, profileText),
+      ...matchingTerms(scoringContext.countries, procedureContextText),
+    ])];
+    const technologyMatches = [...new Set([
+      ...matchingTerms(scoringContext.technologies, profileText),
+      ...matchingTerms(scoringContext.technologies, procedureContextText),
+    ])];
+    const contextSources: string[] = [];
+    if (matchingTerms([...scoringContext.industries, ...scoringContext.countries, ...scoringContext.technologies], profileText).length) {
+      contextSources.push("actor profile");
+    }
+    if (matchingTerms([...scoringContext.industries, ...scoringContext.countries, ...scoringContext.technologies], procedureContextText).length) {
+      contextSources.push("quarter procedures or report names");
+    }
 
     for (const procedure of procedures) {
-      // Suggestions intentionally use only the dated TID and procedure text
-      // from the selected quarter; actor metadata and out-of-quarter activity
-      // must not influence the recommendation.
-      const text = `${procedure.mitreId} ${procedure.procedure}`;
+      const text = `${procedure.mitreId} ${procedure.tacticName} ${procedure.techniqueName} ${procedure.procedure} ${procedure.externalRef} ${procedure.reportRefs.join(" ")}`;
       const signals: string[] = [];
       for (const signal of INTENT_SIGNALS) {
         if (signal.re.test(text)) {
@@ -171,6 +230,12 @@ export function generateQuarterlyAssessments(
       ? "high"
       : procedures.length >= 2 && distinctSignals >= 1 ? "medium" : "low";
     const willingness = 0;
+    const contextIntentModifier = Math.min(2, Number(industryMatches.length > 0) + Number(countryMatches.length > 0));
+    const technologyCapabilityBoost = technologyMatches.length > 0 ? 1 : 0;
+    const demonstratedTargetingBoost =
+      contextSources.includes("quarter procedures or report names") &&
+      (industryMatches.length > 0 || countryMatches.length > 0) ? 1 : 0;
+    const contextCapabilityModifier = Math.min(2, technologyCapabilityBoost + demonstratedTargetingBoost);
 
     assessments.push({
       actorName: actor.name,
@@ -181,8 +246,8 @@ export function generateQuarterlyAssessments(
       willingnessModifier: willingness,
       capabilityBaseScore: capability,
       noveltyModifier: novelty,
-      intentFinalScore: Math.max(1, Math.min(5, intent + willingness)),
-      capabilityFinalScore: Math.max(1, Math.min(5, capability + novelty)),
+      intentFinalScore: Math.max(1, Math.min(5, intent + willingness + contextIntentModifier)),
+      capabilityFinalScore: Math.max(1, Math.min(5, capability + novelty + contextCapabilityModifier)),
       confidence,
       procedureCount: procedures.length,
       evidence,
@@ -192,6 +257,15 @@ export function generateQuarterlyAssessments(
       noveltyRationale: rationale("novelty", novelty),
       previousIntentScore: actor.effectiveIntentScore,
       previousCapabilityScore: actor.effectiveCapabilityScore,
+      scoringContext,
+      contextMatches: {
+        industries: industryMatches,
+        technologies: technologyMatches,
+        countries: countryMatches,
+        sources: contextSources,
+      },
+      contextIntentModifier,
+      contextCapabilityModifier,
     });
   }
   return assessments;

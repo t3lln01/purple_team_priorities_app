@@ -5,7 +5,7 @@ import { useSortTable } from "@/hooks/useSortTable";
 import SortableTh from "@/components/SortableTh";
 import AssessmentReviewPanel from "@/components/AssessmentReviewPanel";
 import { useAppData } from "@/context/AppDataContext";
-import { generateQuarterlyAssessments, sourceQuarterForAssessment, type AutoAssessment } from "@/utils/quarterlyAutoScoring";
+import { generateQuarterlyAssessments, sourceQuarterForAssessment, type AutoAssessment, type ScoringContext } from "@/utils/quarterlyAutoScoring";
 import {
   ChevronDown, ChevronRight, Shield, Target, Zap, Globe, X,
   RefreshCw, Plus, Check, AlertCircle, Search, Eye, EyeOff,
@@ -1270,7 +1270,7 @@ export default function ThreatModel() {
         date: typeof procedure.date === "number" ? procedure.date : null,
         externalRef: String(procedure.externalRef ?? ""),
         risk: Number(procedure.risk) || 0,
-        reportRefs: [],
+        reportRefs: procedure.externalRef ? [String(procedure.externalRef)] : [],
       })),
       actorRanking: [],
       label: "Bundled procedure dataset",
@@ -1304,6 +1304,11 @@ export default function ThreatModel() {
   const [showFramework, setShowFramework] = useState(false);
   const [showAdd, setShowAdd]             = useState(false);
   const [showAssessmentReview, setShowAssessmentReview] = useState(false);
+  const [scoringContext, setScoringContext] = useState<ScoringContext>({
+    industries: [],
+    technologies: [],
+    countries: [],
+  });
   const [refreshingNames, setRefreshingNames] = useState<Set<string>>(new Set());
   const [refreshAllRunning, setRefreshAllRunning] = useState(false);
   const [refreshMsg, setRefreshMsg]       = useState<{ text: string; type: "ok" | "err" } | null>(null);
@@ -1549,13 +1554,14 @@ export default function ThreatModel() {
     return [...staticMerged, ...customMerged];
   }, [staticActors, customActors, actorOverrides, ppTapList, sirtList, liveLastActive, autoAssessments]);
 
-  function generateAssessments() {
-    const generated = generateQuarterlyAssessments(selectedQuarter, mergedActors, procedureSource);
+  function generateAssessments(context: ScoringContext = scoringContext) {
+    const generated = generateQuarterlyAssessments(selectedQuarter, mergedActors, procedureSource, context);
     const next = Object.fromEntries(generated.map(item => [item.actorName, item]));
     setAutoAssessments(next);
     setShowAssessmentReview(true);
     void persistState({ autoAssessments: next });
-    showMsg(`Generated ${generated.length} suggestions for ${selectedQuarter} from ${sourceQuarterForAssessment(selectedQuarter)} procedures`);
+    const contextCount = context.industries.length + context.technologies.length + context.countries.length;
+    showMsg(`Generated ${generated.length} suggestions for ${selectedQuarter}${contextCount ? ` with ${contextCount} context filters` : ""}`);
   }
 
   async function decideAssessments(names: string[], status: "approved" | "rejected") {
@@ -1898,7 +1904,7 @@ export default function ThreatModel() {
                 {showFramework ? "Hide" : "Show"} Scoring Framework
               </button>
               <button
-                onClick={generateAssessments}
+                onClick={() => generateAssessments()}
                 disabled={!procedureSource.procedures.length}
                 title={`Generate ${selectedQuarter} score suggestions from ${sourceQuarterForAssessment(selectedQuarter)} procedures`}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg border border-violet-400/30 bg-violet-400/10 text-xs text-violet-300 hover:bg-violet-400/20 transition-colors disabled:opacity-40"
@@ -1944,6 +1950,9 @@ export default function ThreatModel() {
           assessments={Object.values(autoAssessments).sort((a, b) => a.actorName.localeCompare(b.actorName))}
           onClose={() => setShowAssessmentReview(false)}
           onDecide={decideAssessments}
+          scoringContext={scoringContext}
+          onScoringContextChange={setScoringContext}
+          onRegenerate={generateAssessments}
         />
       )}
 
