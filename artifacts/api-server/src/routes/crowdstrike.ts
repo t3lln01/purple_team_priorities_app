@@ -1,11 +1,11 @@
 import { Router } from "express";
 import fs from "fs/promises";
 import path from "path";
-import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
-const ROOT       = path.resolve(__dirname, "../..");
+// The production bundle is CommonJS, where import.meta.url is empty. Resolve
+// persisted API state from the workspace root instead so both dev and publish
+// runs use the same artifact directory.
+const ROOT       = path.resolve(process.cwd(), "artifacts/api-server");
 const SYNC_FILE  = path.join(ROOT, "cs-sync-state.json");
 const CREDS_FILE = path.join(ROOT, "cs-credentials.json");
 
