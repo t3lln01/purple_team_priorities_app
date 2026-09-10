@@ -1,12 +1,16 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import threatModelData from "@/threatModelData.json";
+import dashboardData from "@/data.json";
 import { useSortTable } from "@/hooks/useSortTable";
 import SortableTh from "@/components/SortableTh";
+import AssessmentReviewPanel from "@/components/AssessmentReviewPanel";
+import { useAppData } from "@/context/AppDataContext";
+import { generateQuarterlyAssessments, type AutoAssessment } from "@/utils/quarterlyAutoScoring";
 import {
   ChevronDown, ChevronRight, Shield, Target, Zap, Globe, X,
   RefreshCw, Plus, Check, AlertCircle, Search, Eye, EyeOff,
   Loader2, Trash2, Edit2, BookOpen, Pencil, Tag, ListX, ArrowUp,
-  History, ChevronDown as ChevronDownSm, Save,
+  History, ChevronDown as ChevronDownSm, Save, ClipboardCheck,
 } from "lucide-react";
 
 const CS_API = "/api";
@@ -81,6 +85,8 @@ type ActorOverride = {
   intentFinalScore?: number | null;     // derived: intentBaseScore + willingnessModifier
   capabilityFinalScore?: number | null; // derived: capabilityBaseScore + noveltyModifier
 } & RubricScores;
+
+type AutoAssessmentMap = Record<string, AutoAssessment>;
 
 type MergedActor = BaseActor & {
   isCustom: boolean;
@@ -226,6 +232,7 @@ function saveToLocalStorage(state: {
   actorOverrides: Record<string, ActorOverride>;
   ppTapList: string[];
   sirtList: string[];
+  autoAssessments: AutoAssessmentMap;
 }) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch { /* quota */ }
 }
@@ -1249,6 +1256,27 @@ function AddActorModal({
 type TabId = "actors" | "pptap" | "sirt";
 
 export default function ThreatModel() {
+  const { liveActorData } = useAppData();
+  const procedureSource = useMemo(() => {
+    if (liveActorData?.procedures?.length) return liveActorData;
+    const source = dashboardData as any;
+    return {
+      procedures: (source.allProcedures ?? []).map((procedure: any) => ({
+        actor: String(procedure.actor ?? ""),
+        mitreId: String(procedure.mitreId ?? ""),
+        tacticName: (source.techTacticMap?.[procedure.mitreId] ?? []).join(", "),
+        techniqueName: String(source.techNameMap?.[procedure.mitreId] ?? ""),
+        procedure: String(procedure.procedure ?? ""),
+        date: typeof procedure.date === "number" ? procedure.date : null,
+        externalRef: String(procedure.externalRef ?? ""),
+        risk: Number(procedure.risk) || 0,
+        reportRefs: [],
+      })),
+      actorRanking: [],
+      label: "Bundled procedure dataset",
+      loadedAt: new Date(0).toISOString(),
+    };
+  }, [liveActorData]);
   // Quarter versioning
   const [selectedQuarter, setSelectedQuarter] = useState<string>(QUARTER_LABEL);
   const [savedVersions, setSavedVersions]     = useState<Array<{
@@ -1263,6 +1291,7 @@ export default function ThreatModel() {
   const [actorOverrides, setActorOverrides] = useState<Record<string, ActorOverride>>({});
   const [ppTapList, setPpTapList]           = useState<string[]>([]);
   const [sirtList, setSirtList]             = useState<string[]>([]);
+  const [autoAssessments, setAutoAssessments] = useState<AutoAssessmentMap>({});
   const [liveLastActive, setLiveLastActive] = useState<Record<string, string>>({});
   const [serverLoading, setServerLoading]   = useState(true);
 
@@ -1274,6 +1303,7 @@ export default function ThreatModel() {
   const [monitoredOnly, setMonitoredOnly] = useState(false);
   const [showFramework, setShowFramework] = useState(false);
   const [showAdd, setShowAdd]             = useState(false);
+  const [showAssessmentReview, setShowAssessmentReview] = useState(false);
   const [refreshingNames, setRefreshingNames] = useState<Set<string>>(new Set());
   const [refreshAllRunning, setRefreshAllRunning] = useState(false);
   const [refreshMsg, setRefreshMsg]       = useState<{ text: string; type: "ok" | "err" } | null>(null);
@@ -1313,6 +1343,7 @@ export default function ThreatModel() {
         if (data.ok) {
           setCustomActors(data.customActors ?? []);
           setActorOverrides(data.actorOverrides ?? {});
+          setAutoAssessments(data.autoAssessments ?? {});
           const loadedPpTap: string[] = data.ppTapList ?? [];
           const loadedSirt: string[]  = data.sirtList ?? [];
           // Seed defaults only for the current quarter
@@ -1326,6 +1357,7 @@ export default function ThreatModel() {
               actorOverrides: data.actorOverrides ?? {},
               ppTapList: loadedPpTap.length > 0 ? loadedPpTap : SEED_PPTAP,
               sirtList:  loadedSirt.length  > 0 ? loadedSirt  : SEED_SIRT,
+              autoAssessments: data.autoAssessments ?? {},
             });
           }
           loaded = true;
@@ -1338,6 +1370,7 @@ export default function ThreatModel() {
         if (ls) {
           setCustomActors(ls.customActors ?? []);
           setActorOverrides(ls.actorOverrides ?? {});
+          setAutoAssessments(ls.autoAssessments ?? {});
           const lsPpTap: string[] = ls.ppTapList ?? [];
           const lsSirt: string[]  = ls.sirtList ?? [];
           setPpTapList(lsPpTap.length > 0 ? lsPpTap : SEED_PPTAP);
@@ -1349,6 +1382,7 @@ export default function ThreatModel() {
         setActorOverrides({});
         setPpTapList([]);
         setSirtList([]);
+        setAutoAssessments({});
       }
       setServerLoading(false);
     })();
@@ -1393,51 +1427,55 @@ export default function ThreatModel() {
       actorOverrides?: Record<string, ActorOverride>;
       ppTapList?: string[];
       sirtList?: string[];
+      autoAssessments?: AutoAssessmentMap;
     }
   ) => {
     const ca    = next.customActors   ?? customActors;
     const ovr   = next.actorOverrides ?? actorOverrides;
     const pptap = next.ppTapList      ?? ppTapList;
     const sirt  = next.sirtList       ?? sirtList;
+    const assessments = next.autoAssessments ?? autoAssessments;
     // Mirror current quarter to localStorage for offline fallback
     if (selectedQuarter === QUARTER_LABEL) {
-      saveToLocalStorage({ customActors: ca, actorOverrides: ovr, ppTapList: pptap, sirtList: sirt });
+      saveToLocalStorage({ customActors: ca, actorOverrides: ovr, ppTapList: pptap, sirtList: sirt, autoAssessments: assessments });
     }
     try {
       const res = await fetch(`${CS_API}/cs/threat-model-state`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customActors: ca, actorOverrides: ovr, ppTapList: pptap, sirtList: sirt, quarter: selectedQuarter }),
+        body: JSON.stringify({ customActors: ca, actorOverrides: ovr, ppTapList: pptap, sirtList: sirt, autoAssessments: assessments, quarter: selectedQuarter }),
       });
       const data = await res.json();
       if (data.ok) {
         // Keep versions list fresh after a save
         setSavedVersions(prev => {
           const exists = prev.find(v => v.quarter === selectedQuarter);
-          const entry = { quarter: selectedQuarter, savedAt: new Date().toISOString(), actorCount: ca.length, overrideCount: Object.keys(ovr).length };
+          const entry = { quarter: selectedQuarter, savedAt: new Date().toISOString(), seededFrom: exists?.seededFrom ?? null, actorCount: ca.length, overrideCount: Object.keys(ovr).length };
           return exists ? prev.map(v => v.quarter === selectedQuarter ? entry : v) : [...prev, entry];
         });
       }
     } catch { /* offline — localStorage copy already saved above */ }
-  }, [customActors, actorOverrides, ppTapList, sirtList, selectedQuarter]);
+  }, [customActors, actorOverrides, ppTapList, sirtList, autoAssessments, selectedQuarter]);
 
   // ── Merge static + custom actors, compute effective scores ────────────────
   const mergedActors = useMemo((): MergedActor[] => {
     const staticMerged: MergedActor[] = staticActors.map(a => {
       const ovr = actorOverrides[a.name] ?? {};
       const csData = ovr.csData ?? {};
+      const auto = autoAssessments[a.name];
+      const approvedAuto = auto?.status === "approved" ? auto : null;
 
       // Base intent/capability: manual override → csData → static
       const baseIntent = ovr.intentFinalScore !== undefined && ovr.intentFinalScore !== null
         ? ovr.intentFinalScore
         : (csData.intentFinalScore !== undefined && csData.intentFinalScore !== null
           ? csData.intentFinalScore
-          : a.intentFinalScore);
+          : (approvedAuto?.intentFinalScore ?? a.intentFinalScore));
       const baseCap = ovr.capabilityFinalScore !== undefined && ovr.capabilityFinalScore !== null
         ? ovr.capabilityFinalScore
         : (csData.capabilityFinalScore !== undefined && csData.capabilityFinalScore !== null
           ? csData.capabilityFinalScore
-          : a.capabilityFinalScore);
+          : (approvedAuto?.capabilityFinalScore ?? a.capabilityFinalScore));
 
       const mergedMalware = (csData as any).malware ?? a.malware;
       const inPpTap = matchesList(a.name, mergedMalware ?? "", ppTapList);
@@ -1464,14 +1502,14 @@ export default function ThreatModel() {
         inPpTap,
         inSirt,
         // Rubric selections: override wins over static Excel data
-        intentRationale:      ovr.intentRationale      ?? a.intent      ?? "",
-        willingnessRationale: ovr.willingnessRationale ?? a.willingness  ?? "",
-        capabilityRationale:  ovr.capabilityRationale  ?? a.capabilities ?? "",
-        noveltyRationale:     ovr.noveltyRationale     ?? a.novelty      ?? "",
-        intentBaseScore:      ovr.intentBaseScore      !== undefined ? ovr.intentBaseScore      : a.intentScore,
-        willingnessModifier:  ovr.willingnessModifier  !== undefined ? ovr.willingnessModifier  : a.willingnessScore,
-        capabilityBaseScore:  ovr.capabilityBaseScore  !== undefined ? ovr.capabilityBaseScore  : a.capabilitiesScore,
-        noveltyModifier:      ovr.noveltyModifier      !== undefined ? ovr.noveltyModifier      : a.noveltyScore,
+        intentRationale:      ovr.intentRationale      ?? approvedAuto?.intentRationale ?? a.intent      ?? "",
+        willingnessRationale: ovr.willingnessRationale ?? approvedAuto?.willingnessRationale ?? a.willingness  ?? "",
+        capabilityRationale:  ovr.capabilityRationale  ?? approvedAuto?.capabilityRationale ?? a.capabilities ?? "",
+        noveltyRationale:     ovr.noveltyRationale     ?? approvedAuto?.noveltyRationale ?? a.novelty      ?? "",
+        intentBaseScore:      ovr.intentBaseScore      !== undefined ? ovr.intentBaseScore      : (approvedAuto?.intentBaseScore ?? a.intentScore),
+        willingnessModifier:  ovr.willingnessModifier  !== undefined ? ovr.willingnessModifier  : (approvedAuto?.willingnessModifier ?? a.willingnessScore),
+        capabilityBaseScore:  ovr.capabilityBaseScore  !== undefined ? ovr.capabilityBaseScore  : (approvedAuto?.capabilityBaseScore ?? a.capabilitiesScore),
+        noveltyModifier:      ovr.noveltyModifier      !== undefined ? ovr.noveltyModifier      : (approvedAuto?.noveltyModifier ?? a.noveltyScore),
       };
     });
 
@@ -1509,7 +1547,27 @@ export default function ThreatModel() {
     });
 
     return [...staticMerged, ...customMerged];
-  }, [staticActors, customActors, actorOverrides, ppTapList, sirtList, liveLastActive]);
+  }, [staticActors, customActors, actorOverrides, ppTapList, sirtList, liveLastActive, autoAssessments]);
+
+  function generateAssessments() {
+    const generated = generateQuarterlyAssessments(selectedQuarter, mergedActors, procedureSource);
+    const next = Object.fromEntries(generated.map(item => [item.actorName, item]));
+    setAutoAssessments(next);
+    setShowAssessmentReview(true);
+    void persistState({ autoAssessments: next });
+    showMsg(`Generated ${generated.length} evidence-backed suggestions for ${selectedQuarter}`);
+  }
+
+  async function decideAssessments(names: string[], status: "approved" | "rejected") {
+    const reviewedAt = new Date().toISOString();
+    const next = { ...autoAssessments };
+    for (const name of names) {
+      if (next[name]) next[name] = { ...next[name], status, reviewedAt };
+    }
+    setAutoAssessments(next);
+    await persistState({ autoAssessments: next });
+    showMsg(`${status === "approved" ? "Approved" : "Rejected"} ${names.length} suggestions`);
+  }
 
   // ── Save intent/capability scores for an actor ────────────────────────────
   async function saveScores(name: string, scores: {
@@ -1840,6 +1898,15 @@ export default function ThreatModel() {
                 {showFramework ? "Hide" : "Show"} Scoring Framework
               </button>
               <button
+                onClick={generateAssessments}
+                disabled={!procedureSource.procedures.length}
+                title={`Generate ${selectedQuarter} score suggestions from ${liveActorData?.procedures?.length ? "live" : "bundled"} procedures`}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-violet-400/30 bg-violet-400/10 text-xs text-violet-300 hover:bg-violet-400/20 transition-colors disabled:opacity-40"
+              >
+                <ClipboardCheck className="w-3.5 h-3.5" />
+                Review Suggested Scores
+              </button>
+              <button
                 onClick={refreshAll}
                 disabled={refreshAllRunning || monitored === 0}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-xs text-cyan-400 hover:bg-cyan-400/20 transition-colors disabled:opacity-40"
@@ -1868,6 +1935,16 @@ export default function ThreatModel() {
           {refreshMsg.type === "ok" ? <Check className="w-4 h-4 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
           {refreshMsg.text}
         </div>
+      )}
+
+      {/* Summary cards */}
+      {showAssessmentReview && activeTab === "actors" && (
+        <AssessmentReviewPanel
+          quarter={selectedQuarter}
+          assessments={Object.values(autoAssessments).sort((a, b) => a.actorName.localeCompare(b.actorName))}
+          onClose={() => setShowAssessmentReview(false)}
+          onDecide={decideAssessments}
+        />
       )}
 
       {/* Summary cards */}

@@ -94,7 +94,7 @@ function reply(req: Request, res: Response, data: any[], metaExtra: Record<strin
     res.setHeader("Content-Disposition", `attachment; filename="${req.path.replace(/\//g, "-").slice(1)}.csv"`);
     return res.send(toCsv(data));
   }
-  res.json({ ok: true, meta: meta(req, data, metaExtra), data });
+  return res.json({ ok: true, meta: meta(req, data, metaExtra), data });
 }
 
 // ── Discovery endpoint ─────────────────────────────────────────────────────────
@@ -350,7 +350,7 @@ exportRouter.get("/export/threat-model", async (req, res) => {
       return res.send(toCsv(allActors));
     }
 
-    res.json({
+    return res.json({
       ok:   true,
       meta: {
         endpoint:    req.path,
@@ -363,7 +363,7 @@ exportRouter.get("/export/threat-model", async (req, res) => {
       data: payload,
     });
   } catch (err: any) {
-    res.status(500).json({ ok: false, error: err.message });
+    return res.status(500).json({ ok: false, error: err.message });
   }
 });
 
@@ -497,7 +497,7 @@ exportRouter.get("/export/high-value-assets", async (req, res) => {
       return res.send(toCsv(hva));
     }
 
-    res.json({
+    return res.json({
       ok:   true,
       meta: {
         endpoint:    req.path,
@@ -513,7 +513,7 @@ exportRouter.get("/export/high-value-assets", async (req, res) => {
       },
     });
   } catch (err: any) {
-    res.status(500).json({ ok: false, error: err.message });
+    return res.status(500).json({ ok: false, error: err.message });
   }
 });
 
