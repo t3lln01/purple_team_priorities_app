@@ -2,10 +2,12 @@ import { Router } from "express";
 import fs from "fs/promises";
 import path from "path";
 
-// The production bundle is CommonJS, where import.meta.url is empty. Resolve
-// persisted API state from the workspace root instead so both dev and publish
-// runs use the same artifact directory.
-const ROOT       = path.resolve(process.cwd(), "artifacts/api-server");
+// The production bundle is CommonJS, where import.meta.url is empty. Filtered
+// pnpm dev runs start inside this artifact, while publish starts at workspace
+// root, so support both working directories explicitly.
+const ROOT       = path.basename(process.cwd()) === "api-server"
+  ? process.cwd()
+  : path.resolve(process.cwd(), "artifacts/api-server");
 const SYNC_FILE  = path.join(ROOT, "cs-sync-state.json");
 const CREDS_FILE = path.join(ROOT, "cs-credentials.json");
 

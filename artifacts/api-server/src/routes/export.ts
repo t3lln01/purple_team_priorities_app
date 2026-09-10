@@ -15,7 +15,9 @@ import fs   from "fs/promises";
 import path from "path";
 
 // Paths to static data files bundled with the frontend
-const ROOT_API      = path.resolve(process.cwd(), "artifacts/api-server");
+const ROOT_API      = path.basename(process.cwd()) === "api-server"
+  ? process.cwd()
+  : path.resolve(process.cwd(), "artifacts/api-server");
 const DASHBOARD_SRC = path.resolve(ROOT_API, "../purple-team-dashboard/src");
 const DATA_FILE     = path.join(DASHBOARD_SRC, "data.json");
 const TM_FILE       = path.join(DASHBOARD_SRC, "threatModelData.json");
