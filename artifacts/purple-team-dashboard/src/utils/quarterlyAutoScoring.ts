@@ -59,12 +59,26 @@ const CAPABILITY_SIGNALS = [
 const NOVELTY_HIGH = /\b(zero.?day|0day|custom malware|custom tool|novel|previously unknown|bespoke)\b/i;
 const NOVELTY_COMMON = /\b(mimikatz|cobalt strike|powershell|rclone|psexec|publicly available|open.source|commodity)\b/i;
 
-export function quarterBounds(label: string): { start: number; end: number } | null {
+export function sourceQuarterForAssessment(label: string): string | null {
   const match = label.match(/^Q([1-4])\s+(\d{4})$/);
   if (!match) return null;
   const q = Number(match[1]);
   const year = Number(match[2]);
-  // Fiscal quarters are labelled by the year in which they end:
+  // A view is published at the start of its quarter and assesses the
+  // immediately preceding completed quarter:
+  // Q4 2026 → Q3 2026 → June–August 2026.
+  const sourceQ = q === 1 ? 4 : q - 1;
+  const sourceYear = q === 1 ? year - 1 : year;
+  return `Q${sourceQ} ${sourceYear}`;
+}
+
+export function quarterBounds(label: string): { start: number; end: number } | null {
+  const sourceLabel = sourceQuarterForAssessment(label);
+  const match = sourceLabel?.match(/^Q([1-4])\s+(\d{4})$/);
+  if (!match) return null;
+  const q = Number(match[1]);
+  const year = Number(match[2]);
+  // Fiscal quarters are labelled by the year in which Q1–Q3 occur:
   // Q1 = Dec–Feb, Q2 = Mar–May, Q3 = Jun–Aug, Q4 = Sep–Nov.
   const starts = [[year - 1, 11], [year, 2], [year, 5], [year, 8]] as const;
   const [startYear, startMonth] = starts[q - 1];

@@ -5,7 +5,7 @@ import { useSortTable } from "@/hooks/useSortTable";
 import SortableTh from "@/components/SortableTh";
 import AssessmentReviewPanel from "@/components/AssessmentReviewPanel";
 import { useAppData } from "@/context/AppDataContext";
-import { generateQuarterlyAssessments, type AutoAssessment } from "@/utils/quarterlyAutoScoring";
+import { generateQuarterlyAssessments, sourceQuarterForAssessment, type AutoAssessment } from "@/utils/quarterlyAutoScoring";
 import {
   ChevronDown, ChevronRight, Shield, Target, Zap, Globe, X,
   RefreshCw, Plus, Check, AlertCircle, Search, Eye, EyeOff,
@@ -191,17 +191,18 @@ function fmtDate(iso: string | null) {
   });
 }
 
-/** Returns "Q1 2026" etc. for fiscal quarters Dec–Feb, Mar–May, Jun–Aug, Sep–Nov. */
+/** Returns the latest published view. Views are created on quarter boundaries. */
 function currentQuarterLabel(): string {
   const now = new Date();
   const month = now.getMonth() + 1; // 1–12
   const year  = now.getFullYear();
   let q: number;
   let qYear = year;
-  if (month <= 2)        { q = 1; qYear = year; }
-  else if (month <= 5)   { q = 2; qYear = year; }
-  else if (month <= 8)   { q = 3; qYear = year; }
-  else                   { q = 4; qYear = year; }
+  if (month <= 2)        { q = 4; qYear = year - 1; }
+  else if (month <= 5)   { q = 1; }
+  else if (month <= 8)   { q = 2; }
+  else if (month <= 11)  { q = 3; }
+  else                   { q = 4; }
   return `Q${q} ${qYear}`;
 }
 
@@ -1554,7 +1555,7 @@ export default function ThreatModel() {
     setAutoAssessments(next);
     setShowAssessmentReview(true);
     void persistState({ autoAssessments: next });
-    showMsg(`Generated ${generated.length} evidence-backed suggestions for ${selectedQuarter}`);
+    showMsg(`Generated ${generated.length} suggestions for ${selectedQuarter} from ${sourceQuarterForAssessment(selectedQuarter)} procedures`);
   }
 
   async function decideAssessments(names: string[], status: "approved" | "rejected") {
@@ -1899,7 +1900,7 @@ export default function ThreatModel() {
               <button
                 onClick={generateAssessments}
                 disabled={!procedureSource.procedures.length}
-                title={`Generate ${selectedQuarter} score suggestions from ${liveActorData?.procedures?.length ? "live" : "bundled"} procedures`}
+                title={`Generate ${selectedQuarter} score suggestions from ${sourceQuarterForAssessment(selectedQuarter)} procedures`}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg border border-violet-400/30 bg-violet-400/10 text-xs text-violet-300 hover:bg-violet-400/20 transition-colors disabled:opacity-40"
               >
                 <ClipboardCheck className="w-3.5 h-3.5" />

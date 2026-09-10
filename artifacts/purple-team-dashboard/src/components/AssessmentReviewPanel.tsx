@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Check, ChevronDown, ChevronRight, ClipboardCheck, X } from "lucide-react";
 import type { AutoAssessment, AssessmentStatus } from "@/utils/quarterlyAutoScoring";
+import { sourceQuarterForAssessment } from "@/utils/quarterlyAutoScoring";
 
 type Props = {
   quarter: string;
@@ -49,7 +50,7 @@ export default function AssessmentReviewPanel({ quarter, assessments, onClose, o
             Quarterly score review · {quarter}
           </h3>
           <p className="text-xs text-muted-foreground mt-1">
-            Deterministic suggestions from procedure text. Approvals are stored separately and never replace manual overrides.
+            Deterministic suggestions from {sourceQuarterForAssessment(quarter)} TIDs and procedure text. Approvals are stored separately and never replace manual overrides.
           </p>
         </div>
         <button onClick={onClose} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent">
