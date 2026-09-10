@@ -64,10 +64,12 @@ export function quarterBounds(label: string): { start: number; end: number } | n
   if (!match) return null;
   const q = Number(match[1]);
   const year = Number(match[2]);
-  const starts = [[year, 1], [year, 4], [year, 7], [year, 10]] as const;
+  // Fiscal quarters are labelled by the year in which they end:
+  // Q1 = Dec–Feb, Q2 = Mar–May, Q3 = Jun–Aug, Q4 = Sep–Nov.
+  const starts = [[year - 1, 11], [year, 2], [year, 5], [year, 8]] as const;
   const [startYear, startMonth] = starts[q - 1];
-  const endYear = q === 4 ? year + 1 : startYear;
-  const endMonth = q === 4 ? 1 : startMonth + 3;
+  const endYear = q === 1 ? year : startYear;
+  const endMonth = q === 1 ? 2 : startMonth + 3;
   return {
     start: Date.UTC(startYear, startMonth, 1),
     end: Date.UTC(endYear, endMonth, 1) - 1,
@@ -123,7 +125,10 @@ export function generateQuarterlyAssessments(
     const evidence: AssessmentEvidence[] = [];
 
     for (const procedure of procedures) {
-      const text = `${procedure.procedure} ${procedure.techniqueName} ${procedure.tacticName}`;
+      // Suggestions intentionally use only the dated TID and procedure text
+      // from the selected quarter; actor metadata and out-of-quarter activity
+      // must not influence the recommendation.
+      const text = `${procedure.mitreId} ${procedure.procedure}`;
       const signals: string[] = [];
       for (const signal of INTENT_SIGNALS) {
         if (signal.re.test(text)) {

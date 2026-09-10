@@ -191,18 +191,17 @@ function fmtDate(iso: string | null) {
   });
 }
 
-/** Returns "Q1 2026" etc. based on fiscal quarters starting Feb/May/Aug/Nov */
+/** Returns "Q1 2026" etc. for fiscal quarters Dec–Feb, Mar–May, Jun–Aug, Sep–Nov. */
 function currentQuarterLabel(): string {
   const now = new Date();
   const month = now.getMonth() + 1; // 1–12
   const year  = now.getFullYear();
   let q: number;
   let qYear = year;
-  if (month === 1)        { q = 4; qYear = year - 1; } // Jan belongs to Q4 of prior year
-  else if (month <= 4)    { q = 1; }
-  else if (month <= 7)    { q = 2; }
-  else if (month <= 10)   { q = 3; }
-  else                    { q = 4; }
+  if (month <= 2)        { q = 1; qYear = year; }
+  else if (month <= 5)   { q = 2; qYear = year; }
+  else if (month <= 8)   { q = 3; qYear = year; }
+  else                   { q = 4; qYear = year; }
   return `Q${q} ${qYear}`;
 }
 

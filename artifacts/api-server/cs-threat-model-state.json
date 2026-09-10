@@ -120,5 +120,1180 @@
     "SNARKY SPIDER",
     "STATIC KITTEN",
     "VICE SPIDER"
-  ]
+  ],
+  "autoAssessments": {
+    "AVIATOR SPIDER": {
+      "actorName": "AVIATOR SPIDER",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.219Z",
+      "status": "pending",
+      "intentBaseScore": 5,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 4,
+      "noveltyModifier": -1,
+      "intentFinalScore": 5,
+      "capabilityFinalScore": 3,
+      "confidence": "high",
+      "procedureCount": 12,
+      "evidence": [
+        {
+          "mitreId": "T1566.002",
+          "date": 1787066269000,
+          "excerpt": "[AVIATOR SPIDER] - AVIATOR SPIDER sends phishing emails with links to malicious downloaders AVIATOR SPIDER sent phishing emails containing links to file hosting sites initiating the installation of UpCrypter. Heavy us…",
+          "signals": [
+            "established operational tooling"
+          ]
+        },
+        {
+          "mitreId": "T1059.001",
+          "date": 1787066269000,
+          "excerpt": "[AVIATOR SPIDER] - AVIATOR SPIDER leveraged second stage UpCrypter PS downloaders. Secondary Snip3 PS stagers decrypt and load payloads into memory",
+          "signals": [
+            "established operational tooling",
+            "generally available tooling"
+          ]
+        },
+        {
+          "mitreId": "T1059.003",
+          "date": 1787066269000,
+          "excerpt": "[AVIATOR SPIDER] - AVIATOR SPIDER deployed an intermediary batch script downloader.",
+          "signals": [
+            "established operational tooling",
+            "basic executable capability"
+          ]
+        },
+        {
+          "mitreId": "T1204.001",
+          "date": 1787066269000,
+          "excerpt": "[AVIATOR SPIDER] - AVIATOR SPIDER enticed the user to click on a link within a phishing email to initiate the download.",
+          "signals": [
+            "established operational tooling",
+            "basic executable capability"
+          ]
+        },
+        {
+          "mitreId": "T1027.009",
+          "date": 1787066269000,
+          "excerpt": "[AVIATOR SPIDER] - AVIATOR SPIDER used a base-64 encoded UpCrypter second stage embedded into either a JS or PS first stage.",
+          "signals": [
+            "sector-focused activity",
+            "multi-stage operational capability"
+          ]
+        }
+      ],
+      "intentRationale": "Target-specific objective",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "Credible capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 2,
+      "previousCapabilityScore": 5
+    },
+    "CHARMING KITTEN": {
+      "actorName": "CHARMING KITTEN",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.232Z",
+      "status": "pending",
+      "intentBaseScore": 3,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 4,
+      "noveltyModifier": -1,
+      "intentFinalScore": 3,
+      "capabilityFinalScore": 3,
+      "confidence": "medium",
+      "procedureCount": 3,
+      "evidence": [
+        {
+          "mitreId": "T1566.002",
+          "date": 1787690236000,
+          "excerpt": "[CHARMING KITTEN] - Adversary likely used Skype to lure victim into using a malicious link, some of which included shortened URLs CHARMING KITTEN sent links to websites imitating Microsoft OneDrive, which abuse the se…",
+          "signals": [
+            "established operational tooling",
+            "basic executable capability"
+          ]
+        },
+        {
+          "mitreId": "T1027",
+          "date": 1787690236000,
+          "excerpt": "[CHARMING KITTEN] - Adversary used basic command obfuscation when attempting follow-on operations",
+          "signals": [
+            "sector-focused activity",
+            "multi-stage operational capability",
+            "basic executable capability"
+          ]
+        }
+      ],
+      "intentRationale": "Sector association",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "Credible capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 5,
+      "previousCapabilityScore": 5
+    },
+    "CHATTY SPIDER": {
+      "actorName": "CHATTY SPIDER",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.234Z",
+      "status": "pending",
+      "intentBaseScore": 4,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 4,
+      "noveltyModifier": -1,
+      "intentFinalScore": 4,
+      "capabilityFinalScore": 3,
+      "confidence": "high",
+      "procedureCount": 8,
+      "evidence": [
+        {
+          "mitreId": "T1204",
+          "date": 1788878362000,
+          "excerpt": "[CHATTY SPIDER] - Instructs victims to execute commercial remote support tools to gain initial access",
+          "signals": [
+            "basic executable capability"
+          ]
+        },
+        {
+          "mitreId": "T1098.001",
+          "date": 1788878362000,
+          "excerpt": "[CHATTY SPIDER] - Registers user’s workstation as MFA device in Okta for persistence",
+          "signals": [
+            "multi-stage operational capability"
+          ]
+        },
+        {
+          "mitreId": "T1656",
+          "date": 1788878362000,
+          "excerpt": "[CHATTY SPIDER] - Impersonates IT personnel during voice calls and directed victims to establish remote support sessions Impersonates legitimate IT employees to gain physical access to victim devices",
+          "signals": [
+            "sector-focused activity",
+            "multi-stage operational capability"
+          ]
+        },
+        {
+          "mitreId": "T1213",
+          "date": 1788878362000,
+          "excerpt": "[CHATTY SPIDER] - Attempts to gather files from various document management systems such as iManage, Dropbox, Google Drive, Net Voyage and OneDrive",
+          "signals": [
+            "theft or collection objective"
+          ]
+        },
+        {
+          "mitreId": "T1219",
+          "date": 1788878362000,
+          "excerpt": "[CHATTY SPIDER] - Uses remote access software such as AnyDesk, Atera, Quick Assist, LogMeIn Rescue, SplashTop, SuperOps, Syncro, Zoho Assist, and Zoom",
+          "signals": [
+            "multi-stage operational capability",
+            "basic executable capability"
+          ]
+        }
+      ],
+      "intentRationale": "Ideology association",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "Credible capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 1,
+      "previousCapabilityScore": 4
+    },
+    "CIRCUIT PANDA": {
+      "actorName": "CIRCUIT PANDA",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.237Z",
+      "status": "pending",
+      "intentBaseScore": 5,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 5,
+      "noveltyModifier": -1,
+      "intentFinalScore": 5,
+      "capabilityFinalScore": 4,
+      "confidence": "high",
+      "procedureCount": 16,
+      "evidence": [
+        {
+          "mitreId": "T1546.008",
+          "date": 1787770155000,
+          "excerpt": "[CIRCUIT PANDA] - CIRCUIT PANDA used sethc.exe once it was spawned from utilizing svchost.exe to expand persistence and control on the victim’s host.",
+          "signals": [
+            "multi-stage operational capability"
+          ]
+        },
+        {
+          "mitreId": "T1014",
+          "date": 1786021162000,
+          "excerpt": "[CIRCUIT PANDA] - CIRCUIT PANDA used a kernel-mode driver.",
+          "signals": [
+            "sector-focused activity",
+            "advanced or custom capability",
+            "multi-stage operational capability"
+          ]
+        },
+        {
+          "mitreId": "T1036",
+          "date": 1787770155000,
+          "excerpt": "[CIRCUIT PANDA] - CIRCUIT PANDA has obfuscated implant payloads using legitimate looking filenames CIRCUIT PANDA loaded malicious DLLs through legitimate Windows binaries and executables like arp.exe, svchost.exe, set…",
+          "signals": [
+            "sector-focused activity",
+            "multi-stage operational capability",
+            "basic executable capability"
+          ]
+        },
+        {
+          "mitreId": "T1036.005",
+          "date": 1786021162000,
+          "excerpt": "[CIRCUIT PANDA] - CIRCUIT PANDA used malicious DLLs named after legitimate system files (snmpapi.dll, systemsettings.dll).",
+          "signals": [
+            "sector-focused activity",
+            "multi-stage operational capability"
+          ]
+        },
+        {
+          "mitreId": "T1070.006",
+          "date": 1786021162000,
+          "excerpt": "[CIRCUIT PANDA] - CICUIT PANDA FakeDead implant modifies the timestamp properties of the application by copying C:\\Windows\\notepad.exe timestamp metadata The file background.png was timestomped to dates in 2021 and 2022.",
+          "signals": [
+            "sector-focused activity",
+            "multi-stage operational capability"
+          ]
+        }
+      ],
+      "intentRationale": "Target-specific objective",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "Significant capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 5,
+      "previousCapabilityScore": 5
+    },
+    "CORDIAL SPIDER": {
+      "actorName": "CORDIAL SPIDER",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.237Z",
+      "status": "pending",
+      "intentBaseScore": 1,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 4,
+      "noveltyModifier": -1,
+      "intentFinalScore": 1,
+      "capabilityFinalScore": 3,
+      "confidence": "medium",
+      "procedureCount": 4,
+      "evidence": [
+        {
+          "mitreId": "T1566.004",
+          "date": 1786554544000,
+          "excerpt": "[CORDIAL SPIDER] - Uses vishing to direct targets to SSO-themed phishing pages.",
+          "signals": [
+            "established operational tooling"
+          ]
+        },
+        {
+          "mitreId": "T1098.005",
+          "date": 1786478491000,
+          "excerpt": "[CORDIAL SPIDER] - Registers a Google Pixel device for MFA.",
+          "signals": [
+            "multi-stage operational capability"
+          ]
+        }
+      ],
+      "intentRationale": "Target of opportunity",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "Credible capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 7,
+      "previousCapabilityScore": 5
+    },
+    "CURLY SPIDER": {
+      "actorName": "CURLY SPIDER",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.241Z",
+      "status": "pending",
+      "intentBaseScore": 5,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 4,
+      "noveltyModifier": -1,
+      "intentFinalScore": 5,
+      "capabilityFinalScore": 3,
+      "confidence": "medium",
+      "procedureCount": 3,
+      "evidence": [
+        {
+          "mitreId": "T1566.004",
+          "date": 1786554544000,
+          "excerpt": "[CURLY SPIDER] - CURLY SPIDER relies on vishing tactics for securing initial access CURLY SPIDER uses vishing techniques to gain remote access to victim machines CURLY SPIDER uses vishing to engage with the victim and…",
+          "signals": [
+            "basic executable capability"
+          ]
+        },
+        {
+          "mitreId": "T1105",
+          "date": 1786554544000,
+          "excerpt": "[CURLY SPIDER] - Additional tooling was downloaded from likely compromised Sharepoint URLs CURLY SPIDER is known to use curl commands to retrieve tools or files from an external location CURLY SPIDER transfers malicio…",
+          "signals": [
+            "multi-stage operational capability",
+            "basic executable capability"
+          ]
+        },
+        {
+          "mitreId": "T1486",
+          "date": 1786554544000,
+          "excerpt": "[CURLY SPIDER] - CURLY SPIDER deployed Cactus ransomware",
+          "signals": [
+            "destructive or disruptive action"
+          ]
+        }
+      ],
+      "intentRationale": "Target-specific objective",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "Credible capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 5,
+      "previousCapabilityScore": 5
+    },
+    "FAMOUS CHOLLIMA": {
+      "actorName": "FAMOUS CHOLLIMA",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.244Z",
+      "status": "pending",
+      "intentBaseScore": 5,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 5,
+      "noveltyModifier": -1,
+      "intentFinalScore": 5,
+      "capabilityFinalScore": 4,
+      "confidence": "high",
+      "procedureCount": 24,
+      "evidence": [
+        {
+          "mitreId": "T1195",
+          "date": 1788365863000,
+          "excerpt": "[FAMOUS CHOLLIMA] - The adversary compromises the legitimate @joyfill npm scope and publishes malicious beta versions @joyfill/layouts@0.1.2-2773.beta.0 and @joyfill/components@4.0.0-rc24-2773-beta.4 to distribute Cha…",
+          "signals": [
+            "advanced or custom capability"
+          ]
+        },
+        {
+          "mitreId": "T1059",
+          "date": 1786741830000,
+          "excerpt": "[FAMOUS CHOLLIMA] - FAMOUS CHOLLIMA employed Git hooks and npm dependency abuse to execute malicious code on victim systems. FAMOUS CHOLLIMA uses malicious scripts, JavaScript-based malware. FAMOUS CHOLLIMA uses multi…",
+          "signals": [
+            "basic executable capability"
+          ]
+        },
+        {
+          "mitreId": "T1059.004",
+          "date": 1785872288000,
+          "excerpt": "[FAMOUS CHOLLIMA] - Actor instructs victim to execute curl command to download malicious payload The victim likely executes a downloaded shell script as part of a ClickFix social engineering scheme.",
+          "signals": [
+            "established operational tooling",
+            "basic executable capability"
+          ]
+        },
+        {
+          "mitreId": "T1204",
+          "date": 1786741830000,
+          "excerpt": "[FAMOUS CHOLLIMA] - Click fix social engineering tactic used to coerce victim to issue curl commands to malicious infrastructure. The described activity was initiated when a targeted user launched a malicious applicat…",
+          "signals": [
+            "established operational tooling",
+            "basic executable capability"
+          ]
+        },
+        {
+          "mitreId": "T1027",
+          "date": 1786741830000,
+          "excerpt": "[FAMOUS CHOLLIMA] - BeaverTail uses obfuscated JavaScript. InvisibleFerret uses obfuscated Python scripts. FAMOUS CHOLLIMA uses virtual audio cables, modified or AI-generated profile pictures.",
+          "signals": [
+            "sector-focused activity",
+            "multi-stage operational capability"
+          ]
+        }
+      ],
+      "intentRationale": "Target-specific objective",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "Significant capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 5,
+      "previousCapabilityScore": 5
+    },
+    "GOLDEN CHOLLIMA": {
+      "actorName": "GOLDEN CHOLLIMA",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.250Z",
+      "status": "pending",
+      "intentBaseScore": 4,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 4,
+      "noveltyModifier": -1,
+      "intentFinalScore": 4,
+      "capabilityFinalScore": 3,
+      "confidence": "high",
+      "procedureCount": 6,
+      "evidence": [
+        {
+          "mitreId": "T1566.002",
+          "date": 1787673959000,
+          "excerpt": "[GOLDEN CHOLLIMA] - GOLDEN CHOLLIMA distributed malicious cryptocurrency trading applications through Telegram conversations with targets in the fintech sector. Phishing email from adversary-controlled domain onjuno[.…",
+          "signals": [
+            "sector-focused activity",
+            "established operational tooling",
+            "basic executable capability"
+          ]
+        },
+        {
+          "mitreId": "T1059.002",
+          "date": 1787673959000,
+          "excerpt": "[GOLDEN CHOLLIMA] - GOLDEN CHOLLIMA uses compiled run-only AppleScript dropper and a persistent applet implant. The adversary delivers malicious AppleScript files with .scpt extensions via phishing links, with the fil…",
+          "signals": [
+            "established operational tooling",
+            "basic executable capability"
+          ]
+        },
+        {
+          "mitreId": "T1204.002",
+          "date": 1787673959000,
+          "excerpt": "[GOLDEN CHOLLIMA] - GOLDEN CHOLLIMA distributed fake cryptocurrency trading applications as MSI and DMG installers that required user interaction to execute malicious payloads. GOLDEN CHOLLIMA induces victims to execu…",
+          "signals": [
+            "established operational tooling",
+            "basic executable capability"
+          ]
+        },
+        {
+          "mitreId": "T1036",
+          "date": 1787673959000,
+          "excerpt": "[GOLDEN CHOLLIMA] - GOLDEN CHOLLIMA malware used filenames and class names mimicking legitimate software functionality including iTunes_trush and Windows media player components. The malware uses AppleScript files wit…",
+          "signals": [
+            "sector-focused activity",
+            "multi-stage operational capability"
+          ]
+        },
+        {
+          "mitreId": "T1005",
+          "date": 1787673959000,
+          "excerpt": "[GOLDEN CHOLLIMA] - Adversary collected DVN configuration including list of RPCs used by the DVN GOLDEN CHOLLIMA malware collected files, registry values, running process lists, and system configuration data from comp…",
+          "signals": [
+            "theft or collection objective"
+          ]
+        }
+      ],
+      "intentRationale": "Ideology association",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "Credible capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 5,
+      "previousCapabilityScore": 5
+    },
+    "HAYWIRE KITTEN": {
+      "actorName": "HAYWIRE KITTEN",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.255Z",
+      "status": "pending",
+      "intentBaseScore": 4,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 3,
+      "noveltyModifier": -1,
+      "intentFinalScore": 4,
+      "capabilityFinalScore": 2,
+      "confidence": "medium",
+      "procedureCount": 2,
+      "evidence": [
+        {
+          "mitreId": "T1566.001",
+          "date": 1787690236000,
+          "excerpt": "[HAYWIRE KITTEN] - The adversary likely delivered the PDF containing an embedded link to a Microsoft-themed credential-harvesting page via a spear phishing email",
+          "signals": [
+            "theft or collection objective",
+            "established operational tooling"
+          ]
+        },
+        {
+          "mitreId": "T1566.002",
+          "date": 1787690236000,
+          "excerpt": "[HAYWIRE KITTEN] - HAYWIRE KITTEN used phishing messages on WhatsApp, Telegram, and X to deliver malicious links.",
+          "signals": [
+            "established operational tooling"
+          ]
+        }
+      ],
+      "intentRationale": "Ideology association",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "Limited capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 5,
+      "previousCapabilityScore": 5
+    },
+    "HOLLOW PANDA": {
+      "actorName": "HOLLOW PANDA",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.256Z",
+      "status": "pending",
+      "intentBaseScore": 1,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 4,
+      "noveltyModifier": -1,
+      "intentFinalScore": 1,
+      "capabilityFinalScore": 3,
+      "confidence": "medium",
+      "procedureCount": 2,
+      "evidence": [
+        {
+          "mitreId": "T1190",
+          "date": 1786384545000,
+          "excerpt": "[HOLLOW PANDA] - HOLLOW PANDA has consistently compromised CheckPoint appliances to gain initial access to the victim networks. The adversary likely uses compromised accounts or exploits a critical CheckPoint-device v…",
+          "signals": [
+            "multi-stage operational capability"
+          ]
+        },
+        {
+          "mitreId": "T1071.004",
+          "date": 1786384545000,
+          "excerpt": "[HOLLOW PANDA] - HOLLOW PANDA has configured their ShadowPad implant to leverage DNS tunneling via DNS TXT record queries.",
+          "signals": [
+            "multi-stage operational capability",
+            "basic executable capability"
+          ]
+        }
+      ],
+      "intentRationale": "Target of opportunity",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "Credible capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 5,
+      "previousCapabilityScore": 5
+    },
+    "HOOK SPIDER": {
+      "actorName": "HOOK SPIDER",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.258Z",
+      "status": "pending",
+      "intentBaseScore": 4,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 1,
+      "noveltyModifier": -1,
+      "intentFinalScore": 4,
+      "capabilityFinalScore": 1,
+      "confidence": "medium",
+      "procedureCount": 3,
+      "evidence": [
+        {
+          "mitreId": "T1555",
+          "date": 1786732230000,
+          "excerpt": "[HOOK SPIDER] - HOOK SPIDER uses information stealers that can target valid account credentials held in password stores.",
+          "signals": [
+            "theft or collection objective"
+          ]
+        }
+      ],
+      "intentRationale": "Ideology association",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "No confirmed capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 0,
+      "previousCapabilityScore": 4
+    },
+    "MUSTANG PANDA": {
+      "actorName": "MUSTANG PANDA",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.276Z",
+      "status": "pending",
+      "intentBaseScore": 3,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 4,
+      "noveltyModifier": -1,
+      "intentFinalScore": 3,
+      "capabilityFinalScore": 3,
+      "confidence": "high",
+      "procedureCount": 8,
+      "evidence": [
+        {
+          "mitreId": "T1204.002",
+          "date": 1787848573000,
+          "excerpt": "[MUSTANG PANDA] - Likely requires user to execute it The user was lured into executing the LingerRAT shellcode loader.",
+          "signals": [
+            "basic executable capability"
+          ]
+        },
+        {
+          "mitreId": "T1053.005",
+          "date": 1787848573000,
+          "excerpt": "[MUSTANG PANDA] - MUSTANG PANDA uses scheduled tasks in order to persist malicious batch script execution Persists via a scheduled task that runs every minute The LingerRAT implant persists itself using a scheduled task.",
+          "signals": [
+            "multi-stage operational capability",
+            "established operational tooling"
+          ]
+        },
+        {
+          "mitreId": "T1547.001",
+          "date": 1787599373000,
+          "excerpt": "[MUSTANG PANDA] - MUSTANG PANDA uses ASEP Registry run keys to execute Claimloader at startup Persists via registry auto-run keys Places a legitimate executable and a malicious DLL into the Startup folder The LingerRA…",
+          "signals": [
+            "multi-stage operational capability",
+            "basic executable capability"
+          ]
+        },
+        {
+          "mitreId": "T1564.001",
+          "date": 1787599373000,
+          "excerpt": "[MUSTANG PANDA] - MUSTANG PANDA hides the LingerRAT DLL inside VHD file by applying the NTFS hidden file attribute.",
+          "signals": [
+            "sector-focused activity",
+            "multi-stage operational capability"
+          ]
+        },
+        {
+          "mitreId": "T1574.001",
+          "date": 1787599373000,
+          "excerpt": "[MUSTANG PANDA] - Deploys legitimate executables that load malicious DLLs, both placed into the same directory via search-order hijacking Executes via DLL search-order hijacking Is executed via DLL search-order hijack…",
+          "signals": [
+            "sector-focused activity",
+            "multi-stage operational capability",
+            "basic executable capability"
+          ]
+        }
+      ],
+      "intentRationale": "Sector association",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "Credible capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 5,
+      "previousCapabilityScore": 5
+    },
+    "PULSAR KITTEN": {
+      "actorName": "PULSAR KITTEN",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.283Z",
+      "status": "pending",
+      "intentBaseScore": 5,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 4,
+      "noveltyModifier": -1,
+      "intentFinalScore": 5,
+      "capabilityFinalScore": 3,
+      "confidence": "high",
+      "procedureCount": 13,
+      "evidence": [
+        {
+          "mitreId": "T1190",
+          "date": 1788787856000,
+          "excerpt": "[PULSAR KITTEN] - PULSAR KITTEN attempts to exploit multiple vulnerabilities of public facing applications. PULSAR KITTEN exploited CVE-2026-63077 to compromise vulnerable TeamCity instance and achieve RCE with root p…",
+          "signals": [
+            "multi-stage operational capability"
+          ]
+        },
+        {
+          "mitreId": "T1059.003",
+          "date": 1788787856000,
+          "excerpt": "[PULSAR KITTEN] - PULSAR KITTEN used cmd /C to execute Windows OS commands.",
+          "signals": [
+            "basic executable capability"
+          ]
+        },
+        {
+          "mitreId": "T1505.003",
+          "date": 1788787856000,
+          "excerpt": "[PULSAR KITTEN] - PULSAR KITTEN deployed a web shells (*.jspws) in the TeamCity webroot.",
+          "signals": [
+            "multi-stage operational capability"
+          ]
+        },
+        {
+          "mitreId": "T1036.008",
+          "date": 1788787856000,
+          "excerpt": "[PULSAR KITTEN] - PULSAR KITTEN delivered payload as .txt but executed as .exe.",
+          "signals": [
+            "sector-focused activity",
+            "multi-stage operational capability"
+          ]
+        },
+        {
+          "mitreId": "T1070.004",
+          "date": 1788787856000,
+          "excerpt": "[PULSAR KITTEN] - PULSAR KITTEN deleted jswps web shells.",
+          "signals": [
+            "sector-focused activity",
+            "multi-stage operational capability"
+          ]
+        }
+      ],
+      "intentRationale": "Target-specific objective",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "Credible capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 5,
+      "previousCapabilityScore": 5
+    },
+    "PUNK SPIDER": {
+      "actorName": "PUNK SPIDER",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.284Z",
+      "status": "pending",
+      "intentBaseScore": 1,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 1,
+      "noveltyModifier": -1,
+      "intentFinalScore": 1,
+      "capabilityFinalScore": 1,
+      "confidence": "low",
+      "procedureCount": 2,
+      "evidence": [],
+      "intentRationale": "Target of opportunity",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "No confirmed capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 5,
+      "previousCapabilityScore": 5
+    },
+    "REVENANT SPIDER": {
+      "actorName": "REVENANT SPIDER",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.288Z",
+      "status": "pending",
+      "intentBaseScore": 5,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 4,
+      "noveltyModifier": -1,
+      "intentFinalScore": 5,
+      "capabilityFinalScore": 3,
+      "confidence": "medium",
+      "procedureCount": 7,
+      "evidence": [
+        {
+          "mitreId": "T1190",
+          "date": 1787736492000,
+          "excerpt": "[REVENANT SPIDER] - A Qilin affiliate likely exploited CVE-2024-55591 to gain initial access",
+          "signals": [
+            "multi-stage operational capability"
+          ]
+        },
+        {
+          "mitreId": "T1552",
+          "date": 1787736492000,
+          "excerpt": "[REVENANT SPIDER] - Qilin affiliates used Veeam-Get-Creds.ps1 to dump credentials from VBR databases",
+          "signals": [
+            "theft or collection objective"
+          ]
+        },
+        {
+          "mitreId": "T1021.004",
+          "date": 1787736492000,
+          "excerpt": "[REVENANT SPIDER] - Qilin affiliates used SSH for lateral movement",
+          "signals": [
+            "multi-stage operational capability"
+          ]
+        },
+        {
+          "mitreId": "T1005",
+          "date": 1787736492000,
+          "excerpt": "[REVENANT SPIDER] - Qilin affiliates collected data from local systems",
+          "signals": [
+            "theft or collection objective"
+          ]
+        },
+        {
+          "mitreId": "T1560",
+          "date": 1787736492000,
+          "excerpt": "[REVENANT SPIDER] - Qilin affiliates used file-archival tools such as WinRAR to archive collected data",
+          "signals": [
+            "theft or collection objective"
+          ]
+        }
+      ],
+      "intentRationale": "Target-specific objective",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "Credible capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 2,
+      "previousCapabilityScore": 5
+    },
+    "ROYAL SPIDER": {
+      "actorName": "ROYAL SPIDER",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.291Z",
+      "status": "pending",
+      "intentBaseScore": 5,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 4,
+      "noveltyModifier": -1,
+      "intentFinalScore": 5,
+      "capabilityFinalScore": 3,
+      "confidence": "medium",
+      "procedureCount": 2,
+      "evidence": [
+        {
+          "mitreId": "T1105",
+          "date": 1786554544000,
+          "excerpt": "[ROYAL SPIDER] - ROYAL SPIDER affiliates download additional tools onto compromised hosts, including Cobalt Strike, ScreenConnect, AnyDesk, DameWare, SharpShares, Advanced IP Scanner, Mimikatz, Rclone, and rsocx The a…",
+          "signals": [
+            "multi-stage operational capability",
+            "basic executable capability",
+            "generally available tooling"
+          ]
+        },
+        {
+          "mitreId": "T1486",
+          "date": 1786554544000,
+          "excerpt": "[ROYAL SPIDER] - Deployed BlackSuit ransomware ROYAL SPIDER affiliate used BlackSuit to encrypt data on compromised Windows and ESXi systems ROYAL SPIDER affiliates use Royal and BlackSuit ransomware to encrypt victim…",
+          "signals": [
+            "destructive or disruptive action"
+          ]
+        }
+      ],
+      "intentRationale": "Target-specific objective",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "Credible capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 5,
+      "previousCapabilityScore": 5
+    },
+    "SINFUL SPIDER": {
+      "actorName": "SINFUL SPIDER",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.295Z",
+      "status": "pending",
+      "intentBaseScore": 1,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 4,
+      "noveltyModifier": -1,
+      "intentFinalScore": 1,
+      "capabilityFinalScore": 3,
+      "confidence": "medium",
+      "procedureCount": 2,
+      "evidence": [
+        {
+          "mitreId": "T1505.003",
+          "date": 1786651533000,
+          "excerpt": "[SINFUL SPIDER] - The adversary deploys webshells for persistence",
+          "signals": [
+            "multi-stage operational capability"
+          ]
+        }
+      ],
+      "intentRationale": "Target of opportunity",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "Credible capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 0,
+      "previousCapabilityScore": 4
+    },
+    "SNARKY SPIDER": {
+      "actorName": "SNARKY SPIDER",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.297Z",
+      "status": "pending",
+      "intentBaseScore": 1,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 3,
+      "noveltyModifier": -1,
+      "intentFinalScore": 1,
+      "capabilityFinalScore": 2,
+      "confidence": "low",
+      "procedureCount": 1,
+      "evidence": [
+        {
+          "mitreId": "T1566.004",
+          "date": 1787839226000,
+          "excerpt": "[SNARKY SPIDER] - SNARKY SPIDER placed vishing calls to convince users to authenticate with an adversary-provided device code. SNARKY SPIDER vished the user into authenticating with an adversary-provided device code. …",
+          "signals": [
+            "established operational tooling"
+          ]
+        }
+      ],
+      "intentRationale": "Target of opportunity",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "Limited capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 7,
+      "previousCapabilityScore": 5
+    },
+    "STARDUST CHOLLIMA": {
+      "actorName": "STARDUST CHOLLIMA",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.302Z",
+      "status": "pending",
+      "intentBaseScore": 4,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 5,
+      "noveltyModifier": -1,
+      "intentFinalScore": 4,
+      "capabilityFinalScore": 4,
+      "confidence": "high",
+      "procedureCount": 7,
+      "evidence": [
+        {
+          "mitreId": "T1195.002",
+          "date": 1787675677000,
+          "excerpt": "[STARDUST CHOLLIMA] - The adversary compromised a legitimate package hosted on NPM. The adversary used a malicious NPM dependency to start the infection chain. This activity compromised Mastra AI npm packages.",
+          "signals": [
+            "advanced or custom capability"
+          ]
+        },
+        {
+          "mitreId": "T1059.001",
+          "date": 1787675677000,
+          "excerpt": "[STARDUST CHOLLIMA] - PowerRatankba is a PowerShell-based variant of Ratankba STARDUST CHOLLIMA has been observed using PowerShell scripts to drop their PowerMaze tool. The PowerShell script [REG_TIME.ps1] is a simple…",
+          "signals": [
+            "established operational tooling",
+            "basic executable capability",
+            "generally available tooling"
+          ]
+        },
+        {
+          "mitreId": "T1543.002",
+          "date": 1787675677000,
+          "excerpt": "[STARDUST CHOLLIMA] - The infection chain creates the malicious systemd service apt-software-updates.service.",
+          "signals": [
+            "multi-stage operational capability"
+          ]
+        },
+        {
+          "mitreId": "T1547.001",
+          "date": 1787675677000,
+          "excerpt": "[STARDUST CHOLLIMA] - RedFlag is configured to run using the registry run key. TwoPence XorDNS Downloader is added as an SSP to be loaded by lsass.exe. The infection chain creates the registry value RunJSAtStartup or …",
+          "signals": [
+            "multi-stage operational capability"
+          ]
+        },
+        {
+          "mitreId": "T1082",
+          "date": 1787675677000,
+          "excerpt": "[STARDUST CHOLLIMA] - TwoPence Framework implants have the ability to collect victim system information including the OS version, computer name, and network adapter information. This includes the attached logical driv…",
+          "signals": [
+            "theft or collection objective"
+          ]
+        }
+      ],
+      "intentRationale": "Ideology association",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "Significant capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 5,
+      "previousCapabilityScore": 5
+    },
+    "VAULT PANDA": {
+      "actorName": "VAULT PANDA",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.306Z",
+      "status": "pending",
+      "intentBaseScore": 4,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 5,
+      "noveltyModifier": -1,
+      "intentFinalScore": 4,
+      "capabilityFinalScore": 4,
+      "confidence": "high",
+      "procedureCount": 30,
+      "evidence": [
+        {
+          "mitreId": "T1190",
+          "date": 1787867401000,
+          "excerpt": "[VAULT PANDA] - It cannot be determined how VAULT PANDA gained access to the Fortinet appliances, i.e. whether the adversary used a compromised account or exploited a critical Fortinet-device vulnerability such as CVE…",
+          "signals": [
+            "multi-stage operational capability"
+          ]
+        },
+        {
+          "mitreId": "T1059",
+          "date": 1787071958000,
+          "excerpt": "[VAULT PANDA] - Executed bash processes, used AI agents to run tailored commands. Groovy scripting is executed via Logback GEventEvaluator.",
+          "signals": [
+            "basic executable capability"
+          ]
+        },
+        {
+          "mitreId": "T1059.001",
+          "date": 1786366231000,
+          "excerpt": "[VAULT PANDA] - The adversary's PowerShell-based RAT, PowerBoat, uses PS to execute commands. VAULT PANDA leveraged PowerShell scripts to conduct internal reconnaissance and connectivity checks to their C2 domains.",
+          "signals": [
+            "multi-stage operational capability",
+            "established operational tooling",
+            "basic executable capability",
+            "generally available tooling"
+          ]
+        },
+        {
+          "mitreId": "T1059.004",
+          "date": 1787867401000,
+          "excerpt": "[VAULT PANDA] - The actors and VAULT PANDA executed Base64-encoded shell scripts via PostgreSQL COPY TO PROGRAM feature across ID1, IN1, and some honeypot infrastructure. VAULT PANDA executed shell commands. logback.g…",
+          "signals": [
+            "established operational tooling"
+          ]
+        },
+        {
+          "mitreId": "T1505.003",
+          "date": 1787867401000,
+          "excerpt": "[VAULT PANDA] - VAULT PANDA deployed AI-generated web shells. VAULT PANDA deployed three web shells (*.jspws) in the TeamCity webroot.",
+          "signals": [
+            "multi-stage operational capability"
+          ]
+        }
+      ],
+      "intentRationale": "Ideology association",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "Significant capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 5,
+      "previousCapabilityScore": 5
+    },
+    "VICE SPIDER": {
+      "actorName": "VICE SPIDER",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.311Z",
+      "status": "pending",
+      "intentBaseScore": 4,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 4,
+      "noveltyModifier": -1,
+      "intentFinalScore": 4,
+      "capabilityFinalScore": 3,
+      "confidence": "high",
+      "procedureCount": 24,
+      "evidence": [
+        {
+          "mitreId": "T1059.001",
+          "date": 1788274391000,
+          "excerpt": "[VICE SPIDER] - CleanUp.dll created a scheduled task to load a malicious JS file. Executes Powershell commands to gather domain information. SocksShell executes PS commands received from its C2 Used PS to execute comm…",
+          "signals": [
+            "multi-stage operational capability",
+            "established operational tooling",
+            "basic executable capability",
+            "generally available tooling"
+          ]
+        },
+        {
+          "mitreId": "T1059.003",
+          "date": 1788274391000,
+          "excerpt": "[VICE SPIDER] - Executes commands via WCS to gather system information like administrator status, local account name, network hostname, and OS version. SocksShell executes Windows commands received from its C2",
+          "signals": [
+            "multi-stage operational capability",
+            "basic executable capability"
+          ]
+        },
+        {
+          "mitreId": "T1059.005",
+          "date": 1788274391000,
+          "excerpt": "[VICE SPIDER] - VICE SPIDER uses Microsoft Office documents to execute VBA macro code that facilitates process injection",
+          "signals": [
+            "multi-stage operational capability",
+            "established operational tooling",
+            "basic executable capability"
+          ]
+        },
+        {
+          "mitreId": "T1036.005",
+          "date": 1788195315000,
+          "excerpt": "[VICE SPIDER] - File masquerading as legitamate Google Chrome Updater",
+          "signals": [
+            "sector-focused activity",
+            "multi-stage operational capability"
+          ]
+        },
+        {
+          "mitreId": "T1070.004",
+          "date": 1787078199000,
+          "excerpt": "[VICE SPIDER] - Commands to self-delete and remove evidence of infection. SocksShell contains a small helper DLL used to delete itself from disk",
+          "signals": [
+            "sector-focused activity",
+            "multi-stage operational capability"
+          ]
+        }
+      ],
+      "intentRationale": "Ideology association",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "Credible capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 7,
+      "previousCapabilityScore": 6
+    },
+    "VOODOO BEAR": {
+      "actorName": "VOODOO BEAR",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.316Z",
+      "status": "pending",
+      "intentBaseScore": 5,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 4,
+      "noveltyModifier": -1,
+      "intentFinalScore": 5,
+      "capabilityFinalScore": 3,
+      "confidence": "high",
+      "procedureCount": 45,
+      "evidence": [
+        {
+          "mitreId": "T1078",
+          "date": 1786384545000,
+          "excerpt": "[VOODOO BEAR] - Open-source reporting noted that the actor had been able to access M.E. Doc servers using stolen employee credentials, further supporting this hypothesis. VOODOO BEAR gains access to new hosts using va…",
+          "signals": [
+            "theft or collection objective",
+            "generally available tooling"
+          ]
+        },
+        {
+          "mitreId": "T1190",
+          "date": 1786384545000,
+          "excerpt": "[VOODOO BEAR] - Older unpatched Centreon servers were likely exploited using an unidentified vulnerability. VOODOO BEAR operators have exploited Exim Mail Tranfer Agent servers using the CVE-2019-10149 vulnerability, …",
+          "signals": [
+            "multi-stage operational capability"
+          ]
+        },
+        {
+          "mitreId": "T1566",
+          "date": 1786384545000,
+          "excerpt": "[VOODOO BEAR] - Infrastructure attributed with low confidence to VOODOO BEAR was likely used in credential collection operations.",
+          "signals": [
+            "theft or collection objective",
+            "established operational tooling"
+          ]
+        },
+        {
+          "mitreId": "T1047",
+          "date": 1786384545000,
+          "excerpt": "[VOODOO BEAR] - The VBS backdoor can execute command on remote system using WMIC and credentials passed from control server.",
+          "signals": [
+            "basic executable capability"
+          ]
+        },
+        {
+          "mitreId": "T1053.005",
+          "date": 1788379896000,
+          "excerpt": "[VOODOO BEAR] - EnderDropper schedules a host reboot task named shutdown that is configured to run 5 minutes after the dropper.",
+          "signals": [
+            "established operational tooling"
+          ]
+        }
+      ],
+      "intentRationale": "Target-specific objective",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "Credible capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 5,
+      "previousCapabilityScore": 5
+    },
+    "WARP PANDA": {
+      "actorName": "WARP PANDA",
+      "quarter": "Q3 2026",
+      "generatedAt": "2026-09-10T07:55:19.317Z",
+      "status": "pending",
+      "intentBaseScore": 3,
+      "willingnessModifier": 0,
+      "capabilityBaseScore": 4,
+      "noveltyModifier": -1,
+      "intentFinalScore": 3,
+      "capabilityFinalScore": 3,
+      "confidence": "low",
+      "procedureCount": 1,
+      "evidence": [
+        {
+          "mitreId": "T1211",
+          "date": 1787086382000,
+          "excerpt": "[WARP PANDA] - CVE-2026-41709 allows authenticated attackers to establish non-interactive shell sessions without pseudo-terminal (pty) allocation, which in turn lets the attacker execute commands that are not recorded…",
+          "signals": [
+            "sector-focused activity",
+            "multi-stage operational capability",
+            "basic executable capability"
+          ]
+        }
+      ],
+      "intentRationale": "Sector association",
+      "willingnessRationale": "No procedure evidence supports a reducing modifier",
+      "capabilityRationale": "Credible capability",
+      "noveltyRationale": "Limited-availability toolset",
+      "previousIntentScore": 5,
+      "previousCapabilityScore": 5
+    }
+  }
 }
