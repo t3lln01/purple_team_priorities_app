@@ -64,12 +64,9 @@ export function sourceQuarterForAssessment(label: string): string | null {
   if (!match) return null;
   const q = Number(match[1]);
   const year = Number(match[2]);
-  // A view is published at the start of its quarter and assesses the
-  // immediately preceding completed quarter:
-  // Q4 2026 → Q3 2026 → June–August 2026.
-  const sourceQ = q === 1 ? 4 : q - 1;
-  const sourceYear = q === 1 ? year - 1 : year;
-  return `Q${sourceQ} ${sourceYear}`;
+  // Each view is published at the end of its evidence window:
+  // Q1 2026 → Nov 2025–Jan 2026; Q4 2026 → Aug–Oct 2026.
+  return `Q${q} ${year}`;
 }
 
 export function quarterBounds(label: string): { start: number; end: number } | null {
@@ -78,12 +75,12 @@ export function quarterBounds(label: string): { start: number; end: number } | n
   if (!match) return null;
   const q = Number(match[1]);
   const year = Number(match[2]);
-  // Fiscal quarters are labelled by the year in which Q1–Q3 occur:
-  // Q1 = Dec–Feb, Q2 = Mar–May, Q3 = Jun–Aug, Q4 = Sep–Nov.
-  const starts = [[year - 1, 11], [year, 2], [year, 5], [year, 8]] as const;
+  // Fiscal quarters are labelled by the year in which they end:
+  // Q1 = Nov–Jan, Q2 = Feb–Apr, Q3 = May–Jul, Q4 = Aug–Oct.
+  const starts = [[year - 1, 10], [year, 1], [year, 4], [year, 7]] as const;
   const [startYear, startMonth] = starts[q - 1];
-  const endYear = q === 1 ? year : startYear;
-  const endMonth = q === 1 ? 2 : startMonth + 3;
+  const endYear = q === 1 ? year : year;
+  const endMonth = q === 1 ? 1 : startMonth + 3;
   return {
     start: Date.UTC(startYear, startMonth, 1),
     end: Date.UTC(endYear, endMonth, 1) - 1,
