@@ -451,18 +451,17 @@ csRouter.get("/cs/sync-result", async (_req, res) => {
 const TM_STATE_FILE    = path.join(ROOT, "cs-threat-model-state.json");
 const TM_VERSIONS_FILE = path.join(ROOT, "cs-threat-model-versions.json");
 
-/** Returns "Q1 2025" etc. based on fiscal quarters starting Feb/May/Aug/Nov */
+/** Returns "Q1 2025" etc. for fiscal quarters Dec–Feb, Mar–May, Jun–Aug, Sep–Nov. */
 function currentQuarterLabel(): string {
   const now   = new Date();
   const month = now.getMonth() + 1;
   const year  = now.getFullYear();
   let q: number;
   let qYear = year;
-  if (month === 1)       { q = 4; qYear = year - 1; }
-  else if (month <= 4)   { q = 1; }
-  else if (month <= 7)   { q = 2; }
-  else if (month <= 10)  { q = 3; }
-  else                   { q = 4; }
+  if (month <= 2)       { q = 1; }
+  else if (month <= 5)  { q = 2; }
+  else if (month <= 8)  { q = 3; }
+  else                  { q = 4; }
   return `Q${q} ${qYear}`;
 }
 
