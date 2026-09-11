@@ -1,4 +1,6 @@
+@layer theme, base, clerk, components, utilities;
 @import "tailwindcss";
+@import "@clerk/themes/shadcn.css";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
 
@@ -142,6 +144,19 @@
 }
 
 @layer utilities {
+  fieldset:disabled button,
+  fieldset:disabled input,
+  fieldset:disabled select,
+  fieldset:disabled textarea {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .cl-formFieldInput::placeholder {
+    color: hsl(215 20% 65%);
+    opacity: 1;
+  }
+
   input[type="search"]::-webkit-search-cancel-button {
     @apply hidden;
   }
