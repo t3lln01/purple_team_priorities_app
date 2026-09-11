@@ -737,7 +737,7 @@ function normalizeCSActor(r: any): ThreatModelActor {
     aliases: knownAs,
     actorType,
     lastSeen,
-    malware: malwareFamilies.join(" "),
+    malware: malwareFamilies.join(", "),
     countries,
     industries,
     intentFinalScore: null,         // not directly in CS data — preserved from static
