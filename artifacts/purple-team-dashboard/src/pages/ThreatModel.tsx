@@ -64,6 +64,7 @@ type CustomActor = {
   csEnriched: boolean;
   csLastRefreshed: string | null;
   description: string;
+  csRawData?: Record<string, unknown> | null;
 } & RubricScores;
 
 type RubricScores = {
@@ -253,6 +254,14 @@ function matchesList(actorName: string, malware: string, list: string[]): boolea
     if (!t) return false;
     return nameUpper === t || malwareUpper.includes(t);
   });
+}
+
+function malwareTags(value: string | undefined): string[] {
+  return (value ?? "")
+    .replace(/Malware developed|Malware used/gi, "")
+    .split(/,\s*|;\s*|\n+/)
+    .map(item => item.trim())
+    .filter(Boolean);
 }
 
 // ── Per-actor row ──────────────────────────────────────────────────────────────
@@ -621,6 +630,29 @@ function ActorRow({
                       <div key={label} className={`flex flex-col items-center px-3 py-2 rounded-lg border ${color} min-w-[60px]`}>
                         <span className="text-lg font-bold font-mono">{typeof value === "number" && value > 0 && label.includes("illingnes") ? `+${value}` : value}</span>
                         <span className="text-[10px] text-muted-foreground uppercase tracking-wide mt-0.5 text-center leading-tight">{label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                    {[
+                      { label: "Malware / Tools", values: malwareTags(actor.malware), color: "text-primary border-primary/20 bg-primary/5" },
+                      { label: "Targeted Industries", values: actor.industries ?? [], color: "text-amber-400 border-amber-400/20 bg-amber-400/5" },
+                      { label: "Targeted Countries", values: actor.countries ?? [], color: "text-cyan-400 border-cyan-400/20 bg-cyan-400/5" },
+                    ].map(({ label, values, color }) => (
+                      <div key={label} className={`rounded-lg border p-2.5 ${color}`}>
+                        <div className="text-[10px] font-semibold uppercase tracking-wide mb-1.5">{label}</div>
+                        {values.length ? (
+                          <div className="flex flex-wrap gap-1">
+                            {values.slice(0, 30).map((value, index) => (
+                              <span key={`${value}-${index}`} className="px-1.5 py-0.5 rounded bg-background/40 text-[10px] text-foreground border border-border/40">
+                                {value}
+                              </span>
+                            ))}
+                            {values.length > 30 && <span className="text-[10px] text-muted-foreground">+{values.length - 30} more</span>}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground">Not available</span>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1628,6 +1660,7 @@ export default function ThreatModel() {
             adversaryType: match.adversaryType,
             communityIds: match.communityIds,
             description: match.description,
+            csRawData: match.csRawData,
             capabilityFinalScore: match.capabilityFinalScore,
           },
         },

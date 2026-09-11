@@ -652,6 +652,12 @@ async function saveTmVersion(quarter: string, state: ThreatModelState): Promise<
 
 /** Normalise a CS combined-actors resource into our ThreatModelActor shape */
 function normalizeCSActor(r: any): ThreatModelActor {
+  const resourceNames = (...values: any[]): string[] => values
+    .flatMap(value => Array.isArray(value) ? value : value ? [value] : [])
+    .map(value => typeof value === "string" ? value : value?.name ?? value?.value ?? value?.title ?? "")
+    .map(value => String(value).trim())
+    .filter(Boolean);
+
   const countries: string[] = (r.target_countries ?? [])
     .map((c: any) => c.country ?? c.name ?? "")
     .filter(Boolean);
@@ -660,9 +666,24 @@ function normalizeCSActor(r: any): ThreatModelActor {
     .map((i: any) => i.name ?? "")
     .filter(Boolean);
 
-  const malwareFamilies: string[] = (r.malware_families ?? [])
-    .map((m: any) => m.name ?? "")
-    .filter(Boolean);
+  // CrowdStrike has returned these relationships under both the explicit
+  // malware_used/malware_developed names and malware_families in different
+  // actor API versions. Keep the used and developed lists in one deduplicated
+  // Malware / Tools value for the dashboard.
+  const malwareUsed = resourceNames(
+    r.malware_used,
+    r.malwareUsed,
+    r.tools_used,
+    r.toolsUsed,
+    r.malware_families,
+  );
+  const malwareDeveloped = resourceNames(
+    r.malware_developed,
+    r.malwareDeveloped,
+    r.tools_developed,
+    r.toolsDeveloped,
+  );
+  const malwareFamilies = [...new Set([...malwareUsed, ...malwareDeveloped])];
 
   const origins: string = (r.origins ?? [])
     .map((o: any) => o.country ?? o.name ?? "")
