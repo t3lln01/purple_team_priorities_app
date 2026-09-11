@@ -39,3 +39,13 @@ Actor Prioritisation is read-only and ranks actors exclusively from the selected
 **Why:** Historical risk views must represent what was observed and knowable during that quarter, not today's age or procedures from another reporting period.
 
 **How to apply:** Any technique risk summary or export should use the shared quarter bounds and in-quarter procedure evidence before ranking or aggregating results.
+
+## Quarterly monitoring status
+
+- Monitored/not-monitored actor status is explicit state inside each quarter snapshot.
+- Static actor defaults and legacy per-actor flags are migration inputs only; once saved, the quarter monitoring map is authoritative.
+- A newly initialized quarter may copy the previous quarter as its starting point, but later changes remain isolated.
+
+**Why:** Monitoring membership is a historical Threat Model decision and must not change past or future quarters when toggled in one view.
+
+**How to apply:** Read, toggle, add, and delete actor monitoring membership through the selected quarter's monitoring map and persist it with the rest of that snapshot.

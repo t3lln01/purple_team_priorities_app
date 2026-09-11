@@ -235,6 +235,7 @@ function saveToLocalStorage(state: {
   ppTapList: string[];
   sirtList: string[];
   autoAssessments: AutoAssessmentMap;
+  monitoringState: Record<string, boolean>;
 }) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch { /* quota */ }
 }
@@ -255,6 +256,20 @@ function matchesList(actorName: string, malware: string, list: string[]): boolea
     if (!t) return false;
     return nameUpper === t || malwareUpper.includes(t);
   });
+}
+
+function deriveLegacyMonitoringState(
+  customActors: CustomActor[],
+  actorOverrides: Record<string, ActorOverride>,
+): Record<string, boolean> {
+  const state: Record<string, boolean> = {};
+  for (const actor of staticActors) {
+    state[actor.name] = actorOverrides[actor.name]?.inMonitoringList ?? actor.inMonitoringList;
+  }
+  for (const actor of customActors) {
+    state[actor.name] = actor.inMonitoringList;
+  }
+  return state;
 }
 
 function malwareTags(value: string | undefined): string[] {
@@ -1413,6 +1428,7 @@ export default function ThreatModel() {
   const [ppTapList, setPpTapList]           = useState<string[]>([]);
   const [sirtList, setSirtList]             = useState<string[]>([]);
   const [autoAssessments, setAutoAssessments] = useState<AutoAssessmentMap>({});
+  const [monitoringState, setMonitoringState] = useState<Record<string, boolean>>({});
   const [liveLastActive, setLiveLastActive] = useState<Record<string, string>>({});
   const [serverLoading, setServerLoading]   = useState(true);
 
@@ -1467,8 +1483,13 @@ export default function ThreatModel() {
 
         const data = await stateRes.json();
         if (data.ok) {
-          setCustomActors(data.customActors ?? []);
-          setActorOverrides(data.actorOverrides ?? {});
+          const loadedCustomActors: CustomActor[] = data.customActors ?? [];
+          const loadedActorOverrides: Record<string, ActorOverride> = data.actorOverrides ?? {};
+          const loadedMonitoringState: Record<string, boolean> = data.monitoringState
+            ?? deriveLegacyMonitoringState(loadedCustomActors, loadedActorOverrides);
+          setCustomActors(loadedCustomActors);
+          setActorOverrides(loadedActorOverrides);
+          setMonitoringState(loadedMonitoringState);
           setAutoAssessments(data.autoAssessments ?? {});
            const loadedPpTap: string[] = data.ppTapList ?? [];
            const loadedSirt: string[]  = data.sirtList ?? [];
@@ -1481,11 +1502,12 @@ export default function ThreatModel() {
           // Mirror current quarter to localStorage for offline fallback
           if (isCurrent) {
             saveToLocalStorage({
-              customActors: data.customActors ?? [],
-              actorOverrides: data.actorOverrides ?? {},
+              customActors: loadedCustomActors,
+              actorOverrides: loadedActorOverrides,
                ppTapList: useLegacySeed ? SEED_PPTAP : loadedPpTap,
                sirtList:  useLegacySeed ? SEED_SIRT : loadedSirt,
               autoAssessments: data.autoAssessments ?? {},
+              monitoringState: loadedMonitoringState,
             });
           }
           loaded = true;
@@ -1499,6 +1521,10 @@ export default function ThreatModel() {
           setCustomActors(ls.customActors ?? []);
           setActorOverrides(ls.actorOverrides ?? {});
           setAutoAssessments(ls.autoAssessments ?? {});
+          setMonitoringState(
+            ls.monitoringState
+              ?? deriveLegacyMonitoringState(ls.customActors ?? [], ls.actorOverrides ?? {}),
+          );
           const lsPpTap: string[] = ls.ppTapList ?? [];
           const lsSirt: string[]  = ls.sirtList ?? [];
           setPpTapList(lsPpTap.length > 0 ? lsPpTap : SEED_PPTAP);
@@ -1511,6 +1537,7 @@ export default function ThreatModel() {
         setPpTapList([]);
         setSirtList([]);
         setAutoAssessments({});
+        setMonitoringState({});
       }
       setServerLoading(false);
     })();
@@ -1556,6 +1583,7 @@ export default function ThreatModel() {
       ppTapList?: string[];
       sirtList?: string[];
       autoAssessments?: AutoAssessmentMap;
+      monitoringState?: Record<string, boolean>;
     }
   ) => {
     const ca    = next.customActors   ?? customActors;
@@ -1563,15 +1591,16 @@ export default function ThreatModel() {
     const pptap = next.ppTapList      ?? ppTapList;
     const sirt  = next.sirtList       ?? sirtList;
     const assessments = next.autoAssessments ?? autoAssessments;
+    const monitoring = next.monitoringState ?? monitoringState;
     // Mirror current quarter to localStorage for offline fallback
     if (selectedQuarter === QUARTER_LABEL) {
-      saveToLocalStorage({ customActors: ca, actorOverrides: ovr, ppTapList: pptap, sirtList: sirt, autoAssessments: assessments });
+      saveToLocalStorage({ customActors: ca, actorOverrides: ovr, ppTapList: pptap, sirtList: sirt, autoAssessments: assessments, monitoringState: monitoring });
     }
     try {
       const res = await fetch(`${CS_API}/cs/threat-model-state`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customActors: ca, actorOverrides: ovr, ppTapList: pptap, sirtList: sirt, autoAssessments: assessments, quarter: selectedQuarter }),
+        body: JSON.stringify({ customActors: ca, actorOverrides: ovr, ppTapList: pptap, sirtList: sirt, autoAssessments: assessments, monitoringState: monitoring, quarter: selectedQuarter }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -1583,7 +1612,7 @@ export default function ThreatModel() {
         });
       }
     } catch { /* offline — localStorage copy already saved above */ }
-  }, [customActors, actorOverrides, ppTapList, sirtList, autoAssessments, selectedQuarter]);
+  }, [customActors, actorOverrides, ppTapList, sirtList, autoAssessments, monitoringState, selectedQuarter]);
 
   // ── Merge static + custom actors, compute effective scores ────────────────
   const mergedActors = useMemo((): MergedActor[] => {
@@ -1624,7 +1653,8 @@ export default function ThreatModel() {
         csEnriched: ovr.csEnriched ?? false,
         csLastRefreshed: ovr.csLastRefreshed ?? null,
         description: (csData as any).description ?? "",
-        monitored: ovr.inMonitoringList !== undefined ? ovr.inMonitoringList : a.inMonitoringList,
+        monitored: monitoringState[a.name]
+          ?? (ovr.inMonitoringList !== undefined ? ovr.inMonitoringList : a.inMonitoringList),
         effectiveIntentScore,
         effectiveCapabilityScore,
         inPpTap,
@@ -1658,7 +1688,7 @@ export default function ThreatModel() {
         novelty: "",
         noveltyScore: null,
         isCustom: true,
-        monitored: a.inMonitoringList,
+        monitored: monitoringState[a.name] ?? a.inMonitoringList,
         effectiveIntentScore,
         effectiveCapabilityScore,
         inPpTap,
@@ -1675,7 +1705,7 @@ export default function ThreatModel() {
     });
 
     return [...staticMerged, ...customMerged];
-  }, [staticActors, customActors, actorOverrides, ppTapList, sirtList, liveLastActive, autoAssessments]);
+  }, [staticActors, customActors, actorOverrides, ppTapList, sirtList, liveLastActive, autoAssessments, monitoringState]);
 
   function generateAssessments(context: ScoringContext = scoringContext) {
     const generated = generateQuarterlyAssessments(selectedQuarter, mergedActors, procedureSource, context);
@@ -1807,35 +1837,31 @@ export default function ThreatModel() {
 
   // ── Toggle monitoring ─────────────────────────────────────────────────────
   async function toggleMonitor(name: string) {
-    const customIdx = customActors.findIndex(a => a.name.toUpperCase() === name.toUpperCase());
-    if (customIdx !== -1) {
-      const updated = [...customActors];
-      updated[customIdx] = { ...updated[customIdx], inMonitoringList: !updated[customIdx].inMonitoringList };
-      setCustomActors(updated);
-      await persistState({ customActors: updated });
-      return;
-    }
-    const curr = actorOverrides[name]?.inMonitoringList;
-    const staticActor = staticActors.find(a => a.name === name);
-    const baseline = curr !== undefined ? curr : (staticActor?.inMonitoringList ?? false);
-    const newOverrides = { ...actorOverrides, [name]: { ...actorOverrides[name], inMonitoringList: !baseline } };
-    setActorOverrides(newOverrides);
-    await persistState({ actorOverrides: newOverrides });
+    const actor = mergedActors.find(item => item.name.toUpperCase() === name.toUpperCase());
+    const next = { ...monitoringState, [name]: !(actor?.monitored ?? false) };
+    setMonitoringState(next);
+    await persistState({ monitoringState: next });
+    showMsg(`${name} ${next[name] ? "monitored" : "not monitored"} in ${selectedQuarter}`);
   }
 
   // ── Delete custom actor ───────────────────────────────────────────────────
   async function deleteActor(name: string) {
     const updated = customActors.filter(a => a.name.toUpperCase() !== name.toUpperCase());
+    const nextMonitoring = { ...monitoringState };
+    delete nextMonitoring[name];
     setCustomActors(updated);
-    await persistState({ customActors: updated });
+    setMonitoringState(nextMonitoring);
+    await persistState({ customActors: updated, monitoringState: nextMonitoring });
     showMsg(`${name} removed`);
   }
 
   // ── Add actor ─────────────────────────────────────────────────────────────
   async function addActor(actor: CustomActor) {
     const updated = [...customActors, actor];
+    const nextMonitoring = { ...monitoringState, [actor.name]: actor.inMonitoringList };
     setCustomActors(updated);
-    await persistState({ customActors: updated });
+    setMonitoringState(nextMonitoring);
+    await persistState({ customActors: updated, monitoringState: nextMonitoring });
     setShowAdd(false);
     showMsg(`${actor.name} added`);
   }

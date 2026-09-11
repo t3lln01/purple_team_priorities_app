@@ -504,6 +504,8 @@ interface ThreatModelState {
   sirtList: string[];
   /** Quarterly machine-generated assessments, kept separate from manual actor overrides. */
   autoAssessments: Record<string, any>;
+  /** Explicit monitored/not-monitored status for every actor in this quarter. */
+  monitoringState?: Record<string, boolean>;
 }
 
 const EMPTY_TM_STATE = (): ThreatModelState => ({
@@ -512,6 +514,7 @@ const EMPTY_TM_STATE = (): ThreatModelState => ({
   ppTapList: [],
   sirtList: [],
   autoAssessments: {},
+  monitoringState: {},
 });
 
 async function loadTmState(): Promise<ThreatModelState> {
@@ -524,6 +527,7 @@ async function loadTmState(): Promise<ThreatModelState> {
       ppTapList: parsed.ppTapList ?? [],
       sirtList: parsed.sirtList ?? [],
       autoAssessments: parsed.autoAssessments ?? {},
+      monitoringState: parsed.monitoringState,
     };
   } catch {
     return EMPTY_TM_STATE();
@@ -599,6 +603,9 @@ async function loadVersionStore(): Promise<VersionStore> {
         actorOverrides: source.actorOverrides ?? {},
         ppTapList:      source.ppTapList      ?? [],
         sirtList:       source.sirtList       ?? [],
+        monitoringState: source.monitoringState
+          ? { ...source.monitoringState }
+          : undefined,
         // Assessments are quarter-specific evidence, so do not copy them forward.
         autoAssessments: {},
         savedAt:        new Date().toISOString(),
@@ -640,6 +647,7 @@ async function loadTmVersion(quarter: string): Promise<ThreatModelState & {
     ppTapList:      entry.ppTapList      ?? [],
     sirtList:       entry.sirtList       ?? [],
     autoAssessments: entry.autoAssessments ?? {},
+    monitoringState: entry.monitoringState,
     seededFrom:     entry.seededFrom,
     savedAt: entry.savedAt ?? null,
     hasSnapshot: entry.savedAt != null,
@@ -903,7 +911,7 @@ csRouter.get("/cs/threat-model-state", async (req, res) => {
 
 /** POST /api/cs/threat-model-state — save state for a quarter (body.quarter or current quarter) */
 csRouter.post("/cs/threat-model-state", async (req, res) => {
-  const { customActors, actorOverrides, ppTapList, sirtList, autoAssessments, quarter: bodyQuarter } = req.body ?? {};
+  const { customActors, actorOverrides, ppTapList, sirtList, autoAssessments, monitoringState, quarter: bodyQuarter } = req.body ?? {};
   if (!Array.isArray(customActors) || typeof actorOverrides !== "object") {
     res.status(400).json({ ok: false, error: "customActors (array) and actorOverrides (object) are required" });
     return;
@@ -916,6 +924,11 @@ csRouter.post("/cs/threat-model-state", async (req, res) => {
       ppTapList: Array.isArray(ppTapList) ? ppTapList : [],
       sirtList:  Array.isArray(sirtList)  ? sirtList  : [],
       autoAssessments: typeof autoAssessments === "object" && autoAssessments !== null ? autoAssessments : {},
+      monitoringState: typeof monitoringState === "object" && monitoringState !== null
+        ? Object.fromEntries(
+            Object.entries(monitoringState).map(([name, monitored]) => [name, monitored === true]),
+          )
+        : undefined,
     });
     res.json({ ok: true, quarter });
   } catch (err: any) {
