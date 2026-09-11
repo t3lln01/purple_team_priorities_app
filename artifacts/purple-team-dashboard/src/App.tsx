@@ -27,7 +27,7 @@ import LikelihoodTable   from "@/pages/LikelihoodTable";
 import ThreatModel       from "@/pages/ThreatModel";
 import ApiDocs           from "@/pages/ApiDocs";
 import { AuthProvider, useAuthorization } from "@/context/AuthContext";
-import { ThreatModelQuarterProvider } from "@/context/ThreatModelQuarterContext";
+import { ThreatModelQuarterProvider, useThreatModelQuarter } from "@/context/ThreatModelQuarterContext";
 import UserManagement from "@/pages/UserManagement";
 
 const queryClient = new QueryClient();
@@ -117,8 +117,11 @@ const navItems = [
 
 function DatePickerWidget() {
   const { dateRange, setDateRange, customFrom, customTo, setCustomFrom, setCustomTo } = useDateWindow();
+  const { selectedQuarter } = useThreatModelQuarter();
+  const [location] = useLocation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const quarterControlsRisk = stripBase(location) === "/risk-calculation";
 
   useEffect(() => {
     function onOut(e: MouseEvent) {
@@ -127,6 +130,18 @@ function DatePickerWidget() {
     document.addEventListener("mousedown", onOut);
     return () => document.removeEventListener("mousedown", onOut);
   }, []);
+
+  if (quarterControlsRisk) {
+    return (
+      <Link href="/threat-model">
+        <span className="flex w-full cursor-pointer items-center gap-2 rounded-lg border border-primary/40 bg-primary/15 px-3 py-2 text-xs font-medium text-primary transition-colors hover:bg-primary/20">
+          <CalendarRange className="h-3.5 w-3.5 flex-shrink-0" />
+          <span className="flex-1 truncate text-left">{selectedQuarter} procedures</span>
+          <Crosshair className="h-3 w-3 flex-shrink-0" />
+        </span>
+      </Link>
+    );
+  }
 
   return (
     <div className="relative" ref={ref}>
@@ -152,7 +167,7 @@ function DatePickerWidget() {
         <div className="absolute left-0 bottom-full mb-1.5 z-50 w-64 bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
           <div className="p-3 border-b border-border">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Calculation date window</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Applies across all pages — filters to techniques observed in this period</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Filters procedure-based views that use the global date window</p>
           </div>
           <div className="p-2 space-y-0.5">
             {(["all", "3m", "6m", "9m", "1y", "custom"] as DateRange[]).map(opt => (

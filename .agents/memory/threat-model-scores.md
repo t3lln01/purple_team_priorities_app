@@ -28,3 +28,14 @@ Actor Prioritisation is read-only and ranks actors exclusively from the selected
 **Why:** Quarterly list membership is part of the evidence and scoring context for that quarter; changing a later quarter must not rewrite historical PP-TAP or SIRT membership.
 
 **How to apply:** Always load and save both lists with the selected quarter state, and preserve empty saved lists as empty.
+
+## Technique risk quarter rule
+
+- Risk Calculation uses the same selected Threat Model quarter as Actor Prioritisation.
+- Only procedures with dates inside that calendar quarter contribute technique evidence.
+- The latest qualifying procedure determines default last-occurrence recency and likelihood as of the quarter end; a manual likelihood override still wins.
+- Techniques with no dated procedure in the selected quarter are excluded rather than carrying forward all-time evidence.
+
+**Why:** Historical risk views must represent what was observed and knowable during that quarter, not today's age or procedures from another reporting period.
+
+**How to apply:** Any technique risk summary or export should use the shared quarter bounds and in-quarter procedure evidence before ranking or aggregating results.

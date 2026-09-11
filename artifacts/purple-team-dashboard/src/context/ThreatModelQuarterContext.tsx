@@ -27,6 +27,37 @@ function currentQuarterLabel(): string {
 
 export const CURRENT_THREAT_MODEL_QUARTER = currentQuarterLabel();
 
+export type ThreatModelQuarterWindow = {
+  fromMs: number;
+  toMs: number;
+  fromLabel: string;
+  toLabel: string;
+};
+
+export function getThreatModelQuarterWindow(label: string): ThreatModelQuarterWindow | null {
+  const match = label.match(/^Q([1-4])\s+(\d{4})$/);
+  if (!match) return null;
+
+  const quarter = Number(match[1]);
+  const year = Number(match[2]);
+  const startMonth = (quarter - 1) * 3;
+  const from = new Date(year, startMonth, 1);
+  const nextQuarter = new Date(year, startMonth + 3, 1);
+  const to = new Date(nextQuarter.getTime() - 1);
+  const format = (date: Date) => date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
+  return {
+    fromMs: from.getTime(),
+    toMs: to.getTime(),
+    fromLabel: format(from),
+    toLabel: format(to),
+  };
+}
+
 export const ALL_THREAT_MODEL_QUARTERS = (() => {
   const quarters: string[] = [];
   const match = CURRENT_THREAT_MODEL_QUARTER.match(/Q(\d) (\d+)/);

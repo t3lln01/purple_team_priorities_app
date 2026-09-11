@@ -4,14 +4,59 @@ import { applyOverrides, type RiskRow } from "@/utils/riskOverrides";
 import { useTacticScores } from "@/context/TacticScoresContext";
 import { useLikelihood }  from "@/context/LikelihoodContext";
 import { useAppData, baseFullRiskCalc } from "@/context/AppDataContext";
-import { CalendarRange } from "lucide-react";
+import data from "@/data.json";
+import { CalendarRange, Crosshair } from "lucide-react";
 import { useImpactOverrides } from "@/context/ImpactOverridesContext";
 import { useHVAScores }       from "@/context/HVAScoresContext";
-import { useDateWindow, DATE_RANGE_LABELS } from "@/context/DateWindowContext";
+import {
+  CURRENT_THREAT_MODEL_QUARTER,
+  getThreatModelQuarterWindow,
+  useThreatModelQuarter,
+} from "@/context/ThreatModelQuarterContext";
+import {
+  LAST_OCC_OPTIONS,
+  calcLikelihoodRate,
+  calcLikelihoodScore,
+} from "@/utils/impactFormulas";
 
 const rawRiskCalc: RiskRow[] = baseFullRiskCalc as RiskRow[];
 
 type SortKey = "TID" | "Technique Name" | "Tactic" | "CIA Score" | "Impact Rate" | "Likelihood Rate" | "Risk Scores";
+type ProcedureEvidence = {
+  mitreId: string;
+  date: number | null;
+};
+type QuarterRiskRow = RiskRow & {
+  quarterLastSeen: number;
+  quarterProcedureCount: number;
+};
+
+const baseProcedures: ProcedureEvidence[] = ((data as any).allProcedures ?? []);
+
+function loadCustomProcedures(): ProcedureEvidence[] {
+  try {
+    const stored = JSON.parse(localStorage.getItem("pt_procedures_custom") ?? "[]");
+    return Array.isArray(stored) ? stored : [];
+  } catch {
+    return [];
+  }
+}
+
+function lastOccurrenceFor(dateMs: number, referenceMs: number) {
+  const ageDays = Math.max(0, referenceMs - dateMs) / 86_400_000;
+  if (ageDays < 90) return LAST_OCC_OPTIONS[0];
+  if (ageDays < 365) return LAST_OCC_OPTIONS[1];
+  if (ageDays < 730) return LAST_OCC_OPTIONS[2];
+  return LAST_OCC_OPTIONS[3];
+}
+
+function formatProcedureDate(dateMs: number) {
+  return new Date(dateMs).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 const RATE_ORDER: Record<string, number> = { "very high": 4, "high": 3, "medium": 2, "low": 1 };
 function rateRank(v: string): number {
@@ -42,7 +87,11 @@ export default function RiskCalculation() {
   const [sortKey, setSortKey]           = useState<SortKey>("Risk Scores");
   const [sortDir, setSortDir]           = useState<"asc" | "desc">("desc");
 
-  const { dateRange, tidsInWindow, setDateRange, setCustomFrom, setCustomTo } = useDateWindow();
+  const { selectedQuarter } = useThreatModelQuarter();
+  const quarterWindow = useMemo(
+    () => getThreatModelQuarterWindow(selectedQuarter),
+    [selectedQuarter],
+  );
 
   const { overrides: tacticOverrides }     = useTacticScores();
   const { overrides: likelihoodOverrides } = useLikelihood();
@@ -60,18 +109,73 @@ export default function RiskCalculation() {
     [allRawRows, tacticOverrides, likelihoodOverrides, impactOverrides, hvaScoreMap]
   );
 
-  // Apply date window — only show TIDs observed within the window
-  const windowFiltered = useMemo(
-    () => tidsInWindow ? riskCalc.filter(r => tidsInWindow.has(r.TID)) : riskCalc,
-    [riskCalc, tidsInWindow]
-  );
+  const quarterEvidence = useMemo(() => {
+    const evidence = new Map<string, { latest: number; count: number }>();
+    if (!quarterWindow) return evidence;
+
+    const procedures: ProcedureEvidence[] = [
+      ...baseProcedures,
+      ...loadCustomProcedures(),
+      ...(liveActorData?.procedures ?? []),
+    ];
+    for (const procedure of procedures) {
+      const date = procedure.date;
+      if (!procedure.mitreId || date == null || date < quarterWindow.fromMs || date > quarterWindow.toMs) continue;
+      const current = evidence.get(procedure.mitreId);
+      evidence.set(procedure.mitreId, {
+        latest: current ? Math.max(current.latest, date) : date,
+        count: (current?.count ?? 0) + 1,
+      });
+    }
+    return evidence;
+  }, [quarterWindow, liveActorData]);
+
+  const quarterRiskCalc = useMemo<QuarterRiskRow[]>(() => {
+    if (!quarterWindow) return [];
+
+    return riskCalc.flatMap(row => {
+      const evidence = quarterEvidence.get(row.TID);
+      if (!evidence) return [];
+
+      const manualLastOccurrence = likelihoodOverrides[row.TID]?.lastOccurrence;
+      const procedureOccurrence = lastOccurrenceFor(evidence.latest, quarterWindow.toMs);
+      const lastOccurrence = manualLastOccurrence
+        ? LAST_OCC_OPTIONS.find(option => option.label === manualLastOccurrence) ?? procedureOccurrence
+        : procedureOccurrence;
+
+      const previousLastOccurrenceScore = row["Last occurrence Score"] || 1;
+      const previousBase = (row["TID  Priority"] || 1)
+        * previousLastOccurrenceScore
+        * (row["Confidence Score"] || 1);
+      const likelihoodFactor = previousBase > 0
+        ? row["Likelihood Score"] / previousBase
+        : 1;
+      const likelihoodScore = calcLikelihoodScore(
+        row["TID  Priority"] || 1,
+        lastOccurrence.score,
+        row["Confidence Score"] || 1,
+        likelihoodFactor,
+      );
+
+      return [{
+        ...row,
+        "Last Occurrence": lastOccurrence.label,
+        "Last occurrence Score": lastOccurrence.score,
+        "Likelihood Score": likelihoodScore,
+        "Likelihood Rate": calcLikelihoodRate(likelihoodScore),
+        "Risk Scores": row["Impact Score"] * likelihoodScore,
+        quarterLastSeen: evidence.latest,
+        quarterProcedureCount: evidence.count,
+      }];
+    });
+  }, [riskCalc, quarterEvidence, quarterWindow, likelihoodOverrides]);
 
   const tactics = useMemo(
-    () => ["All", ...Array.from(new Set(windowFiltered.flatMap(r => r.Tactic?.split(", ") || []))).sort()],
-    [windowFiltered]
+    () => ["All", ...Array.from(new Set(quarterRiskCalc.flatMap(r => r.Tactic?.split(", ") || []))).sort()],
+    [quarterRiskCalc]
   );
 
-  const filtered = windowFiltered.filter(r => {
+  const filtered = quarterRiskCalc.filter(r => {
     const q = search.toLowerCase();
     const matchSearch = !q ||
       r.TID?.toLowerCase().includes(q) ||
@@ -110,39 +214,53 @@ export default function RiskCalculation() {
     return <span className="ml-1 text-primary">{sortDir === "asc" ? "↑" : "↓"}</span>;
   }
 
-  const avgRisk  = windowFiltered.reduce((s, r) => s + (r["Risk Scores"] || 0), 0) / (windowFiltered.length || 1);
-  const maxRisk  = Math.max(...windowFiltered.map(r => r["Risk Scores"] || 0), 1);
-  const vhImpact = windowFiltered.filter(r => r["Impact Rate"] === "Very High").length;
+  const avgRisk  = quarterRiskCalc.reduce((s, r) => s + (r["Risk Scores"] || 0), 0) / (quarterRiskCalc.length || 1);
+  const maxRisk  = Math.max(...quarterRiskCalc.map(r => r["Risk Scores"] || 0), 0);
+  const riskBarScale = Math.max(maxRisk, 1);
+  const vhImpact = quarterRiskCalc.filter(r => r["Impact Rate"] === "Very High").length;
+  const procedureCount = Array.from(quarterEvidence.values()).reduce((sum, item) => sum + item.count, 0);
 
   return (
     <div className="p-6 space-y-6">
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Risk Calculation</h1>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-foreground">Risk Calculation</h1>
+            <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+              {selectedQuarter}
+              {selectedQuarter === CURRENT_THREAT_MODEL_QUARTER ? " · current" : ""}
+            </span>
+          </div>
         <p className="text-muted-foreground text-sm mt-1">
-          Risk = Impact × Likelihood
-          {tidsInWindow
-            ? ` · showing ${windowFiltered.length} of ${riskCalc.length} techniques observed in window`
-            : ` · ${riskCalc.length} techniques`}
+            Risk = Impact × Likelihood · {quarterRiskCalc.length} techniques with dated procedures in {selectedQuarter}
         </p>
+        </div>
+        <Link href="/threat-model">
+          <span className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-secondary px-3 py-2 text-xs font-medium text-secondary-foreground hover:bg-accent">
+            <Crosshair className="h-4 w-4" />
+            Change Threat Model quarter
+          </span>
+        </Link>
       </div>
 
-      {tidsInWindow && (
-        <div className="flex items-center gap-2 px-4 py-2.5 bg-primary/5 border border-primary/20 rounded-xl text-xs text-primary/80">
-          <CalendarRange className="w-3.5 h-3.5 flex-shrink-0" />
-          <span>
-            Date window active: showing <strong>{windowFiltered.length}</strong> of {riskCalc.length} techniques
-            that have at least one observed procedure within <strong>{DATE_RANGE_LABELS[dateRange].toLowerCase()}</strong>.
-          </span>
-          <button onClick={() => { setDateRange("all"); setCustomFrom(""); setCustomTo(""); }}
-            className="ml-auto text-primary underline hover:no-underline whitespace-nowrap">Clear</button>
-        </div>
-      )}
+      <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 text-xs text-primary/80">
+        <CalendarRange className="h-3.5 w-3.5 flex-shrink-0" />
+        <span>
+          Procedure window: <strong>{quarterWindow?.fromLabel ?? "—"}</strong> to{" "}
+          <strong>{quarterWindow?.toLabel ?? "—"}</strong>. Only dated procedures in this quarter are included;
+          their latest occurrence drives likelihood unless manually overridden.
+        </span>
+      </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <div className="bg-card border border-card-border rounded-xl p-4">
-          <div className="text-2xl font-bold text-primary">{windowFiltered.length}</div>
-          <div className="text-sm text-muted-foreground mt-1">Techniques Shown</div>
+          <div className="text-2xl font-bold text-primary">{quarterRiskCalc.length}</div>
+          <div className="text-sm text-muted-foreground mt-1">Observed Techniques</div>
+        </div>
+        <div className="bg-card border border-card-border rounded-xl p-4">
+          <div className="text-2xl font-bold text-cyan-400">{procedureCount}</div>
+          <div className="text-sm text-muted-foreground mt-1">Quarter Procedures</div>
         </div>
         <div className="bg-card border border-card-border rounded-xl p-4">
           <div className="text-2xl font-bold text-red-400">{vhImpact}</div>
@@ -197,6 +315,7 @@ export default function RiskCalculation() {
                   </th>
                 ))}
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">Last Seen</th>
+                <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">Procedures</th>
                 <th className="text-left px-4 py-2.5 text-xs text-muted-foreground font-medium whitespace-nowrap">
                   <button onClick={() => handleSort("Risk Scores")} className="flex items-center hover:text-foreground transition-colors">
                     Risk Score<SortIcon col="Risk Scores" />
@@ -205,6 +324,16 @@ export default function RiskCalculation() {
               </tr>
             </thead>
             <tbody>
+              {sorted.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="px-6 py-12 text-center">
+                    <div className="text-sm font-medium text-foreground">No dated procedures in {selectedQuarter}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Techniques appear here when a procedure date falls between {quarterWindow?.fromLabel ?? "the quarter start"} and {quarterWindow?.toLabel ?? "the quarter end"}.
+                    </div>
+                  </td>
+                </tr>
+              )}
               {sorted.slice(0, 100).map((row, i) => (
                 <tr key={i} className="border-b border-border/40 hover:bg-accent/20 transition-colors">
                   <td className="px-4 py-2.5">
@@ -237,13 +366,19 @@ export default function RiskCalculation() {
                       {row["Likelihood Rate"] || "—"}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 text-xs text-muted-foreground">{row["Last Occurrence"] || "—"}</td>
+                  <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                    <div>{formatProcedureDate(row.quarterLastSeen)}</div>
+                    <div className="mt-0.5 text-[10px]">{row["Last Occurrence"]}</div>
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-center font-mono text-muted-foreground">
+                    {row.quarterProcedureCount}
+                  </td>
                   <td className="px-4 py-2.5 text-xs">
                     <div className="flex items-center gap-1.5">
                       <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
                         <div
                           className="h-full bg-primary rounded-full"
-                          style={{ width: `${Math.min(100, ((row["Risk Scores"] || 0) / maxRisk) * 100)}%` }}
+                          style={{ width: `${Math.min(100, ((row["Risk Scores"] || 0) / riskBarScale) * 100)}%` }}
                         />
                       </div>
                       <span className="font-mono font-semibold text-foreground">{(row["Risk Scores"] || 0).toFixed(0)}</span>
