@@ -6,6 +6,7 @@ import SortableTh from "@/components/SortableTh";
 import AssessmentReviewPanel from "@/components/AssessmentReviewPanel";
 import { useAppData } from "@/context/AppDataContext";
 import { generateQuarterlyAssessments, sourceQuarterForAssessment, type AutoAssessment, type ScoringContext } from "@/utils/quarterlyAutoScoring";
+import { useThreatModelQuarter } from "@/context/ThreatModelQuarterContext";
 import {
   ChevronDown, ChevronRight, Shield, Target, Zap, Globe, X,
   RefreshCw, Plus, Check, AlertCircle, Search, Eye, EyeOff,
@@ -1310,7 +1311,7 @@ export default function ThreatModel() {
     };
   }, [liveActorData]);
   // Quarter versioning
-  const [selectedQuarter, setSelectedQuarter] = useState<string>(QUARTER_LABEL);
+  const { selectedQuarter, setSelectedQuarter } = useThreatModelQuarter();
   const [savedVersions, setSavedVersions]     = useState<Array<{
     quarter: string; savedAt: string | null; seededFrom: string | null;
     actorCount: number; overrideCount: number;

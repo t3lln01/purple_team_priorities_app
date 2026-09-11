@@ -27,6 +27,7 @@ import LikelihoodTable   from "@/pages/LikelihoodTable";
 import ThreatModel       from "@/pages/ThreatModel";
 import ApiDocs           from "@/pages/ApiDocs";
 import { AuthProvider, useAuthorization } from "@/context/AuthContext";
+import { ThreatModelQuarterProvider } from "@/context/ThreatModelQuarterContext";
 
 const queryClient = new QueryClient();
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -416,13 +417,14 @@ function AppProvidersAndRoutes() {
         <ClerkQueryClientCacheInvalidator />
         <AuthProvider>
           <TooltipProvider>
-            <AppDataProvider>
-              <DateWindowProvider>
-                <TacticScoresProvider>
-                  <LikelihoodProvider>
-                    <ImpactOverridesProvider>
-                      <HVAScoresProvider>
-                        <Switch>
+            <ThreatModelQuarterProvider>
+              <AppDataProvider>
+                <DateWindowProvider>
+                  <TacticScoresProvider>
+                    <LikelihoodProvider>
+                      <ImpactOverridesProvider>
+                        <HVAScoresProvider>
+                          <Switch>
                           <Route path="/" component={WelcomePage} />
                           <Route path="/sign-in/*?" component={SignInPage} />
                           <Route path="/sign-up/*?" component={SignUpPage} />
@@ -439,13 +441,14 @@ function AppProvidersAndRoutes() {
                           <Route path="/data-sources" component={DashboardRouter} />
                           <Route path="/api-docs" component={DashboardRouter} />
                           <Route><Redirect to="/" /></Route>
-                        </Switch>
-                      </HVAScoresProvider>
-                    </ImpactOverridesProvider>
-                  </LikelihoodProvider>
-                </TacticScoresProvider>
-              </DateWindowProvider>
-            </AppDataProvider>
+                          </Switch>
+                        </HVAScoresProvider>
+                      </ImpactOverridesProvider>
+                    </LikelihoodProvider>
+                  </TacticScoresProvider>
+                </DateWindowProvider>
+              </AppDataProvider>
+            </ThreatModelQuarterProvider>
             <Toaster />
           </TooltipProvider>
         </AuthProvider>

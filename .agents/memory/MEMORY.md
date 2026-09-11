@@ -1,4 +1,4 @@
-- [Threat Model score architecture](threat-model-scores.md) — TM effective scores flow to Actor Prioritisation via API fetch on mount; PP-TAP/SIRT lists drive bonuses.
+- [Threat Model score architecture](threat-model-scores.md) — Actor rankings use the selected quarter’s effective TM intent × capability; PP-TAP/SIRT drive intent bonuses.
 - [TM state file](threat-model-scores.md) — cs-threat-model-state.json stores customActors, actorOverrides (with intentFinalScore/capabilityFinalScore), ppTapList, sirtList.
 - [Quarterly auto-assessments](quarterly-auto-assessments.md) — approved procedure-based suggestions stay separate from manual overrides; manual scores always win.
 - [API production paths](api-production-paths.md) — the API bundles to CommonJS; resolve workspace data from process.cwd(), never import.meta.url.
