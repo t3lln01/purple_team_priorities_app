@@ -22,3 +22,9 @@ Actor Prioritisation is read-only and ranks actors exclusively from the selected
 - SIRT match adds +2 intent.
 - Matching is case-insensitive against the actor name or malware/tool text.
 - Effective intent is capped at 7; capability receives no list bonus.
+- PP-TAP and SIRT lists are stored inside each quarter's Threat Model snapshot, not as one global list. A saved empty list is intentional and must not be replaced by legacy seed values on reload.
+- Bulk list imports append deduplicated actor/malware names to the selected quarter only.
+
+**Why:** Quarterly list membership is part of the evidence and scoring context for that quarter; changing a later quarter must not rewrite historical PP-TAP or SIRT membership.
+
+**How to apply:** Always load and save both lists with the selected quarter state, and preserve empty saved lists as empty.

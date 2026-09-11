@@ -11,7 +11,7 @@ import {
   ChevronDown, ChevronRight, Shield, Target, Zap, Globe, X,
   RefreshCw, Plus, Check, AlertCircle, Search, Eye, EyeOff,
   Loader2, Trash2, Edit2, BookOpen, Pencil, Tag, ListX, ArrowUp,
-  History, ChevronDown as ChevronDownSm, Save, ClipboardCheck,
+  History, ChevronDown as ChevronDownSm, Save, ClipboardCheck, Upload, FileSpreadsheet,
 } from "lucide-react";
 
 const CS_API = "/api";
@@ -263,6 +263,23 @@ function malwareTags(value: string | undefined): string[] {
     .split(/,\s*|;\s*|\n+/)
     .map(item => item.trim())
     .filter(Boolean);
+}
+
+/** Parse one-column Excel pastes and simple CSV/TSV/TXT uploads into unique entries. */
+function parseBulkEntries(value: string): string[] {
+  const entries: string[] = [];
+  const seen = new Set<string>();
+  for (const row of value.split(/\r?\n/)) {
+    for (const cell of row.split(/[\t,;]/)) {
+      const entry = cell.trim().replace(/^["']|["']$/g, "").trim();
+      if (!entry) continue;
+      const key = entry.toUpperCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      entries.push(key);
+    }
+  }
+  return entries;
 }
 
 // ── Per-actor row ──────────────────────────────────────────────────────────────
@@ -786,6 +803,7 @@ function ListPage({
   list,
   allActors,
   onAdd,
+  onImport,
   onRemove,
 }: {
   title: string;
@@ -795,9 +813,13 @@ function ListPage({
   list: string[];
   allActors: MergedActor[];
   onAdd: (item: string) => void;
+  onImport: (items: string[]) => void;
   onRemove: (item: string) => void;
 }) {
   const [input, setInput] = useState("");
+  const [bulkText, setBulkText] = useState("");
+  const [bulkError, setBulkError] = useState("");
+  const [fileName, setFileName] = useState("");
 
   function handleAdd() {
     const v = input.trim().toUpperCase();
@@ -805,6 +827,31 @@ function ListPage({
     if (list.some(l => l.toUpperCase() === v)) return;
     onAdd(v);
     setInput("");
+  }
+
+  function handleBulkImport() {
+    const entries = parseBulkEntries(bulkText);
+    if (entries.length === 0) {
+      setBulkError("Paste or upload at least one entry.");
+      return;
+    }
+    onImport(entries);
+    setBulkText("");
+    setBulkError("");
+    setFileName("");
+  }
+
+  async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      setBulkText(await file.text());
+      setFileName(file.name);
+      setBulkError("");
+    } catch {
+      setBulkError("Unable to read that file.");
+    }
   }
 
   // Which actors each list item matches
@@ -883,6 +930,47 @@ function ListPage({
                 <Plus className="w-4 h-4" />
               </button>
             </div>
+          </div>
+
+          {/* Bulk paste/upload */}
+          <div className="border-b border-border bg-muted/10 p-3">
+            <div className="mb-2 flex items-center gap-2">
+              <FileSpreadsheet className="h-4 w-4 text-emerald-400" />
+              <span className="text-xs font-semibold text-foreground">Bulk import</span>
+              <span className="text-[10px] text-muted-foreground">Excel column, CSV, TSV, or TXT</span>
+            </div>
+            <textarea
+              value={bulkText}
+              onChange={e => { setBulkText(e.target.value); setBulkError(""); }}
+              rows={4}
+              placeholder={"Paste one actor or malware name per row from Excel…"}
+              className="w-full resize-y rounded-lg border border-border bg-input px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+                <Upload className="h-3.5 w-3.5" />
+                Choose file
+                <input
+                  type="file"
+                  accept=".csv,.tsv,.txt,text/csv,text/plain"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={handleBulkImport}
+                disabled={!bulkText.trim()}
+                className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+              >
+                Add entries
+              </button>
+              {fileName && <span className="max-w-[180px] truncate text-[10px] text-muted-foreground">{fileName}</span>}
+            </div>
+            {bulkError && <p className="mt-2 text-xs text-red-400">{bulkError}</p>}
+            <p className="mt-2 text-[10px] leading-4 text-muted-foreground">
+              Duplicate entries are ignored. Imports add to this quarter&apos;s existing list; they do not replace another quarter.
+            </p>
           </div>
 
           {/* List */}
@@ -1382,19 +1470,21 @@ export default function ThreatModel() {
           setCustomActors(data.customActors ?? []);
           setActorOverrides(data.actorOverrides ?? {});
           setAutoAssessments(data.autoAssessments ?? {});
-          const loadedPpTap: string[] = data.ppTapList ?? [];
-          const loadedSirt: string[]  = data.sirtList ?? [];
-          // Seed defaults only for the current quarter
+           const loadedPpTap: string[] = data.ppTapList ?? [];
+           const loadedSirt: string[]  = data.sirtList ?? [];
+           // Seed the legacy current-quarter baseline only when this quarter has
+           // never been saved. An intentionally empty saved list must stay empty.
           const isCurrent = selectedQuarter === QUARTER_LABEL;
-          setPpTapList(loadedPpTap.length > 0 ? loadedPpTap : (isCurrent ? SEED_PPTAP : []));
-          setSirtList(loadedSirt.length > 0  ? loadedSirt  : (isCurrent ? SEED_SIRT  : []));
+           const useLegacySeed = isCurrent && !data.hasSnapshot;
+           setPpTapList(useLegacySeed ? SEED_PPTAP : loadedPpTap);
+           setSirtList(useLegacySeed ? SEED_SIRT : loadedSirt);
           // Mirror current quarter to localStorage for offline fallback
           if (isCurrent) {
             saveToLocalStorage({
               customActors: data.customActors ?? [],
               actorOverrides: data.actorOverrides ?? {},
-              ppTapList: loadedPpTap.length > 0 ? loadedPpTap : SEED_PPTAP,
-              sirtList:  loadedSirt.length  > 0 ? loadedSirt  : SEED_SIRT,
+               ppTapList: useLegacySeed ? SEED_PPTAP : loadedPpTap,
+               sirtList:  useLegacySeed ? SEED_SIRT : loadedSirt,
               autoAssessments: data.autoAssessments ?? {},
             });
           }
@@ -1772,6 +1862,35 @@ export default function ThreatModel() {
     await persistState({ sirtList: next });
   }
 
+  function mergeList(existing: string[], incoming: string[]) {
+    const seen = new Set(existing.map(item => item.trim().toUpperCase()));
+    const next = [...existing];
+    for (const item of incoming) {
+      const normalized = item.trim().toUpperCase();
+      if (normalized && !seen.has(normalized)) {
+        seen.add(normalized);
+        next.push(normalized);
+      }
+    }
+    return next;
+  }
+
+  async function importToPpTap(items: string[]) {
+    const next = mergeList(ppTapList, items);
+    const added = next.length - ppTapList.length;
+    setPpTapList(next);
+    await persistState({ ppTapList: next });
+    showMsg(added > 0 ? `${added} PP-TAP entr${added === 1 ? "y" : "ies"} added to ${selectedQuarter}` : "All PP-TAP entries were already present");
+  }
+
+  async function importToSirt(items: string[]) {
+    const next = mergeList(sirtList, items);
+    const added = next.length - sirtList.length;
+    setSirtList(next);
+    await persistState({ sirtList: next });
+    showMsg(added > 0 ? `${added} SIRT entr${added === 1 ? "y" : "ies"} added to ${selectedQuarter}` : "All SIRT entries were already present");
+  }
+
   // ── Filtered + sorted table ───────────────────────────────────────────────
   const { sortKey, sortDir, toggle, sorted } = useSortTable(
     useMemo(() => {
@@ -2146,6 +2265,7 @@ export default function ThreatModel() {
           list={ppTapList}
           allActors={mergedActors}
           onAdd={addToPpTap}
+           onImport={importToPpTap}
           onRemove={removeFromPpTap}
         />
       )}
@@ -2160,6 +2280,7 @@ export default function ThreatModel() {
           list={sirtList}
           allActors={mergedActors}
           onAdd={addToSirt}
+           onImport={importToSirt}
           onRemove={removeFromSirt}
         />
       )}

@@ -620,10 +620,20 @@ async function saveVersionStore(store: VersionStore): Promise<void> {
   await fs.writeFile(TM_VERSIONS_FILE, JSON.stringify(store, null, 2));
 }
 
-async function loadTmVersion(quarter: string): Promise<ThreatModelState & { seededFrom?: string }> {
+async function loadTmVersion(quarter: string): Promise<ThreatModelState & {
+  seededFrom?: string;
+  savedAt: string | null;
+  hasSnapshot: boolean;
+}> {
   const store = await loadVersionStore();
   const entry = store[quarter];
-  if (!entry) return EMPTY_TM_STATE();
+  if (!entry) {
+    return {
+      ...EMPTY_TM_STATE(),
+      savedAt: null,
+      hasSnapshot: false,
+    };
+  }
   return {
     customActors:   entry.customActors   ?? [],
     actorOverrides: entry.actorOverrides ?? {},
@@ -631,6 +641,8 @@ async function loadTmVersion(quarter: string): Promise<ThreatModelState & { seed
     sirtList:       entry.sirtList       ?? [],
     autoAssessments: entry.autoAssessments ?? {},
     seededFrom:     entry.seededFrom,
+    savedAt: entry.savedAt ?? null,
+    hasSnapshot: entry.savedAt != null,
   };
 }
 
