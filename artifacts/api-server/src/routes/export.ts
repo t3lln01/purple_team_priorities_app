@@ -13,6 +13,7 @@
 import { Router, type Request, type Response } from "express";
 import fs   from "fs/promises";
 import path from "path";
+import { requireAuthenticatedUser } from "../middlewares/adminAuthorization";
 
 // Paths to static data files bundled with the frontend
 const ROOT_API      = path.basename(process.cwd()) === "api-server"
@@ -239,7 +240,7 @@ exportRouter.get("/export/actor-prioritisation", async (req, res) => {
 
 // ── /export/threat-model/versions ─────────────────────────────────────────────
 
-exportRouter.get("/export/threat-model/versions", async (req, res) => {
+exportRouter.get("/export/threat-model/versions", requireAuthenticatedUser, async (req, res) => {
   try {
     const store = await getTmVersions();
     const versions = Object.entries(store).map(([quarter, entry]: [string, any]) => ({
@@ -259,7 +260,7 @@ exportRouter.get("/export/threat-model/versions", async (req, res) => {
 
 // ── /export/threat-model ──────────────────────────────────────────────────────
 
-exportRouter.get("/export/threat-model", async (req, res) => {
+exportRouter.get("/export/threat-model", requireAuthenticatedUser, async (req, res) => {
   try {
     const quarter = ((req.query.quarter as string) ?? "").trim() || currentQuarter();
     const [tmStatic, store] = await Promise.all([getTmData(), getTmVersions()]);

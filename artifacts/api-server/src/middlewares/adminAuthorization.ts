@@ -26,6 +26,25 @@ export async function getRequestAccess(req: Request): Promise<{
   return { userId, email, isAdmin, canWrite };
 }
 
+export function requireAuthenticatedUser(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const { userId } = getAuth(req);
+    if (!userId) {
+      res.status(401).json({ error: "Sign in to access this resource." });
+      return;
+    }
+
+    next();
+  } catch (error) {
+    console.error("Unable to verify authenticated access", error);
+    res.status(503).json({ error: "Unable to verify authenticated access." });
+  }
+}
+
 export async function requireWriteAccessForWrites(
   req: Request,
   res: Response,

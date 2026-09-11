@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requireAuthenticatedUser } from "../middlewares/adminAuthorization";
 import fs from "fs/promises";
 import path from "path";
 
@@ -14,6 +15,10 @@ const CREDS_FILE = path.join(ROOT, "cs-credentials.json");
 const CS_BASE = "https://api.us-2.crowdstrike.com";
 
 export const csRouter = Router();
+
+// CrowdStrike intelligence, credentials metadata, and persisted threat-model
+// state are licensed or internal data. Every read requires a Clerk session.
+csRouter.get("/cs/*splat", requireAuthenticatedUser);
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
