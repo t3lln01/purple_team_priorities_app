@@ -1,0 +1,13 @@
+diff --git a/dist/config-BF1guadq.mjs b/dist/config-BF1guadq.mjs
+index 1aa9df6a6d560bca506f9fa818a29a8c07c081a0..b4082563fed4ffc7ac0d534c9edd8a29ff661916 100644
+--- a/dist/config-BF1guadq.mjs
++++ b/dist/config-BF1guadq.mjs
+@@ -6,7 +6,7 @@ import { bundle } from "@scalar/json-magic/bundle";
+ import { fetchUrls, parseJson, parseYaml, readFiles } from "@scalar/json-magic/bundle/plugins/node";
+ import { upgrade, validate } from "@scalar/openapi-parser";
+ import { isNullish as isNullish$1, pick } from "remeda";
+-import yaml from "js-yaml";
++import * as yaml from "js-yaml";
+ import * as mock from "@orval/mock";
+ import { dedupeStrictMockTypeDeclarations, generateFakerForSchemas, generateMockImports, getDefaultMockOptionsForType } from "@orval/mock";
+ import angular from "@orval/angular";
