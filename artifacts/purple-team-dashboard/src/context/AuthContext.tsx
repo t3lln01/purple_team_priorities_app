@@ -7,6 +7,7 @@ type AuthContextValue = {
   isLoaded: boolean;
   isSignedIn: boolean;
   isAdmin: boolean;
+  canWrite: boolean;
   email: string | null;
 };
 
@@ -23,6 +24,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ({ emailAddress }) => emailAddress.toLowerCase() === ADMIN_EMAIL,
     ),
   );
+  const canWrite = Boolean(
+    isAdmin || (isSignedIn && user?.publicMetadata?.role === "writer"),
+  );
 
   return (
     <AuthContext.Provider
@@ -30,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoaded,
         isSignedIn: Boolean(isSignedIn),
         isAdmin,
+        canWrite,
         email,
       }}
     >

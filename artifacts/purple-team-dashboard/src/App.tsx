@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Switch, Route, Router as WouterRouter, Link, useLocation, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ClerkProvider, SignIn, SignUp, UserButton, useClerk } from "@clerk/react";
+import { ClerkProvider, SignIn, UserButton, useClerk } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import { shadcn } from "@clerk/themes";
 import { Toaster } from "@/components/ui/toaster";
@@ -21,13 +21,14 @@ import { AppDataProvider, useAppData } from "@/context/AppDataContext";
 import { ImpactOverridesProvider }  from "@/context/ImpactOverridesContext";
 import { HVAScoresProvider }        from "@/context/HVAScoresContext";
 import { DateWindowProvider, useDateWindow, DATE_RANGE_LABELS, type DateRange } from "@/context/DateWindowContext";
-import { Shield, Users, Activity, Target, ChartBar, AlertTriangle, List, Database, Table2, TrendingUp, CalendarRange, ChevronDown, Crosshair, BookOpen } from "lucide-react";
+import { Shield, Users, Activity, Target, ChartBar, AlertTriangle, List, Database, Table2, TrendingUp, CalendarRange, ChevronDown, Crosshair, BookOpen, UserCog } from "lucide-react";
 import ImpactTable       from "@/pages/ImpactTable";
 import LikelihoodTable   from "@/pages/LikelihoodTable";
 import ThreatModel       from "@/pages/ThreatModel";
 import ApiDocs           from "@/pages/ApiDocs";
 import { AuthProvider, useAuthorization } from "@/context/AuthContext";
 import { ThreatModelQuarterProvider } from "@/context/ThreatModelQuarterContext";
+import UserManagement from "@/pages/UserManagement";
 
 const queryClient = new QueryClient();
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -85,9 +86,11 @@ const clerkAppearance = {
     logoBox: "h-14",
     logoImage: "h-12 w-12",
     socialButtonsBlockButton: "border-slate-600 bg-slate-800 hover:bg-slate-700",
+    socialButtons: "hidden",
+    dividerRow: "hidden",
     formButtonPrimary: "bg-purple-600 hover:bg-purple-500 text-white",
     formFieldInput: "border-slate-600 bg-slate-800 text-slate-50",
-    footerAction: "bg-transparent",
+    footerAction: "hidden",
     dividerLine: "bg-slate-700",
     alert: "border-red-900 bg-red-950",
     otpCodeFieldInput: "border-slate-600 bg-slate-800 text-slate-50",
@@ -109,6 +112,7 @@ const navItems = [
   { path: "/all-procedures", label: "All Procedures", icon: List },
   { path: "/data-sources", label: "Data Sources", icon: Database },
   { path: "/api-docs",     label: "API",          icon: BookOpen },
+  { path: "/users", label: "Users", icon: UserCog, adminOnly: true },
 ];
 
 function DatePickerWidget() {
@@ -207,7 +211,7 @@ function Sidebar() {
     ? mitreVersions.find(v => v.id === activeMitreVersionId)
     : null;
   const mitreLabel = activeVersion?.label ?? "MITRE ATT&CK v16";
-  const { isAdmin, isSignedIn, email } = useAuthorization();
+  const { isAdmin, canWrite, isSignedIn, email } = useAuthorization();
 
   return (
     <aside className="w-64 min-h-screen bg-sidebar border-r border-sidebar-border flex flex-col">
@@ -224,7 +228,7 @@ function Sidebar() {
       </div>
 
       <nav className="flex-1 p-3 overflow-y-auto flex flex-col gap-0.5">
-        {navItems.map(({ path, label, icon: Icon }) => {
+        {navItems.filter((item) => !item.adminOnly || isAdmin).map(({ path, label, icon: Icon }) => {
           const isActive = location === path;
           return (
             <Link key={path} href={path}>
@@ -256,15 +260,15 @@ function Sidebar() {
               <div className="truncate text-xs font-medium text-sidebar-foreground">
                 {isSignedIn ? email : "Guest"}
               </div>
-              <div className={`text-[10px] ${isAdmin ? "text-emerald-400" : "text-amber-400"}`}>
-                {isAdmin ? "Administrator" : "View only"}
+              <div className={`text-[10px] ${canWrite ? "text-emerald-400" : "text-amber-400"}`}>
+                {isAdmin ? "Administrator" : canWrite ? "Write access" : "View only"}
               </div>
             </div>
           </div>
           {!isSignedIn && (
             <Link href="/sign-in">
               <span className="mt-2 block cursor-pointer text-xs text-primary hover:underline">
-                Sign in for admin access
+                Sign in for write access
               </span>
             </Link>
           )}
@@ -279,23 +283,27 @@ function Sidebar() {
 }
 
 function Layout({ children }: { children: React.ReactNode }) {
-  const { isAdmin } = useAuthorization();
+  const { canWrite, isSignedIn } = useAuthorization();
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar />
       <main className="flex-1 overflow-auto">
-        {!isAdmin && (
+        {!canWrite && (
           <div className="sticky top-0 z-40 flex items-center justify-between border-b border-amber-400/20 bg-amber-400/10 px-6 py-2 text-xs text-amber-200 backdrop-blur">
-            <span>View-only access — sign in with the administrator account to make changes.</span>
-            <Link href="/sign-in"><span className="cursor-pointer font-semibold text-amber-100 hover:underline">Sign in</span></Link>
+            <span>
+              {isSignedIn
+                ? "View-only access — ask the administrator to grant write access."
+                : "View-only access — sign in with a write-enabled account to make changes."}
+            </span>
+            {!isSignedIn && <Link href="/sign-in"><span className="cursor-pointer font-semibold text-amber-100 hover:underline">Sign in</span></Link>}
           </div>
         )}
         <fieldset
-          disabled={!isAdmin}
+          disabled={!canWrite}
           className="m-0 min-w-0 border-0 p-0"
           onClickCapture={(event) => {
             if (
-              !isAdmin
+              !canWrite
               && (event.target as Element).closest(
                 '[role="button"], [role="switch"], [role="checkbox"]',
               )
@@ -328,6 +336,7 @@ function DashboardRouter() {
         <Route path="/all-procedures" component={AllProcedures} />
         <Route path="/data-sources" component={DataSources} />
         <Route path="/api-docs"     component={ApiDocs} />
+        <Route path="/users" component={UserManagement} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
@@ -354,7 +363,7 @@ function WelcomePage() {
         <div className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary">Purple Team</div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">Adversary Prioritisation</h1>
         <p className="mt-4 max-w-lg text-sm leading-6 text-muted-foreground">
-          Review threat actors, scoring evidence, risk calculations, and ATT&amp;CK priorities. Sign in to administer the model or continue with view-only guest access.
+          Review threat actors, scoring evidence, risk calculations, and ATT&amp;CK priorities. Sign in with your username and password to edit, or continue with view-only guest access.
         </p>
         <div className="mt-8 grid gap-3 sm:grid-cols-2">
           <button
@@ -383,15 +392,7 @@ function WelcomePage() {
 function SignInPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
-      <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} forceRedirectUrl={`${basePath}/dashboard`} />
-    </div>
-  );
-}
-
-function SignUpPage() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
-      <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} forceRedirectUrl={`${basePath}/dashboard`} />
+      <SignIn routing="path" path={`${basePath}/sign-in`} forceRedirectUrl={`${basePath}/dashboard`} />
     </div>
   );
 }
@@ -405,10 +406,8 @@ function AppProvidersAndRoutes() {
       proxyUrl={clerkProxyUrl}
       appearance={clerkAppearance}
       signInUrl={`${basePath}/sign-in`}
-      signUpUrl={`${basePath}/sign-up`}
       localization={{
-        signIn: { start: { title: "Welcome back", subtitle: "Sign in to administer the Purple Team dashboard" } },
-        signUp: { start: { title: "Create your account", subtitle: "Create a view-only account" } },
+        signIn: { start: { title: "Welcome back", subtitle: "Sign in with your username and password" } },
       }}
       routerPush={(to) => setLocation(stripBase(to))}
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
@@ -427,7 +426,6 @@ function AppProvidersAndRoutes() {
                           <Switch>
                           <Route path="/" component={WelcomePage} />
                           <Route path="/sign-in/*?" component={SignInPage} />
-                          <Route path="/sign-up/*?" component={SignUpPage} />
                           <Route path="/dashboard" component={DashboardRouter} />
                           <Route path="/threat-model" component={DashboardRouter} />
                           <Route path="/risk-calculation" component={DashboardRouter} />
@@ -440,6 +438,7 @@ function AppProvidersAndRoutes() {
                           <Route path="/all-procedures" component={DashboardRouter} />
                           <Route path="/data-sources" component={DashboardRouter} />
                           <Route path="/api-docs" component={DashboardRouter} />
+                          <Route path="/users" component={DashboardRouter} />
                           <Route><Redirect to="/" /></Route>
                           </Switch>
                         </HVAScoresProvider>

@@ -7,7 +7,7 @@ import {
   clerkProxyMiddleware,
   getClerkProxyHost,
 } from "./middlewares/clerkProxyMiddleware";
-import { requireAdminForWrites } from "./middlewares/adminAuthorization";
+import { requireWriteAccessForWrites } from "./middlewares/adminAuthorization";
 import router from "./routes";
 
 const app: Express = express();
@@ -28,6 +28,6 @@ app.use(
   })),
 );
 
-app.use("/api", requireAdminForWrites, router);
+app.use("/api", requireWriteAccessForWrites, router);
 
 export default app;
