@@ -49,3 +49,13 @@ Actor Prioritisation is read-only and ranks actors exclusively from the selected
 **Why:** Monitoring membership is a historical Threat Model decision and must not change past or future quarters when toggled in one view.
 
 **How to apply:** Read, toggle, add, and delete actor monitoring membership through the selected quarter's monitoring map and persist it with the rest of that snapshot.
+
+## Explicit quarter saves
+
+- Threat Model edits remain a local draft until the user saves the complete selected-quarter snapshot.
+- The snapshot includes scores and rubric selections, PP-TAP, SIRT, custom actors, automated assessments, and monitoring status.
+- Failed or unauthorized writes must remain visibly unsaved and show the server error.
+
+**Why:** Independent auto-saves could fail silently or persist only part of a quarter, leaving the UI inconsistent with the stored snapshot.
+
+**How to apply:** New quarter-level editable fields must participate in the shared dirty-state comparison and full-snapshot save action.

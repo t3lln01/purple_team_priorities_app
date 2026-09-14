@@ -94,6 +94,267 @@
         "willingnessModifier": 0,
         "capabilityBaseScore": 5,
         "noveltyModifier": 0
+      },
+      "HAYWIRE KITTEN": {
+        "csEnriched": true,
+        "csLastRefreshed": "2026-09-13T15:51:48.610Z",
+        "csData": {
+          "origins": "",
+          "aliases": "NEPTUNIUM, Holy Souls, Black Magic, Atlas Group, Yare Gomnam Cyber Team, Hackers of Savior, Deus, Sangkancil, AMC239, Generous Thief, Al-Toufan, Yooz E Cybery, Cotton Sandstorm, kalin3t",
+          "lastSeen": "2026-01-15",
+          "malware": "",
+          "countries": [],
+          "industries": [],
+          "motivation": "State-Sponsored",
+          "adversaryType": "",
+          "communityIds": "NEPTUNIUM, Holy Souls, Black Magic, Atlas Group, Yare Gomnam Cyber Team, Hackers of Savior, Deus, Sangkancil, AMC239, Generous Thief, Al-Toufan, Yooz E Cybery, Cotton Sandstorm, kalin3t",
+          "description": "HAYWIRE KITTEN is an Iran-nexus adversary that likely represents Emennet Pasargad operations and has been active since at least 2020. Previously tracked as the ChaoticOrchestra activity cluster, the adversary’s activity spans targeted intrusion, domestic surveillance, and information operations (IO) across multiple target sectors and geographies. Some of HAYWIRE KITTEN’s activity has been characte...",
+          "csRawData": {
+            "id": 162036,
+            "name": "HAYWIRE KITTEN",
+            "slug": "haywire-kitten",
+            "url": "https://falcon.us-2.crowdstrike.com/intelligence/actors/haywire-kitten/",
+            "short_description": "HAYWIRE KITTEN is an Iran-nexus adversary that likely represents Emennet Pasargad operations and has been active since at least 2020. Previously tracked as the ChaoticOrchestra activity cluster, the adversary’s activity spans targeted intrusion, domestic surveillance, and information operations (IO) across multiple target sectors and geographies. Some of HAYWIRE KITTEN’s activity has been characte...",
+            "animal_classifier": "KITTEN",
+            "created_date": 1644609603,
+            "last_modified_date": 1781282250,
+            "first_activity_date": 1588335780,
+            "last_activity_date": 1768435200,
+            "active": true,
+            "status": "Active",
+            "known_as": "NEPTUNIUM, Holy Souls, Black Magic, Atlas Group, Yare Gomnam Cyber Team, Hackers of Savior, Deus, Sangkancil, AMC239, Generous Thief, Al-Toufan, Yooz E Cybery, Cotton Sandstorm, kalin3t",
+            "motivations": [
+              {
+                "id": 1001485,
+                "slug": "state-sponsored",
+                "value": "State-Sponsored"
+              }
+            ],
+            "objectives": [
+              {
+                "id": 1000018,
+                "slug": "destruction",
+                "value": "Destruction"
+              }
+            ],
+            "capabilities": [
+              {
+                "id": 559,
+                "slug": "ransomware",
+                "value": "Ransomware"
+              },
+              {
+                "id": 1000075,
+                "slug": "proxy",
+                "value": "Proxy"
+              }
+            ],
+            "notify_users": false,
+            "origins": [
+              {
+                "id": 101,
+                "slug": "ir",
+                "value": "Iran"
+              },
+              {
+                "id": 453,
+                "slug": "middle-east",
+                "value": "Middle East"
+              }
+            ],
+            "target_countries": [
+              {
+                "id": 118,
+                "slug": "lb",
+                "value": "Lebanon"
+              },
+              {
+                "id": 166,
+                "slug": "ps",
+                "value": "Palestine"
+              },
+              {
+                "id": 102,
+                "slug": "iq",
+                "value": "Iraq"
+              },
+              {
+                "id": 1,
+                "slug": "us",
+                "value": "United States"
+              },
+              {
+                "id": 20,
+                "slug": "bh",
+                "value": "Bahrain"
+              },
+              {
+                "id": 229,
+                "slug": "ae",
+                "value": "United Arab Emirates"
+              },
+              {
+                "id": 105,
+                "slug": "il",
+                "value": "Israel"
+              },
+              {
+                "id": 101,
+                "slug": "ir",
+                "value": "Iran"
+              },
+              {
+                "id": 73,
+                "slug": "fr",
+                "value": "France"
+              },
+              {
+                "id": 242,
+                "slug": "ye",
+                "value": "Yemen"
+              }
+            ],
+            "target_regions": [
+              {
+                "id": 453,
+                "slug": "middle-east",
+                "value": "Middle East"
+              },
+              {
+                "id": 533,
+                "slug": "western-europe",
+                "value": "Western Europe"
+              },
+              {
+                "id": 529,
+                "slug": "europe",
+                "value": "Europe"
+              },
+              {
+                "id": 528,
+                "slug": "north-america",
+                "value": "North America"
+              },
+              {
+                "id": 1003732,
+                "slug": "americas",
+                "value": "Americas"
+              }
+            ],
+            "target_industries": [
+              {
+                "id": 344,
+                "slug": "government",
+                "value": "Government"
+              },
+              {
+                "id": 328,
+                "slug": "technology",
+                "value": "Technology"
+              },
+              {
+                "id": 1740754547,
+                "slug": "maritime",
+                "value": "Maritime"
+              },
+              {
+                "id": 457,
+                "slug": "academic",
+                "value": "Academic"
+              },
+              {
+                "id": 1001523,
+                "slug": "telecommunications",
+                "value": "Telecommunications"
+              },
+              {
+                "id": 1741851570,
+                "slug": "transportation",
+                "value": "Transportation"
+              },
+              {
+                "id": 1001654,
+                "slug": "ngo",
+                "value": "NGO"
+              },
+              {
+                "id": 345,
+                "slug": "national-government",
+                "value": "National Government"
+              },
+              {
+                "id": 554,
+                "slug": "manufacturing",
+                "value": "Manufacturing"
+              },
+              {
+                "id": 2472,
+                "slug": "logistics",
+                "value": "Logistics"
+              },
+              {
+                "id": 2757,
+                "slug": "opportunistic",
+                "value": "Opportunistic"
+              },
+              {
+                "id": 412,
+                "slug": "hospitality",
+                "value": "Hospitality"
+              },
+              {
+                "id": 1000001,
+                "slug": "financial-services",
+                "value": "Financial Services"
+              },
+              {
+                "id": 1741851568,
+                "slug": "media",
+                "value": "Media"
+              },
+              {
+                "id": 402,
+                "slug": "sports-organizations",
+                "value": "Sports Organizations"
+              },
+              {
+                "id": 2221,
+                "slug": "social-media",
+                "value": "Social Media"
+              }
+            ],
+            "uses_threats": [
+              {
+                "family_name": "rpivot"
+              },
+              {
+                "family_name": "Acunetix"
+              },
+              {
+                "family_name": "Deus"
+              },
+              {
+                "family_name": "WhiteLock"
+              },
+              {
+                "family_name": "WezAgent"
+              },
+              {
+                "family_name": "LoreamIpsumBackdoor"
+              }
+            ],
+            "is_successor_of": [
+              {
+                "id": "chaoticorchestra",
+                "name": "ChaoticOrchestra",
+                "publish_flags": [
+                  "IntelFeedPublic"
+                ]
+              }
+            ]
+          },
+          "capabilityFinalScore": null
+        }
       }
     },
     "ppTapList": [
@@ -4279,7 +4540,7 @@
       "WARP PANDA": true,
       "WICKED PANDA": true
     },
-    "savedAt": "2026-09-11T16:51:51.634Z"
+    "savedAt": "2026-09-13T15:51:48.864Z"
   },
   "Q1 2026": {
     "customActors": [],

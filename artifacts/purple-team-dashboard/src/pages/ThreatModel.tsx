@@ -90,6 +90,15 @@ type ActorOverride = {
 
 type AutoAssessmentMap = Record<string, AutoAssessment>;
 
+type QuarterSnapshot = {
+  customActors: CustomActor[];
+  actorOverrides: Record<string, ActorOverride>;
+  ppTapList: string[];
+  sirtList: string[];
+  autoAssessments: AutoAssessmentMap;
+  monitoringState: Record<string, boolean>;
+};
+
 type MergedActor = BaseActor & {
   isCustom: boolean;
   csEnriched: boolean;
@@ -374,6 +383,13 @@ function ActorRow({
   }
 
   const bonusIntent = (actor.inPpTap ? 1 : 0) + (actor.inSirt ? 2 : 0);
+  const actorDescription = actor.description?.trim()
+    || [
+      `${actor.name} is a ${actorTypeShort(actor.actorType).toLowerCase()} threat actor${actor.origins ? ` associated with ${actor.origins}` : ""}.`,
+      actor.motivation ? `Its reported motivation is ${actor.motivation}.` : "",
+      actor.industries?.length ? `Reported target industries include ${actor.industries.slice(0, 5).join(", ")}.` : "",
+      actor.malware ? `Associated malware and tools include ${malwareTags(actor.malware).slice(0, 8).join(", ")}.` : "",
+    ].filter(Boolean).join(" ");
 
   return (
     <>
@@ -506,6 +522,12 @@ function ActorRow({
         <tr className="border-b border-border">
           <td colSpan={9} className="bg-card/50 px-6 py-5">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              <section className="col-span-full rounded-lg border border-border/60 bg-muted/15 p-3">
+                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Threat actor description</div>
+                <p className="text-xs leading-relaxed text-foreground">
+                  {actorDescription || "No description is available for this threat actor."}
+                </p>
+              </section>
               {/* Scores */}
               {editing ? (
                 /* ── Rubric Score Editor ─────────────────────────── */
@@ -644,7 +666,7 @@ function ActorRow({
                       disabled={previewIntent === null && previewCap === null}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
                     >
-                      <Check className="w-3 h-3" /> Save Scores
+                      <Check className="w-3 h-3" /> Apply Scores
                     </button>
                   </div>
                 </div>
@@ -695,12 +717,6 @@ function ActorRow({
                       Intent boosted by +{bonusIntent}
                       {actor.inPpTap && " (PP-TAP +1)"}
                       {actor.inSirt && " (SIRT +2)"}
-                    </div>
-                  )}
-                  {actor.description && (
-                    <div>
-                      <div className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide mb-0.5">Description</div>
-                      <p className="text-xs text-foreground leading-relaxed">{actor.description}</p>
                     </div>
                   )}
                   {actor.intentRationale && (
@@ -1431,6 +1447,9 @@ export default function ThreatModel() {
   const [monitoringState, setMonitoringState] = useState<Record<string, boolean>>({});
   const [liveLastActive, setLiveLastActive] = useState<Record<string, string>>({});
   const [serverLoading, setServerLoading]   = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saveRevision, setSaveRevision] = useState(0);
+  const savedSnapshotRef = useRef("");
 
   // UI state
   const [activeTab, setActiveTab]         = useState<TabId>("actors");
@@ -1471,6 +1490,7 @@ export default function ThreatModel() {
   // ── Load state from server for the selected quarter ───────────────────────
   useEffect(() => {
     setServerLoading(true);
+    savedSnapshotRef.current = "";
     (async () => {
       let loaded = false;
       try {
@@ -1497,8 +1517,18 @@ export default function ThreatModel() {
            // never been saved. An intentionally empty saved list must stay empty.
           const isCurrent = selectedQuarter === QUARTER_LABEL;
            const useLegacySeed = isCurrent && !data.hasSnapshot;
-           setPpTapList(useLegacySeed ? SEED_PPTAP : loadedPpTap);
-           setSirtList(useLegacySeed ? SEED_SIRT : loadedSirt);
+           const resolvedPpTap = useLegacySeed ? SEED_PPTAP : loadedPpTap;
+           const resolvedSirt = useLegacySeed ? SEED_SIRT : loadedSirt;
+           setPpTapList(resolvedPpTap);
+           setSirtList(resolvedSirt);
+           savedSnapshotRef.current = JSON.stringify({
+             customActors: loadedCustomActors,
+             actorOverrides: loadedActorOverrides,
+             ppTapList: resolvedPpTap,
+             sirtList: resolvedSirt,
+             autoAssessments: data.autoAssessments ?? {},
+             monitoringState: loadedMonitoringState,
+           } satisfies QuarterSnapshot);
           // Mirror current quarter to localStorage for offline fallback
           if (isCurrent) {
             saveToLocalStorage({
@@ -1527,8 +1557,20 @@ export default function ThreatModel() {
           );
           const lsPpTap: string[] = ls.ppTapList ?? [];
           const lsSirt: string[]  = ls.sirtList ?? [];
-          setPpTapList(lsPpTap.length > 0 ? lsPpTap : SEED_PPTAP);
-          setSirtList(lsSirt.length > 0  ? lsSirt  : SEED_SIRT);
+          const resolvedPpTap = lsPpTap.length > 0 ? lsPpTap : SEED_PPTAP;
+          const resolvedSirt = lsSirt.length > 0 ? lsSirt : SEED_SIRT;
+          const resolvedMonitoring = ls.monitoringState
+            ?? deriveLegacyMonitoringState(ls.customActors ?? [], ls.actorOverrides ?? {});
+          setPpTapList(resolvedPpTap);
+          setSirtList(resolvedSirt);
+          savedSnapshotRef.current = JSON.stringify({
+            customActors: ls.customActors ?? [],
+            actorOverrides: ls.actorOverrides ?? {},
+            ppTapList: resolvedPpTap,
+            sirtList: resolvedSirt,
+            autoAssessments: ls.autoAssessments ?? {},
+            monitoringState: resolvedMonitoring,
+          } satisfies QuarterSnapshot);
         }
       } else if (!loaded) {
         // Historical quarter + offline → show empty
@@ -1538,6 +1580,14 @@ export default function ThreatModel() {
         setSirtList([]);
         setAutoAssessments({});
         setMonitoringState({});
+        savedSnapshotRef.current = JSON.stringify({
+          customActors: [],
+          actorOverrides: {},
+          ppTapList: [],
+          sirtList: [],
+          autoAssessments: {},
+          monitoringState: {},
+        } satisfies QuarterSnapshot);
       }
       setServerLoading(false);
     })();
@@ -1575,7 +1625,21 @@ export default function ThreatModel() {
     return () => { cancelled = true; };
   }, [selectedQuarter]);
 
-  // ── Persist state to server + localStorage ────────────────────────────────
+  const currentSnapshot = useMemo<QuarterSnapshot>(() => ({
+    customActors,
+    actorOverrides,
+    ppTapList,
+    sirtList,
+    autoAssessments,
+    monitoringState,
+  }), [customActors, actorOverrides, ppTapList, sirtList, autoAssessments, monitoringState]);
+
+  const serializedSnapshot = useMemo(() => JSON.stringify(currentSnapshot), [currentSnapshot, saveRevision]);
+  const hasUnsavedChanges = !serverLoading
+    && savedSnapshotRef.current !== ""
+    && serializedSnapshot !== savedSnapshotRef.current;
+
+  // ── Persist the complete selected-quarter snapshot ────────────────────────
   const persistState = useCallback(async (
     next: {
       customActors?: CustomActor[];
@@ -1592,27 +1656,56 @@ export default function ThreatModel() {
     const sirt  = next.sirtList       ?? sirtList;
     const assessments = next.autoAssessments ?? autoAssessments;
     const monitoring = next.monitoringState ?? monitoringState;
-    // Mirror current quarter to localStorage for offline fallback
-    if (selectedQuarter === QUARTER_LABEL) {
-      saveToLocalStorage({ customActors: ca, actorOverrides: ovr, ppTapList: pptap, sirtList: sirt, autoAssessments: assessments, monitoringState: monitoring });
+    const res = await fetch(`${CS_API}/cs/threat-model-state`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ customActors: ca, actorOverrides: ovr, ppTapList: pptap, sirtList: sirt, autoAssessments: assessments, monitoringState: monitoring, quarter: selectedQuarter }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || `Unable to save ${selectedQuarter}`);
     }
-    try {
-      const res = await fetch(`${CS_API}/cs/threat-model-state`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customActors: ca, actorOverrides: ovr, ppTapList: pptap, sirtList: sirt, autoAssessments: assessments, monitoringState: monitoring, quarter: selectedQuarter }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        // Keep versions list fresh after a save
-        setSavedVersions(prev => {
-          const exists = prev.find(v => v.quarter === selectedQuarter);
-          const entry = { quarter: selectedQuarter, savedAt: new Date().toISOString(), seededFrom: exists?.seededFrom ?? null, actorCount: ca.length, overrideCount: Object.keys(ovr).length };
-          return exists ? prev.map(v => v.quarter === selectedQuarter ? entry : v) : [...prev, entry];
-        });
-      }
-    } catch { /* offline — localStorage copy already saved above */ }
+    const savedAt = new Date().toISOString();
+    setSavedVersions(prev => {
+      const exists = prev.find(v => v.quarter === selectedQuarter);
+      const entry = { quarter: selectedQuarter, savedAt, seededFrom: exists?.seededFrom ?? null, actorCount: ca.length, overrideCount: Object.keys(ovr).length };
+      return exists ? prev.map(v => v.quarter === selectedQuarter ? entry : v) : [...prev, entry];
+    });
+    const savedSnapshot: QuarterSnapshot = {
+      customActors: ca,
+      actorOverrides: ovr,
+      ppTapList: pptap,
+      sirtList: sirt,
+      autoAssessments: assessments,
+      monitoringState: monitoring,
+    };
+    savedSnapshotRef.current = JSON.stringify(savedSnapshot);
+    setSaveRevision(value => value + 1);
+    if (selectedQuarter === QUARTER_LABEL) saveToLocalStorage(savedSnapshot);
   }, [customActors, actorOverrides, ppTapList, sirtList, autoAssessments, monitoringState, selectedQuarter]);
+
+  async function saveQuarter() {
+    setSaving(true);
+    try {
+      await persistState(currentSnapshot);
+      showMsg(`${selectedQuarter} threat model saved`);
+    } catch (error) {
+      showMsg(error instanceof Error ? error.message : `Unable to save ${selectedQuarter}`, "err");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function changeQuarter(quarter: string) {
+    if (saving) return;
+    if (quarter === selectedQuarter) {
+      setQuarterOpen(false);
+      return;
+    }
+    if (hasUnsavedChanges && !window.confirm(`Discard unsaved changes to ${selectedQuarter}?`)) return;
+    setSelectedQuarter(quarter);
+    setQuarterOpen(false);
+  }
 
   // ── Merge static + custom actors, compute effective scores ────────────────
   const mergedActors = useMemo((): MergedActor[] => {
@@ -1712,7 +1805,6 @@ export default function ThreatModel() {
     const next = Object.fromEntries(generated.map(item => [item.actorName, item]));
     setAutoAssessments(next);
     setShowAssessmentReview(true);
-    void persistState({ autoAssessments: next });
     const contextCount = context.industries.length + context.technologies.length + context.countries.length;
     showMsg(`Generated ${generated.length} suggestions for ${selectedQuarter}${contextCount ? ` with ${contextCount} context filters` : ""}`);
   }
@@ -1724,8 +1816,7 @@ export default function ThreatModel() {
       if (next[name]) next[name] = { ...next[name], status, reviewedAt };
     }
     setAutoAssessments(next);
-    await persistState({ autoAssessments: next });
-    showMsg(`${status === "approved" ? "Approved" : "Rejected"} ${names.length} suggestions`);
+    showMsg(`${status === "approved" ? "Approved" : "Rejected"} ${names.length} suggestions — save ${selectedQuarter} to persist`);
   }
 
   // ── Save intent/capability scores for an actor ────────────────────────────
@@ -1739,8 +1830,7 @@ export default function ThreatModel() {
       const updated = [...customActors];
       updated[customIdx] = { ...updated[customIdx], intentFinalScore, capabilityFinalScore, ...rubric };
       setCustomActors(updated);
-      await persistState({ customActors: updated });
-      showMsg(`${name} scores updated`);
+      showMsg(`${name} scores updated — save ${selectedQuarter} to persist`);
       return;
     }
     const newOverrides = {
@@ -1748,8 +1838,7 @@ export default function ThreatModel() {
       [name]: { ...actorOverrides[name], intentFinalScore, capabilityFinalScore, ...rubric },
     };
     setActorOverrides(newOverrides);
-    await persistState({ actorOverrides: newOverrides });
-    showMsg(`${name} scores updated`);
+    showMsg(`${name} scores updated — save ${selectedQuarter} to persist`);
   }
 
   // ── CS refresh for a single actor ─────────────────────────────────────────
@@ -1808,12 +1897,10 @@ export default function ThreatModel() {
           csLastRefreshed: new Date().toISOString(),
           capabilityFinalScore: match.capabilityFinalScore ?? updated[idx].capabilityFinalScore,
         };
-        persistState({ customActors: updated, actorOverrides: newOverrides });
         return updated;
       });
 
-      await persistState({ actorOverrides: newOverrides });
-      showMsg(`${name} refreshed from CrowdStrike`);
+      showMsg(`${name} refreshed from CrowdStrike — save ${selectedQuarter} to persist`);
     } catch (e: any) {
       showMsg(`${name}: ${e.message}`, "err");
     } finally {
@@ -1840,8 +1927,7 @@ export default function ThreatModel() {
     const actor = mergedActors.find(item => item.name.toUpperCase() === name.toUpperCase());
     const next = { ...monitoringState, [name]: !(actor?.monitored ?? false) };
     setMonitoringState(next);
-    await persistState({ monitoringState: next });
-    showMsg(`${name} ${next[name] ? "monitored" : "not monitored"} in ${selectedQuarter}`);
+    showMsg(`${name} ${next[name] ? "monitored" : "not monitored"} in ${selectedQuarter} — save to persist`);
   }
 
   // ── Delete custom actor ───────────────────────────────────────────────────
@@ -1851,8 +1937,7 @@ export default function ThreatModel() {
     delete nextMonitoring[name];
     setCustomActors(updated);
     setMonitoringState(nextMonitoring);
-    await persistState({ customActors: updated, monitoringState: nextMonitoring });
-    showMsg(`${name} removed`);
+    showMsg(`${name} removed — save ${selectedQuarter} to persist`);
   }
 
   // ── Add actor ─────────────────────────────────────────────────────────────
@@ -1861,31 +1946,26 @@ export default function ThreatModel() {
     const nextMonitoring = { ...monitoringState, [actor.name]: actor.inMonitoringList };
     setCustomActors(updated);
     setMonitoringState(nextMonitoring);
-    await persistState({ customActors: updated, monitoringState: nextMonitoring });
     setShowAdd(false);
-    showMsg(`${actor.name} added`);
+    showMsg(`${actor.name} added — save ${selectedQuarter} to persist`);
   }
 
   // ── PP-TAP / SIRT list management ─────────────────────────────────────────
   async function addToPpTap(item: string) {
     const next = [...ppTapList, item];
     setPpTapList(next);
-    await persistState({ ppTapList: next });
   }
   async function removeFromPpTap(item: string) {
     const next = ppTapList.filter(i => i !== item);
     setPpTapList(next);
-    await persistState({ ppTapList: next });
   }
   async function addToSirt(item: string) {
     const next = [...sirtList, item];
     setSirtList(next);
-    await persistState({ sirtList: next });
   }
   async function removeFromSirt(item: string) {
     const next = sirtList.filter(i => i !== item);
     setSirtList(next);
-    await persistState({ sirtList: next });
   }
 
   function mergeList(existing: string[], incoming: string[]) {
@@ -1905,16 +1985,14 @@ export default function ThreatModel() {
     const next = mergeList(ppTapList, items);
     const added = next.length - ppTapList.length;
     setPpTapList(next);
-    await persistState({ ppTapList: next });
-    showMsg(added > 0 ? `${added} PP-TAP entr${added === 1 ? "y" : "ies"} added to ${selectedQuarter}` : "All PP-TAP entries were already present");
+    showMsg(added > 0 ? `${added} PP-TAP entr${added === 1 ? "y" : "ies"} added — save ${selectedQuarter} to persist` : "All PP-TAP entries were already present");
   }
 
   async function importToSirt(items: string[]) {
     const next = mergeList(sirtList, items);
     const added = next.length - sirtList.length;
     setSirtList(next);
-    await persistState({ sirtList: next });
-    showMsg(added > 0 ? `${added} SIRT entr${added === 1 ? "y" : "ies"} added to ${selectedQuarter}` : "All SIRT entries were already present");
+    showMsg(added > 0 ? `${added} SIRT entr${added === 1 ? "y" : "ies"} added — save ${selectedQuarter} to persist` : "All SIRT entries were already present");
   }
 
   // ── Filtered + sorted table ───────────────────────────────────────────────
@@ -1997,11 +2075,12 @@ export default function ThreatModel() {
             <div className="relative" ref={quarterRef}>
               <button
                 onClick={() => setQuarterOpen(v => !v)}
+                disabled={saving}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-semibold transition-colors ${
                   isCurrentQuarter
                     ? "border-primary/50 bg-primary/10 text-primary hover:bg-primary/20"
                     : "border-amber-400/40 bg-amber-400/10 text-amber-400 hover:bg-amber-400/15"
-                }`}
+                } disabled:cursor-not-allowed disabled:opacity-60`}
               >
                 <History className="w-3.5 h-3.5" />
                 {selectedQuarter}
@@ -2024,7 +2103,7 @@ export default function ThreatModel() {
                       return (
                         <button
                           key={q}
-                          onClick={() => { setSelectedQuarter(q); setQuarterOpen(false); }}
+                           onClick={() => changeQuarter(q)}
                           className={`w-full flex items-start justify-between gap-3 px-3 py-2 text-sm text-left transition-colors ${
                             isSel
                               ? "bg-primary/15 text-foreground"
@@ -2073,6 +2152,19 @@ export default function ThreatModel() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={saveQuarter}
+            disabled={saving || serverLoading || !hasUnsavedChanges}
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed ${
+              hasUnsavedChanges
+                ? "bg-emerald-500 text-white hover:bg-emerald-400"
+                : "border border-border bg-secondary text-muted-foreground disabled:opacity-60"
+            }`}
+          >
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            {saving ? `Saving ${selectedQuarter}…` : hasUnsavedChanges ? `Save ${selectedQuarter}` : `${selectedQuarter} saved`}
+          </button>
           {activeTab === "actors" && (
             <>
               <button

@@ -16,6 +16,7 @@ type StaticActor = {
   malware: string;
   intentFinalScore: number | null;
   capabilityFinalScore: number | null;
+  inMonitoringList: boolean;
 };
 
 type AutoAssessment = {
@@ -30,6 +31,7 @@ type ThreatModelState = {
     malware?: string;
     intentFinalScore?: number | null;
     capabilityFinalScore?: number | null;
+    inMonitoringList?: boolean;
   }>;
   actorOverrides: Record<string, {
     intentFinalScore?: number | null;
@@ -39,10 +41,12 @@ type ThreatModelState = {
       intentFinalScore?: number | null;
       capabilityFinalScore?: number | null;
     };
+    inMonitoringList?: boolean;
   }>;
   ppTapList: string[];
   sirtList: string[];
   autoAssessments: Record<string, AutoAssessment>;
+  monitoringState: Record<string, boolean>;
 };
 
 type RankedActor = {
@@ -123,6 +127,7 @@ export default function ActorPrioritisation() {
             ppTapList: data.ppTapList ?? [],
             sirtList: data.sirtList ?? [],
             autoAssessments: data.autoAssessments ?? {},
+            monitoringState: data.monitoringState ?? {},
           });
         }
       })
@@ -144,8 +149,12 @@ export default function ActorPrioritisation() {
   const rankedActors = useMemo(() => {
     if (!state) return [];
 
-    const rows = staticActors.map(actor => {
+    const rows = staticActors.flatMap(actor => {
       const override = state.actorOverrides[actor.name] ?? {};
+      const monitored = state.monitoringState[actor.name]
+        ?? override.inMonitoringList
+        ?? actor.inMonitoringList;
+      if (!monitored) return [];
       const csData = override.csData ?? {};
       const approvedAssessment = state.autoAssessments[actor.name]?.status === "approved"
         ? state.autoAssessments[actor.name]
@@ -164,10 +173,12 @@ export default function ActorPrioritisation() {
       const inPpTap = matchesThreatModelList(actor.name, malware, state.ppTapList);
       const inSirt = matchesThreatModelList(actor.name, malware, state.sirtList);
       const intent = Math.min(7, baseIntent + (inPpTap ? 1 : 0) + (inSirt ? 2 : 0));
-      return { name: actor.name, intent, capability, inPpTap, inSirt };
+      return [{ name: actor.name, intent, capability, inPpTap, inSirt }];
     });
 
     for (const actor of state.customActors) {
+      const monitored = state.monitoringState[actor.name] ?? actor.inMonitoringList ?? false;
+      if (!monitored) continue;
       const inPpTap = matchesThreatModelList(actor.name, actor.malware ?? "", state.ppTapList);
       const inSirt = matchesThreatModelList(actor.name, actor.malware ?? "", state.sirtList);
       rows.push({
@@ -223,7 +234,7 @@ export default function ActorPrioritisation() {
             </span>
           </div>
           <p className="text-sm text-muted-foreground">
-            Ranked only by the effective Intent and Capability scores defined in the selected Threat Model.
+            Only monitored actors are ranked, using the effective Intent and Capability scores saved in the selected Threat Model quarter.
           </p>
         </div>
         <Link href="/threat-model">
@@ -237,7 +248,7 @@ export default function ActorPrioritisation() {
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="text-3xl font-bold text-primary">{rankedActors.length}</div>
-          <div className="mt-1 text-sm text-muted-foreground">Actors in ranking</div>
+          <div className="mt-1 text-sm text-muted-foreground">Monitored actors in ranking</div>
         </div>
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="text-3xl font-bold text-red-400">{criticalCount}</div>
