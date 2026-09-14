@@ -1,4 +1,5 @@
-import { Router } from "express";
+import { getAuth } from "@clerk/express";
+import { Router, type RequestHandler } from "express";
 import { requireAuthenticatedUser } from "../middlewares/adminAuthorization";
 import fs from "fs/promises";
 import path from "path";
@@ -13,6 +14,7 @@ const SYNC_FILE  = path.join(ROOT, "cs-sync-state.json");
 const CREDS_FILE = path.join(ROOT, "cs-credentials.json");
 
 const CS_BASE = "https://api.us-2.crowdstrike.com";
+const TOKEN_EXPIRY_SAFETY_MS = 30 * 1000;
 
 export const csRouter = Router();
 
@@ -43,6 +45,8 @@ interface StoredCreds {
 
 // In-memory cache of file-based credentials — populated at startup and on update
 let cachedStoredCreds: StoredCreds | null = null;
+let tokenCache: { token: string; expiresAt: number; credentialKey: string } | null = null;
+let tokenRequest: Promise<string> | null = null;
 
 /** Load credentials from disk and populate the in-memory cache. Call once at startup. */
 export async function initStoredCreds(): Promise<void> {
@@ -76,17 +80,44 @@ async function getToken(): Promise<string> {
   const creds = getActiveCredentials();
   if (!creds) throw new Error("CrowdStrike credentials are not configured. Enter them in Data Sources → CrowdStrike Intel API.");
 
-  const res = await fetch(`${CS_BASE}/oauth2/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `client_id=${encodeURIComponent(creds.clientId)}&client_secret=${encodeURIComponent(creds.clientSecret)}`,
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`OAuth token request failed (${res.status}): ${body.slice(0, 200)}`);
+  const credentialKey = `${creds.source}:${creds.clientId}`;
+  if (
+    tokenCache &&
+    tokenCache.credentialKey === credentialKey &&
+    Date.now() < tokenCache.expiresAt
+  ) {
+    return tokenCache.token;
   }
-  const data = await res.json() as any;
-  return data.access_token as string;
+
+  if (tokenRequest) return tokenRequest;
+
+  tokenRequest = (async () => {
+    const res = await fetch(`${CS_BASE}/oauth2/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `client_id=${encodeURIComponent(creds.clientId)}&client_secret=${encodeURIComponent(creds.clientSecret)}`,
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`OAuth token request failed (${res.status}): ${body.slice(0, 200)}`);
+    }
+    const data = await res.json() as { access_token?: string; expires_in?: number };
+    if (!data.access_token) throw new Error("OAuth token response did not include an access token.");
+
+    const expiresInMs = Math.max(60, Number(data.expires_in) || 300) * 1000;
+    tokenCache = {
+      token: data.access_token,
+      expiresAt: Date.now() + Math.max(1000, expiresInMs - TOKEN_EXPIRY_SAFETY_MS),
+      credentialKey,
+    };
+    return data.access_token;
+  })();
+
+  try {
+    return await tokenRequest;
+  } finally {
+    tokenRequest = null;
+  }
 }
 
 // ── Sync state ─────────────────────────────────────────────────────────────────
@@ -176,7 +207,7 @@ async function syncReports(token: string, since?: number): Promise<any[]> {
 
 // ── Actors + MITRE ─────────────────────────────────────────────────────────────
 
-async function fetchAllActorIds(token: string): Promise<string[]> {
+async function fetchAllActorIds(token: string, maxActors = Number.POSITIVE_INFINITY): Promise<string[]> {
   const ids: string[] = [];
   let offset: string | undefined;
 
@@ -191,6 +222,9 @@ async function fetchAllActorIds(token: string): Promise<string[]> {
     const data = await res.json() as any;
     const page: string[] = data.resources ?? [];
     ids.push(...page);
+    if (ids.length > maxActors) {
+      throw new Error(`CrowdStrike actor directory exceeds the ${maxActors} actor workload limit.`);
+    }
 
     const nextOffset = data.meta?.pagination?.offset;
     if (!nextOffset || page.length === 0) break;
@@ -368,6 +402,35 @@ export async function maybeAutoSync(): Promise<void> {
 
 // ── Routes ─────────────────────────────────────────────────────────────────────
 
+function createPerUserRateLimit(maxRequests: number, windowMs: number): RequestHandler {
+  const requests = new Map<string, { count: number; resetAt: number }>();
+
+  return (req, res, next) => {
+    const userId = getAuth(req).userId;
+    const key = userId ?? req.ip ?? "unknown";
+    const now = Date.now();
+    const current = requests.get(key);
+
+    if (!current || current.resetAt <= now) {
+      requests.set(key, { count: 1, resetAt: now + windowMs });
+      next();
+      return;
+    }
+
+    if (current.count >= maxRequests) {
+      res.setHeader("Retry-After", String(Math.max(1, Math.ceil((current.resetAt - now) / 1000))));
+      res.status(429).json({ ok: false, error: "Too many live CrowdStrike requests. Please try again later." });
+      return;
+    }
+
+    current.count += 1;
+    next();
+  };
+}
+
+const actorSearchRateLimit = createPerUserRateLimit(20, 60 * 1000);
+const actorDirectoryRateLimit = createPerUserRateLimit(2, 60 * 1000);
+
 /** GET /api/cs/credentials — credential source info (never returns actual secrets) */
 csRouter.get("/cs/credentials", (_req, res) => {
   const creds = getActiveCredentials();
@@ -391,6 +454,7 @@ csRouter.post("/cs/credentials", async (req, res) => {
   try {
     await fs.writeFile(CREDS_FILE, JSON.stringify(creds, null, 2));
     cachedStoredCreds = creds;
+    tokenCache = null;
     res.json({ ok: true });
   } catch (err: any) {
     res.status(500).json({ ok: false, error: err.message });
@@ -403,6 +467,7 @@ csRouter.delete("/cs/credentials", async (_req, res) => {
     await fs.unlink(CREDS_FILE);
   } catch { /* already gone */ }
   cachedStoredCreds = null;
+  tokenCache = null;
   res.json({ ok: true });
 });
 
@@ -809,7 +874,9 @@ type LastActiveActor = {
 };
 
 const LAST_ACTIVE_CACHE_TTL_MS = 60 * 60 * 1000;
+const LAST_ACTIVE_MAX_ACTORS = 5000;
 let lastActiveCache: { fetchedAt: number; actors: LastActiveActor[] } | null = null;
+let lastActiveRefresh: Promise<LastActiveActor[]> | null = null;
 
 /**
  * Fetch the authoritative CrowdStrike actor directory once, then cache it for
@@ -823,27 +890,37 @@ async function getActorLastActiveDirectory(): Promise<LastActiveActor[]> {
     return lastActiveCache.actors;
   }
 
-  const token = await getToken();
-  const ids = await fetchAllActorIds(token);
-  const resources = await fetchActorDetails(token, ids);
-  const actors = resources.map(resource => {
-    const normalized = normalizeCSActor(resource);
-    return {
-      name: normalized.name,
-      aliases: normalized.aliases
-        .split(",")
-        .map(alias => alias.trim())
-        .filter(Boolean),
-      lastActive: normalized.lastSeen,
-    };
-  });
+  if (lastActiveRefresh) return lastActiveRefresh;
 
-  lastActiveCache = { fetchedAt: Date.now(), actors };
-  return actors;
+  lastActiveRefresh = (async () => {
+    const token = await getToken();
+    const ids = await fetchAllActorIds(token, LAST_ACTIVE_MAX_ACTORS);
+    const resources = await fetchActorDetails(token, ids);
+    const actors = resources.map(resource => {
+      const normalized = normalizeCSActor(resource);
+      return {
+        name: normalized.name,
+        aliases: normalized.aliases
+          .split(",")
+          .map(alias => alias.trim())
+          .filter(Boolean),
+        lastActive: normalized.lastSeen,
+      };
+    });
+
+    lastActiveCache = { fetchedAt: Date.now(), actors };
+    return actors;
+  })();
+
+  try {
+    return await lastActiveRefresh;
+  } finally {
+    lastActiveRefresh = null;
+  }
 }
 
 /** GET /api/cs/actor?q=NAME — search CS intel combined actors endpoint */
-csRouter.get("/cs/actor", async (req, res) => {
+csRouter.get("/cs/actor", actorSearchRateLimit, async (req, res) => {
   const q = (req.query.q as string ?? "").trim();
   if (!q) {
     res.status(400).json({ ok: false, error: "q parameter is required" });
@@ -869,7 +946,7 @@ csRouter.get("/cs/actor", async (req, res) => {
 });
 
 /** GET /api/cs/actors/last-active — live CrowdStrike Last Active dates */
-csRouter.get("/cs/actors/last-active", async (_req, res) => {
+csRouter.get("/cs/actors/last-active", actorDirectoryRateLimit, async (_req, res) => {
   try {
     const actors = await getActorLastActiveDirectory();
     res.json({
