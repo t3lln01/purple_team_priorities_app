@@ -2,6 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { Crosshair, Search, ShieldCheck } from "lucide-react";
 import threatModelData from "@/threatModelData.json";
+import data from "@/data.json";
+import { baseFullRiskCalc, useAppData } from "@/context/AppDataContext";
+import { useTacticScores } from "@/context/TacticScoresContext";
+import { useLikelihood } from "@/context/LikelihoodContext";
+import { useImpactOverrides } from "@/context/ImpactOverridesContext";
+import { useHVAScores } from "@/context/HVAScoresContext";
+import { applyOverrides, type RiskRow } from "@/utils/riskOverrides";
+import { actorKey, actorTidRisks, calculateActorPriority, type ActorProcedure } from "@/utils/actorPriority";
 import { useSortTable } from "@/hooks/useSortTable";
 import SortableTh from "@/components/SortableTh";
 import {
@@ -53,9 +61,13 @@ type RankedActor = {
   name: string;
   intent: number;
   capability: number;
-  priority: number;
+  priority: number | null;
+  tidCount: number;
+  missingRiskCount: number;
+  riskSum: number;
+  averageRisk: number | null;
   priorityPct: number;
-  level: "Critical" | "High" | "Medium" | "Low";
+  level: "Critical" | "High" | "Medium" | "Low" | "Unscored";
   inPpTap: boolean;
   inSirt: boolean;
 };
@@ -79,6 +91,7 @@ function levelFor(priorityPct: number): RankedActor["level"] {
 }
 
 function levelClass(level: RankedActor["level"]) {
+  if (level === "Unscored") return "border-border bg-muted text-muted-foreground";
   if (level === "Critical") return "border-red-400/30 bg-red-400/10 text-red-400";
   if (level === "High") return "border-orange-400/30 bg-orange-400/10 text-orange-400";
   if (level === "Medium") return "border-yellow-400/30 bg-yellow-400/10 text-yellow-400";
@@ -104,6 +117,34 @@ function ScoreDots({ score, color }: { score: number; color: string }) {
 export default function ActorPrioritisation() {
   const { selectedQuarter } = useThreatModelQuarter();
   const [state, setState] = useState<ThreatModelState | null>(null);
+  const [membership, setMembership] = useState<ThreatModelState | null>(null);
+  const { liveActorData, activeNewRiskRows } = useAppData();
+  const { overrides: tacticOverrides } = useTacticScores();
+  const { overrides: likelihoodOverrides } = useLikelihood();
+  const { overrides: impactOverrides } = useImpactOverrides();
+  const { hvaScoreMap } = useHVAScores();
+  const [customProcedures] = useState<ActorProcedure[]>(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem("pt_procedures_custom") ?? "[]");
+      return Array.isArray(stored) ? stored : [];
+    } catch { return []; }
+  });
+  const riskScores = useMemo(() => Object.fromEntries(
+    applyOverrides(
+      [...baseFullRiskCalc, ...activeNewRiskRows] as RiskRow[],
+      tacticOverrides, likelihoodOverrides, impactOverrides, hvaScoreMap,
+    ).map(row => [row.TID, row["Risk Scores"]]),
+  ), [activeNewRiskRows, tacticOverrides, likelihoodOverrides, impactOverrides, hvaScoreMap]);
+  const tidRisks = useMemo(() => actorTidRisks([
+    ...(data.allProcedures as ActorProcedure[]),
+    ...customProcedures,
+    ...(liveActorData?.procedures ?? []),
+  ], riskScores), [customProcedures, liveActorData, riskScores]);
+  const priorityCeiling = useMemo(() => 49 * Math.max(
+    0,
+    ...Object.values(riskScores).filter(Number.isFinite),
+    ...[...tidRisks.values()].flatMap(tids => [...tids.values()].map(risk => risk ?? 0)),
+  ), [riskScores, tidRisks]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -113,22 +154,32 @@ export default function ActorPrioritisation() {
     let cancelled = false;
     setLoading(true);
     setError("");
+    setState(null);
+    setMembership(null);
 
-    fetch(`${TM_API}?quarter=${encodeURIComponent(selectedQuarter)}`)
-      .then(async response => {
+    async function loadState(quarter: string): Promise<ThreatModelState> {
+        const response = await fetch(`${TM_API}?quarter=${encodeURIComponent(quarter)}`);
         const data = await response.json();
         if (!response.ok || !data.ok) {
           throw new Error(data.error || "Unable to load Threat Model state");
         }
-        if (!cancelled) {
-          setState({
+        return {
             customActors: data.customActors ?? [],
             actorOverrides: data.actorOverrides ?? {},
             ppTapList: data.ppTapList ?? [],
             sirtList: data.sirtList ?? [],
             autoAssessments: data.autoAssessments ?? {},
             monitoringState: data.monitoringState ?? {},
-          });
+        };
+    }
+    const currentState = loadState(CURRENT_THREAT_MODEL_QUARTER);
+    Promise.all([
+      currentState,
+      selectedQuarter === CURRENT_THREAT_MODEL_QUARTER ? currentState : loadState(selectedQuarter),
+    ]).then(([scores, monitored]) => {
+        if (!cancelled) {
+          setState(scores);
+          setMembership(monitored);
         }
       })
       .catch(fetchError => {
@@ -147,13 +198,24 @@ export default function ActorPrioritisation() {
   }, [selectedQuarter]);
 
   const rankedActors = useMemo(() => {
-    if (!state) return [];
+    if (!state || !membership) return [];
 
-    const rows = staticActors.flatMap(actor => {
+    // Include historical custom names for membership, but never borrow their
+    // historical scores: the selected quarter is strictly a membership filter.
+    const candidates = new Map<string, StaticActor | ThreatModelState["customActors"][number]>();
+    for (const actor of staticActors) candidates.set(actorKey(actor.name), actor);
+    for (const actor of state.customActors) candidates.set(actorKey(actor.name), actor);
+    for (const actor of membership.customActors) {
+      if (!candidates.has(actorKey(actor.name))) candidates.set(actorKey(actor.name), { name: actor.name });
+    }
+    const rows = [...candidates.values()].flatMap(actor => {
       const override = state.actorOverrides[actor.name] ?? {};
-      const monitored = state.monitoringState[actor.name]
-        ?? override.inMonitoringList
-        ?? actor.inMonitoringList;
+      const membershipActor = membership.customActors.find(item => actorKey(item.name) === actorKey(actor.name))
+        ?? staticActors.find(item => actorKey(item.name) === actorKey(actor.name));
+      const monitored = membership.monitoringState[actor.name]
+        ?? membership.actorOverrides[actor.name]?.inMonitoringList
+        ?? membershipActor?.inMonitoringList
+        ?? false;
       if (!monitored) return [];
       const csData = override.csData ?? {};
       const approvedAssessment = state.autoAssessments[actor.name]?.status === "approved"
@@ -176,33 +238,19 @@ export default function ActorPrioritisation() {
       return [{ name: actor.name, intent, capability, inPpTap, inSirt }];
     });
 
-    for (const actor of state.customActors) {
-      const monitored = state.monitoringState[actor.name] ?? actor.inMonitoringList ?? false;
-      if (!monitored) continue;
-      const inPpTap = matchesThreatModelList(actor.name, actor.malware ?? "", state.ppTapList);
-      const inSirt = matchesThreatModelList(actor.name, actor.malware ?? "", state.sirtList);
-      rows.push({
-        name: actor.name,
-        intent: Math.min(7, (actor.intentFinalScore ?? 0) + (inPpTap ? 1 : 0) + (inSirt ? 2 : 0)),
-        capability: actor.capabilityFinalScore ?? 0,
-        inPpTap,
-        inSirt,
-      });
-    }
-
     return rows
       .map(actor => {
-        const priority = actor.intent * actor.capability;
-        const priorityPct = priority / 49;
+        const calculation = calculateActorPriority(actor.intent, actor.capability, tidRisks.get(actorKey(actor.name)));
+        const priorityPct = priorityCeiling > 0 ? (calculation.priority ?? 0) / priorityCeiling : 0;
         return {
           ...actor,
-          priority,
+          ...calculation,
           priorityPct,
-          level: levelFor(priorityPct),
+          level: calculation.priority === null ? "Unscored" as const : levelFor(priorityPct),
         };
       })
-      .sort((a, b) => b.priority - a.priority || b.intent - a.intent || a.name.localeCompare(b.name));
-  }, [state]);
+      .sort((a, b) => (b.priority ?? -1) - (a.priority ?? -1) || b.intent - a.intent || a.name.localeCompare(b.name));
+  }, [state, membership, tidRisks, priorityCeiling]);
 
   const filteredActors = useMemo(
     () => rankedActors.filter(actor => {
@@ -234,7 +282,7 @@ export default function ActorPrioritisation() {
             </span>
           </div>
           <p className="text-sm text-muted-foreground">
-            Only monitored actors are ranked, using the effective Intent and Capability scores saved in the selected Threat Model quarter.
+             The selected quarter filters monitored actors only. Scores use {CURRENT_THREAT_MODEL_QUARTER} Threat Model intent and capability and all-time observed TID risk.
           </p>
         </div>
         <Link href="/threat-model">
@@ -272,7 +320,7 @@ export default function ActorPrioritisation() {
               className="w-full rounded-lg border border-border bg-input py-2 pl-9 pr-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
-          {(["All", "Critical", "High", "Medium", "Low"] as const).map(level => (
+          {(["All", "Critical", "High", "Medium", "Low", "Unscored"] as const).map(level => (
             <button
               key={level}
               type="button"
@@ -306,6 +354,8 @@ export default function ActorPrioritisation() {
                   <SortableTh col="name" sortKey={sortKey} sortDir={sortDir} toggle={toggle}>Actor</SortableTh>
                   <SortableTh col="intent" sortKey={sortKey} sortDir={sortDir} toggle={toggle}>Intent</SortableTh>
                   <SortableTh col="capability" sortKey={sortKey} sortDir={sortDir} toggle={toggle}>Capability</SortableTh>
+                  <SortableTh col="tidCount" sortKey={sortKey} sortDir={sortDir} toggle={toggle}>Known TIDs</SortableTh>
+                  <SortableTh col="averageRisk" sortKey={sortKey} sortDir={sortDir} toggle={toggle}>Average TID risk</SortableTh>
                   <SortableTh col="priority" sortKey={sortKey} sortDir={sortDir} toggle={toggle}>Priority</SortableTh>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Threat Model lists</th>
                   <SortableTh col="level" sortKey={sortKey} sortDir={sortDir} toggle={toggle}>Level</SortableTh>
@@ -318,9 +368,13 @@ export default function ActorPrioritisation() {
                     <td className="px-4 py-3 font-semibold text-foreground">{actor.name}</td>
                     <td className="px-4 py-3"><ScoreDots score={actor.intent} color="bg-primary" /></td>
                     <td className="px-4 py-3"><ScoreDots score={actor.capability} color="bg-cyan-400" /></td>
+                    <td className="px-4 py-3 font-mono text-xs">{actor.tidCount}</td>
+                    <td className="px-4 py-3 font-mono text-xs" title={actor.missingRiskCount ? `${actor.missingRiskCount} TIDs have no risk score` : `Risk sum ${actor.riskSum} ÷ ${actor.tidCount} distinct TIDs`}>
+                      {actor.averageRisk === null ? "Missing risk" : actor.averageRisk.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <span className="w-7 font-mono text-xs font-semibold text-foreground">{actor.priority}</span>
+                        <span className="min-w-16 font-mono text-xs font-semibold text-foreground">{actor.priority === null ? "—" : actor.priority.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
                         <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
                           <div className="h-full rounded-full bg-primary" style={{ width: `${actor.priorityPct * 100}%` }} />
                         </div>
@@ -350,7 +404,11 @@ export default function ActorPrioritisation() {
       </div>
 
       <div className="text-right text-xs text-muted-foreground">
-        Priority = Threat Model Intent × Threat Model Capability · Maximum score 49
+        Priority = Intent × Capability × (sum of distinct observed TID risk scores ÷ known TID count).
+        <br />
+        All procedure dates are included; repeated TIDs count once. No known TIDs = 0; missing risk scores = Unscored.
+        <br />
+        Bars and levels use a reference ceiling of 49 × the highest available TID risk score ({priorityCeiling.toLocaleString(undefined, { maximumFractionDigits: 2 })}).
       </div>
     </div>
   );

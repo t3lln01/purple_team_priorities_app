@@ -5,16 +5,17 @@ description: How intent/capability scores flow between ThreatModel and ActorPrio
 
 ## Actor ranking rule
 
-Actor Prioritisation is read-only and ranks actors exclusively from the selected Threat Model quarter:
+Actor Prioritisation is read-only. The selected Threat Model quarter filters monitoring membership only:
 
 - Resolve intent and capability with the Threat Model priority chain: manual override, CrowdStrike data, approved quarterly assessment, then static Threat Model baseline.
 - Add PP-TAP/SIRT bonuses to intent and cap effective intent at 7.
-- Priority = effective intent × effective capability. TTP risk and Actor Prioritisation local overrides do not contribute.
+- Resolve scores and PP-TAP/SIRT bonuses from the current Threat Model quarter, independently of the selected monitoring quarter.
+- Priority = effective intent × effective capability × (sum of risk scores for distinct observed TIDs ÷ number of those TIDs). Use all-time procedures; do not apply a quarter/date filter to evidence.
 - The selected quarter is shared between Threat Model and Actor Prioritisation and persists across navigation/reloads.
 
-**Why:** Rankings must reflect the quarter-specific Threat Model directly, without procedure-derived TTP risk or a second set of editable actor scores.
+**Why:** The user explicitly changed the ranking rule on 2026-09-18: quarter is only a monitored-actor filter, while priority must include average known-TID risk rather than procedure frequency.
 
-**How to apply:** Any ranking, export, or summary that represents Actor Prioritisation should use this formula and the currently selected Threat Model quarter.
+**How to apply:** Keep monitoring membership separate from scoring inputs. Count each observed TID once, retain sub-technique IDs, and use all-time evidence for Actor Prioritisation. The separate Risk Calculation page's quarterly evidence rule is unchanged.
 
 ## PP-TAP and SIRT bonus logic
 
