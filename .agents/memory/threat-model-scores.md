@@ -15,7 +15,7 @@ Actor Prioritisation is read-only. The selected Threat Model quarter filters mon
 
 **Why:** The user explicitly changed the ranking rule on 2026-09-18: quarter is only a monitored-actor filter, while priority must include average known-TID risk rather than procedure frequency.
 
-**How to apply:** Keep monitoring membership separate from scoring inputs. Count each observed TID once, retain sub-technique IDs, and use all-time evidence for Actor Prioritisation. The separate Risk Calculation page's quarterly evidence rule is unchanged.
+**How to apply:** Keep monitoring membership separate from scoring inputs. Count each observed TID once, retain sub-technique IDs, and use all-time evidence for Actor Prioritisation.
 
 ## PP-TAP and SIRT bonus logic
 
@@ -30,16 +30,15 @@ Actor Prioritisation is read-only. The selected Threat Model quarter filters mon
 
 **How to apply:** Always load and save both lists with the selected quarter state, and preserve empty saved lists as empty.
 
-## Technique risk quarter rule
+## Technique risk time scope
 
-- Risk Calculation uses the same selected Threat Model quarter as Actor Prioritisation.
-- Only procedures with dates inside that calendar quarter contribute technique evidence.
-- The latest qualifying procedure determines default last-occurrence recency and likelihood as of the quarter end; a manual likelihood override still wins.
-- Techniques with no dated procedure in the selected quarter are excluded rather than carrying forward all-time evidence.
+- Risk Calculation is independent of the selected Threat Model quarter and includes all techniques.
+- Procedure counts and last-seen dates use all-time evidence, including undated procedures in counts.
+- Use configured impact/likelihood and overrides without recalculating recency against a selected quarter end.
 
-**Why:** Historical risk views must represent what was observed and knowable during that quarter, not today's age or procedures from another reporting period.
+**Why:** The user explicitly removed the quarter filter from Risk Calculation on 2026-09-18, following the shift to all-time TID risk in Actor Prioritisation.
 
-**How to apply:** Any technique risk summary or export should use the shared quarter bounds and in-quarter procedure evidence before ranking or aggregating results.
+**How to apply:** Do not connect Risk Calculation to Threat Model quarter selection or exclude techniques for lacking dated evidence.
 
 ## Quarterly monitoring status
 

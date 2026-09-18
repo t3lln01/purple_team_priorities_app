@@ -27,7 +27,7 @@ import LikelihoodTable   from "@/pages/LikelihoodTable";
 import ThreatModel       from "@/pages/ThreatModel";
 import ApiDocs           from "@/pages/ApiDocs";
 import { AuthProvider, useAuthorization } from "@/context/AuthContext";
-import { ThreatModelQuarterProvider, useThreatModelQuarter } from "@/context/ThreatModelQuarterContext";
+import { ThreatModelQuarterProvider } from "@/context/ThreatModelQuarterContext";
 import UserManagement from "@/pages/UserManagement";
 
 const queryClient = new QueryClient();
@@ -117,11 +117,10 @@ const navItems = [
 
 function DatePickerWidget() {
   const { dateRange, setDateRange, customFrom, customTo, setCustomFrom, setCustomTo } = useDateWindow();
-  const { selectedQuarter } = useThreatModelQuarter();
   const [location] = useLocation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const quarterControlsRisk = stripBase(location) === "/risk-calculation";
+  const allTimeRisk = stripBase(location) === "/risk-calculation";
 
   useEffect(() => {
     function onOut(e: MouseEvent) {
@@ -131,15 +130,12 @@ function DatePickerWidget() {
     return () => document.removeEventListener("mousedown", onOut);
   }, []);
 
-  if (quarterControlsRisk) {
+  if (allTimeRisk) {
     return (
-      <Link href="/threat-model">
-        <span className="flex w-full cursor-pointer items-center gap-2 rounded-lg border border-primary/40 bg-primary/15 px-3 py-2 text-xs font-medium text-primary transition-colors hover:bg-primary/20">
-          <CalendarRange className="h-3.5 w-3.5 flex-shrink-0" />
-          <span className="flex-1 truncate text-left">{selectedQuarter} procedures</span>
-          <Crosshair className="h-3 w-3 flex-shrink-0" />
-        </span>
-      </Link>
+      <div className="flex w-full items-center gap-2 rounded-lg border border-sidebar-border px-3 py-2 text-xs font-medium text-muted-foreground">
+        <CalendarRange className="h-3.5 w-3.5 flex-shrink-0" />
+        <span className="flex-1 truncate text-left">All time</span>
+      </div>
     );
   }
 
