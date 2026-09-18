@@ -1,5 +1,9 @@
 import app from "./app";
-import { maybeAutoSync, initStoredCreds } from "./routes/crowdstrike";
+import {
+  initThreatModelSnapshots,
+  maybeAutoSync,
+  initStoredCreds,
+} from "./routes/crowdstrike";
 
 const rawPort = process.env["PORT"] ?? "8080";
 const port = Number(rawPort);
@@ -13,6 +17,7 @@ app.listen(port, "0.0.0.0", async () => {
 
   // Load any file-stored credentials into memory before running sync checks
   await initStoredCreds();
+  await initThreatModelSnapshots();
 
   // ── Weekly CrowdStrike auto-sync ─────────────────────────────────────────────
   // On startup: check if a sync is overdue (> 7 days since last) and run one.

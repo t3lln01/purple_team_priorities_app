@@ -59,3 +59,12 @@ Actor Prioritisation is read-only and ranks actors exclusively from the selected
 **Why:** Independent auto-saves could fail silently or persist only part of a quarter, leaving the UI inconsistent with the stored snapshot.
 
 **How to apply:** New quarter-level editable fields must participate in the shared dirty-state comparison and full-snapshot save action.
+
+## Durable snapshot storage
+
+- Quarter snapshots are stored in managed PostgreSQL, not writable files in the API service.
+- An empty snapshot table imports the bundled legacy JSON once so existing quarters are retained.
+
+**Why:** Published service files can revert when an instance is replaced, which restored old monitoring counts and removed custom actors.
+
+**How to apply:** All quarter reads and saves must use the snapshot table; JSON files are migration input only.
