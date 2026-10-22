@@ -1,6 +1,7 @@
 import { clerkClient } from "@clerk/express";
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { ADMIN_EMAIL, getRequestAccess } from "../middlewares/adminAuthorization";
+import { userCreationError } from "../lib/userCreationError";
 
 export const accessRouter = Router();
 
@@ -74,8 +75,8 @@ accessRouter.post("/access/users", requireAdmin, async (req, res) => {
     res.status(400).json({ error: "Enter a valid email address." });
     return;
   }
-  if (password.length < 8) {
-    res.status(400).json({ error: "Password must contain at least 8 characters." });
+  if (password.length < 15) {
+    res.status(400).json({ error: "Password must contain at least 15 characters." });
     return;
   }
   if (email === ADMIN_EMAIL) {
@@ -109,8 +110,7 @@ accessRouter.post("/access/users", requireAdmin, async (req, res) => {
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to create user.";
-    console.error("Unable to create write-enabled user", error);
-    res.status(400).json({ error: message });
+    const failure = userCreationError(error);
+    res.status(failure.status).json({ error: failure.error });
   }
 });
