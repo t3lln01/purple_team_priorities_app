@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card"{% if sync.status == 'running' %} data-reload-seconds="10"{% endif %}>
+  <h2>CrowdStrike sync</h2>
+  <p role="status"><span class="dot {% if sync.status == 'running' %}run{% elif sync.status == 'error' %}err{% elif sync.lastSync %}ok{% endif %}" aria-hidden="true"></span><b>{{ sync.status|default:"idle"|capfirst }}</b>{% if sync.status == 'running' %} &middot; refreshing every 10 seconds{% endif %}</p>
+  <dl class="stats">
+    <div class="stat"><dt>Last sync</dt><dd style="font-size:.95rem">{{ sync.lastSync|default:"Never" }}</dd></div>
+    <div class="stat"><dt>Reports</dt><dd>{{ sync.meta.reportCount|default_if_none:"-" }}</dd></div>
+    <div class="stat"><dt>Actors</dt><dd>{{ sync.meta.actorCount|default_if_none:"-" }}</dd></div>
+    <div class="stat"><dt>Credentials</dt><dd style="font-size:.95rem">{% if credentials_present %}<span class="role-write">Configured</span>{% else %}<span class="role-read">Not set</span>{% endif %}</dd></div>
+  </dl>
+  {% if sync.error %}<p class="msg error" role="alert">{{ sync.error }}</p>{% endif %}
+  {% if access.can_write %}
+  <div class="row">
+    <form method="post" action="/data-sources/sync" style="margin:0">{% csrf_token %}<button class="btn btn-primary" type="submit"{% if not credentials_present or sync.status == 'running' %} disabled{% endif %}>Sync now</button></form>
+    <a class="btn" href="/data-sources/credentials">{% if credentials_present %}Update credentials{% else %}Add credentials{% endif %}</a>
+    {% if credentials_present %}<form method="post" action="/data-sources/disconnect" style="margin:0" data-confirm="Disconnect CrowdStrike and remove stored credentials?">{% csrf_token %}<button class="btn btn-danger" type="submit">Disconnect</button></form>{% endif %}
+  </div>
+  {% endif %}
+</div>
+<div class="grid2">
+  <div class="card"><h2>Imports</h2><p class="sub">Load files or copy settings saved by the previous browser-based app.</p>
+    <div class="row" style="margin-top:.75rem">{% if access.can_write %}<a class="btn" href="/data-sources/import">Import file</a>{% endif %}<a class="btn" href="/data-sources/browser-import">Import browser data</a>{% for a in actions %}<a class="btn" href="{{ a.url }}">{{ a.label }}</a>{% endfor %}</div></div>
+  <div class="card"><h2>MITRE ATT&amp;CK versions</h2>
+    {% if versions %}<ul style="padding-left:1rem;margin:0 0 .75rem">{% for v in versions %}<li>{{ v.label }}{% if v.active %} <span class="badge b-primary">ACTIVE</span>{% endif %}</li>{% endfor %}</ul>{% else %}<p class="sub">No versions loaded.</p>{% endif %}
+    {% if access.can_write %}<a class="btn" href="/data-sources/version">Change active version</a>{% endif %}</div>
+</div>
+{% endblock %}

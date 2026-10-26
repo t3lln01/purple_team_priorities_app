@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block header %}{% endblock %}
+{% block content %}
+<div class="auth-wrap"><div class="auth-card">
+  <div class="eyebrow">Purple Team</div>
+  <h1 style="font-size:1.9rem;margin-top:.4rem">Welcome back</h1>
+  <p class="sub">Sign in with your username and password to edit. Guests can view the dashboard but cannot save or modify data.</p>
+  <div id="clerk-sign-in" aria-live="polite"><noscript><p class="msg error" role="alert">JavaScript is required to sign in.</p></noscript></div>
+  <div id="sign-in-error" class="status-line" role="alert">{% if auth_error %}{{ auth_error }}{% endif %}</div>
+  <p style="margin:1rem 0 0;text-align:center"><a href="/dashboard">Continue as guest</a></p>
+</div></div>
+{% endblock %}

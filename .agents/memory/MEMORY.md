@@ -4,3 +4,4 @@
 - [API production paths](api-production-paths.md) — the API bundles to CommonJS; resolve workspace data from process.cwd(), never import.meta.url.
 - [Dependency remediation constraints](dependency-remediation.md) — keep override replacements major-compatible; patched js-yaml requires an Orval import compatibility patch.
 - [Application access roles](application-access-roles.md) — sensitive intelligence/state reads require sign-in; writes require administrator or writer; user management is administrator-only.
+- [Python migration](python-migration.md) — user chose full Django rewrite; preserve data and use artifact-aware portable launch paths.

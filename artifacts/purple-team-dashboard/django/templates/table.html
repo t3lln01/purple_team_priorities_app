@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block head_actions %}<div class="row">{% for a in actions %}<a class="btn{% if forloop.first %} btn-primary{% endif %}" href="{{ a.url }}">{{ a.label }}</a>{% endfor %}{% if export_url %}<a class="btn" href="{{ export_url }}">Export</a>{% endif %}</div>{% endblock %}
+{% block content %}
+{% if notice %}<p class="msg" role="note">{{ notice }}</p>{% endif %}
+{% if requires_signin %}
+<div class="card empty"><strong>Sign in required</strong>This view contains account data. <a href="/sign-in">Sign in</a> to load it.</div>
+{% else %}
+{% if stats %}<dl class="stats">{% for s in stats %}<div class="stat"><dt>{{ s.label }}</dt><dd>{{ s.value }}</dd></div>{% endfor %}</dl>{% endif %}
+<form method="get" class="toolbar" role="search">
+  <label class="field">Search<input type="search" name="q" value="{{ query }}" placeholder="Search"></label>
+  {% for f in filters %}<label class="field">{{ f.label }}<select name="{{ f.name }}">{% for o in f.options %}<option value="{{ o.value }}"{% if o.value|stringformat:"s" == f.value|stringformat:"s" %} selected{% endif %}>{{ o.label }}</option>{% endfor %}</select></label>{% endfor %}
+  {% if sort_options %}<label class="field">Sort<select name="sort">{% for o in sort_options %}<option value="{{ o.value }}"{% if o.value == sort %} selected{% endif %}>{{ o.label }}</option>{% endfor %}</select></label>
+  <label class="field">Direction<select name="direction"><option value="asc"{% if direction == 'asc' %} selected{% endif %}>Ascending</option><option value="desc"{% if direction == 'desc' %} selected{% endif %}>Descending</option></select></label>{% endif %}
+  <button class="btn btn-primary" type="submit">Apply</button>
+</form>
+<div class="table-wrap">
+<table>
+  <thead><tr>{% for c in columns %}<th scope="col">{{ c }}</th>{% endfor %}<th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>{% for cell in r.cells %}<td>{{ cell }}</td>{% endfor %}
+      <td><div class="row">{% if r.edit_url %}<a class="btn" href="{{ r.edit_url }}">Edit</a>{% endif %}{% if r.delete_url %}<a class="btn btn-danger" href="{{ r.delete_url }}">Delete</a>{% endif %}</div></td></tr>
+  {% empty %}
+    <tr><td colspan="{{ columns|length|add:1 }}"><div class="empty"><strong>No records</strong>{% if query %}Nothing matches "{{ query }}".{% else %}No data has been loaded for this view yet.{% endif %}</div></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
+<nav class="pager" aria-label="Pagination">
+  <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} &middot; {{ page_obj.paginator.count }} rows</span>
+  <span class="row">
+    {% if page_obj.has_previous %}<a class="btn" href="?{{ pagination_query }}{% if pagination_query %}&amp;{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}
+    {% if page_obj.has_next %}<a class="btn" href="?{{ pagination_query }}{% if pagination_query %}&amp;{% endif %}page={{ page_obj.next_page_number }}">Next</a>{% endif %}
+  </span>
+</nav>
+{% endif %}
+{% endif %}
+{% endblock %}

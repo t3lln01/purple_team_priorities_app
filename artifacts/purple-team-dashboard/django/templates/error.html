@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block header %}{% endblock %}
+{% block content %}
+<div class="auth-wrap"><div class="auth-card" role="alert">
+  <div class="status-code">{{ status|default:"Error" }}</div>
+  <h1 style="margin-top:.75rem">{{ title|default:"Something went wrong" }}</h1>
+  <p class="sub">{{ error|default:"The request could not be completed." }}</p>
+  <div class="row" style="margin-top:1.25rem"><a class="btn btn-primary" href="/dashboard">Back to dashboard</a><a class="btn" href="javascript:history.back()">Go back</a></div>
+</div></div>
+{% endblock %}

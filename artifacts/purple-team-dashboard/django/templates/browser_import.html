@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<div class="card" style="max-width:44rem">
+  <h2>Copy local browser data to your account</h2>
+  <p>The previous version of this workspace stored some settings and imports in this browser. This step copies them into your current account on the server.</p>
+  <ul class="sub"><li>Originals in this browser are not deleted.</li><li>Nothing is sent until you press the button.</li><li>Use the same browser you used before.</li></ul>
+  <form id="browser-import-form" method="post" action="{{ request.path }}" onsubmit="return false">{% csrf_token %}</form>
+  {% if access.can_write %}
+  <button type="button" class="btn btn-primary btn-lg" id="import-browser">Import browser data</button>
+  {% else %}<p class="role-read">Sign in with a write-enabled account to import.</p><button type="button" class="btn" id="import-browser" disabled>Import browser data</button>{% endif %}
+  <div id="import-status" class="status-line" role="status" aria-live="polite"></div>
+  <p><a href="/data-sources">Back to data sources</a></p>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{% static 'purple/browser-import.js' %}" defer></script>{% endblock %}
