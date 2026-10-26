@@ -34,10 +34,12 @@ DATABASES = {"default": {"ENGINE": "django.db.backends.postgresql", "NAME": db.p
                          "CONN_MAX_AGE": 60, "OPTIONS": {"sslmode": parse_qs(db.query).get("sslmode", ["prefer"])[0]}}}
 SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SECURE = not DEBUG
-SESSION_COOKIE_SAMESITE = "Lax"
-CSRF_COOKIE_SAMESITE = "Lax"
+# Both preview and production are HTTPS, including inside the cross-site Replit
+# preview iframe. Lax cookies are not sent on its form submissions.
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SAMESITE = "None"
 CSRF_FAILURE_VIEW = "purple.views.csrf_failure"
 X_FRAME_OPTIONS = "SAMEORIGIN"
 STATIC_URL = "/static/"

@@ -391,7 +391,7 @@ def source_action(request, action):
         return render(request, "browser_import.html", {"title": "Import browser data"})
     if action == "sync":
         if request.method != "POST":
-            return HttpResponse(status=405)
+            return redirect("/data-sources")
         try:
             crowdstrike.start_sync()
             messages.success(request, "CrowdStrike sync started.")

@@ -98,6 +98,27 @@ class MigrationTests(TestCase):
             self.assertEqual(saved.state["ppTapList"], ["DRAFT TEST"])
             self.assertContains(client.get("/threat-model?quarter=Q1+2099"), "DRAFT TEST")
 
+    def test_embedded_sync_cookie_and_submission(self):
+        from .auth import ClerkSessionMiddleware
+        def authenticate(middleware, request):
+            request.access = {"user_id": "test-writer", "email": "writer@example.com", "is_admin": False, "can_write": True}
+            return middleware.get_response(request)
+        with patch.object(ClerkSessionMiddleware, "__call__", authenticate), \
+             patch("purple.views.crowdstrike.credentials", return_value={"configured": True}), \
+             patch("purple.views.crowdstrike.start_sync") as start:
+            client = Client(enforce_csrf_checks=True)
+            response = client.get("/data-sources", secure=True)
+            self.assertEqual(response.status_code, 200)
+            cookie = response.cookies["csrftoken"]
+            self.assertEqual(cookie["samesite"], "None")
+            self.assertTrue(cookie["secure"])
+            self.assertEqual(client.post("/data-sources/sync", secure=True).status_code, 403)
+            response = client.post("/data-sources/sync", {"csrfmiddlewaretoken": cookie.value}, secure=True,
+                                   HTTP_ORIGIN="https://testserver")
+            self.assertRedirects(response, "/data-sources", fetch_redirect_response=False)
+            start.assert_called_once()
+            self.assertRedirects(client.get("/data-sources/sync", secure=True), "/data-sources", fetch_redirect_response=False)
+
     def test_authenticated_templates(self):
         factory = RequestFactory()
         for slug in views.TABLES:
