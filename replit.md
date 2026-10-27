@@ -2,9 +2,11 @@
 
 ## Overview
 
-The Purple Team application runs on Python 3.13 / Django 5.2, with server-rendered Django templates and PostgreSQL. Its web and API artifact services share `artifacts/purple-team-dashboard/django/`. Run checks from the workspace root with `uv run python artifacts/purple-team-dashboard/django/manage.py test purple --noinput`.
+This workspace's Python/Django version of Purple Team is a fork of the original React/Express project, not a replacement for the original. Treat future work here as changes to the Python fork; do not propagate changes to the original project unless explicitly requested. This designation does not itself create a separate Replit project or isolate the database and authentication services.
 
-The old React/Express sources and JSON datasets are retained as migration references; they are not the application's runtime. The separate mockup sandbox still uses Node. The TypeScript notes below describe that legacy workspace and sandbox, not the active Purple Team app.
+The fork runs on Python 3.13 / Django 5.2, with server-rendered Django templates and PostgreSQL. Its web and API artifact services share `artifacts/purple-team-dashboard/django/`. Run checks from the workspace root with `uv run python artifacts/purple-team-dashboard/django/manage.py test purple --noinput`.
+
+The original React/Express sources and JSON datasets are retained as upstream references; they are not this fork's runtime. The separate mockup sandbox still uses Node. The TypeScript notes below describe the original workspace and sandbox, not the active Python fork.
 
 ### Django operations
 
