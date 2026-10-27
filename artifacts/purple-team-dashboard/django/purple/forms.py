@@ -104,8 +104,9 @@ class ImportForm(forms.Form):
 
     def clean_file(self):
         upload = self.cleaned_data["file"]
-        if upload.size > 35 * 1024 * 1024:
-            raise forms.ValidationError("The upload must be smaller than 35 MB.")
+        limit = 100 if self.cleaned_data.get("kind") == "mitre" else 35
+        if upload.size > limit * 1024 * 1024:
+            raise forms.ValidationError(f"The upload must be no larger than {limit} MB.")
         return upload
 
 

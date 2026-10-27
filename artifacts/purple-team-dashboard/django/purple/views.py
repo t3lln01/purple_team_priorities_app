@@ -420,7 +420,11 @@ def source_action(request, action):
             try:
                 import_data(prefs, form.cleaned_data["kind"], read_upload(form.cleaned_data["file"]), form.cleaned_data["label"])
                 save_preferences(request, prefs)
-                messages.success(request, "Data imported successfully.")
+                if form.cleaned_data["kind"] == "mitre":
+                    imported = prefs["pt_mitre_versions_meta"][-1]
+                    messages.success(request, f'{imported["label"]}: imported {len(imported["impactRows"])} techniques. This version is now active.')
+                else:
+                    messages.success(request, "Data imported successfully.")
                 return redirect("/data-sources")
             except (ValueError, TypeError, KeyError, UnicodeDecodeError) as exc:
                 form.add_error(None, str(exc))

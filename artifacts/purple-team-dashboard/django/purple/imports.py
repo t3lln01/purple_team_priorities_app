@@ -25,6 +25,8 @@ def import_data(preferences, kind, data, label=""):
             raise ValueError("Upload a MITRE ATT&CK STIX bundle with an objects array.")
         impacts = []
         for obj in data["objects"]:
+            if not isinstance(obj, dict):
+                raise ValueError("Invalid STIX bundle: each object must be a JSON object.")
             if obj.get("type") != "attack-pattern" or obj.get("revoked") or obj.get("x_mitre_deprecated"):
                 continue
             tid = next((ref.get("external_id") for ref in obj.get("external_references", [])

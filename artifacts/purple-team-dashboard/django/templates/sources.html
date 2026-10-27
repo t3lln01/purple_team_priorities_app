@@ -22,7 +22,17 @@
   <div class="card"><h2>Imports</h2><p class="sub">Load files or copy settings saved by the previous browser-based app.</p>
     <div class="row" style="margin-top:.75rem">{% if access.can_write %}<a class="btn" href="/data-sources/import">Import file</a>{% endif %}<a class="btn" href="/data-sources/browser-import">Import browser data</a>{% for a in actions %}<a class="btn" href="{{ a.url }}">{{ a.label }}</a>{% endfor %}</div></div>
   <div class="card"><h2>MITRE ATT&amp;CK versions</h2>
-    {% if versions %}<ul style="padding-left:1rem;margin:0 0 .75rem">{% for v in versions %}<li>{{ v.label }}{% if v.active %} <span class="badge b-primary">ACTIVE</span>{% endif %}</li>{% endfor %}</ul>{% else %}<p class="sub">No versions loaded.</p>{% endif %}
+    {% if versions %}<ul style="padding-left:1rem;margin:0 0 .75rem">{% for v in versions %}<li>{{ v.label }} &middot; {{ v.impactRows|length }} techniques{% if v.active %} <span class="badge b-primary">ACTIVE</span>{% endif %}</li>{% endfor %}</ul>{% else %}<p class="sub">No versions loaded. The original baseline is active.</p>{% endif %}
+    {% if access.can_write %}
+    <p class="sub" id="mitre-upload-help">Upload a MITRE ATT&amp;CK STIX JSON bundle (up to 100 MB). The new version becomes active for your account; existing versions are kept.</p>
+    <form method="post" action="/data-sources/import" enctype="multipart/form-data" data-dirty-watch>
+      {% csrf_token %}
+      <input type="hidden" name="kind" value="mitre">
+      <p><label for="mitre-label">Version label (optional)</label><input id="mitre-label" name="label" maxlength="200" placeholder="e.g. Enterprise ATT&amp;CK v18"></p>
+      <p><label for="mitre-file">ATT&amp;CK bundle</label><input id="mitre-file" name="file" type="file" accept=".json,application/json" required aria-describedby="mitre-upload-help"></p>
+      <button class="btn btn-primary" type="submit">Upload MITRE version</button>
+    </form>
+    {% else %}<p class="role-read">Write access is required to upload a version.</p>{% endif %}
     {% if access.can_write %}<a class="btn" href="/data-sources/version">Change active version</a>{% endif %}</div>
 </div>
 {% endblock %}

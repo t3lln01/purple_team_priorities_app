@@ -8,6 +8,66 @@ import copy
 
 
 class MigrationTests(TestCase):
+    def test_mitre_upload_from_sources_persists_and_validates(self):
+        import json
+        import re
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from .auth import ClerkSessionMiddleware
+        from .store import user_settings
+        access = {"user_id": "mitre-upload-writer", "session_id": "mitre-upload-session", "can_write": True, "is_admin": False}
+
+        def authenticate(middleware, request):
+            request.access = access.copy()
+            return middleware.get_response(request)
+
+        bundle = {"type": "bundle", "objects": [
+            {"type": "attack-pattern", "name": "Test technique",
+             "external_references": [{"source_name": "mitre-attack", "external_id": "T1001"}]},
+            {"type": "attack-pattern", "revoked": True},
+            {"type": "identity", "name": "MITRE"},
+        ]}
+        with patch.object(ClerkSessionMiddleware, "__call__", authenticate), \
+             patch("purple.views.crowdstrike.credentials", return_value=None):
+            client = Client(enforce_csrf_checks=True)
+            page = client.get("/data-sources", secure=True)
+            self.assertContains(page, "Upload MITRE version")
+            self.assertContains(page, 'type="file"')
+            token = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', page.content.decode()).group(1)
+            client.cookies.clear()
+
+            def upload(content, csrf=token):
+                return client.post("/data-sources/import", {
+                    "kind": "mitre", "label": "ATT&CK test",
+                    "file": SimpleUploadedFile("enterprise-attack.json", content, "application/json"),
+                    "csrfmiddlewaretoken": csrf,
+                }, secure=True, HTTP_ORIGIN="https://testserver")
+
+            self.assertEqual(upload(json.dumps(bundle).encode(), "").status_code, 403)
+            self.assertRedirects(upload(json.dumps(bundle).encode()), "/data-sources", fetch_redirect_response=False)
+            prefs = user_settings(access["user_id"])
+            version = prefs["pt_mitre_versions_meta"][0]
+            self.assertEqual(version["id"], prefs["pt_active_mitre_version"])
+            self.assertEqual(len(version["impactRows"]), 1)
+            self.assertEqual(version["impactRows"][0]["id"], "T1001")
+            self.assertContains(client.get("/data-sources", secure=True), "ATT&amp;CK test")
+            self.assertContains(upload(b'{"objects": []}'), "No active ATT")
+            self.assertContains(upload(b'{"objects": [null]}'), "Invalid STIX bundle")
+            self.assertContains(upload(b'not json'), "Expecting value")
+            self.assertEqual(len(user_settings(access["user_id"])["pt_mitre_versions_meta"]), 1)
+            access["can_write"] = False
+            self.assertEqual(upload(json.dumps(bundle).encode()).status_code, 403)
+            self.assertNotContains(client.get("/data-sources", secure=True), 'id="mitre-file"')
+
+    def test_mitre_upload_size_limit(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from .forms import ImportForm
+        upload = SimpleUploadedFile("enterprise-attack.json", b"{}")
+        upload.size = 50 * 1024 * 1024
+        self.assertTrue(ImportForm({"kind": "mitre"}, {"file": upload}).is_valid())
+        self.assertFalse(ImportForm({"kind": "reports"}, {"file": upload}).is_valid())
+        upload.size = 101 * 1024 * 1024
+        self.assertFalse(ImportForm({"kind": "mitre"}, {"file": upload}).is_valid())
+
     databases = {"default"}
 
     @classmethod
