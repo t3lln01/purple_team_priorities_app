@@ -119,6 +119,40 @@ class MigrationTests(TestCase):
             start.assert_called_once()
             self.assertRedirects(client.get("/data-sources/sync", secure=True), "/data-sources", fetch_redirect_response=False)
 
+    def test_sync_without_django_cookies_requires_session_bound_token(self):
+        import re
+        from .auth import ClerkSessionMiddleware
+        active_session = {"id": "verified-session-a", "write": True}
+        def authenticate(middleware, request):
+            request.access = {"user_id": "test-writer", "session_id": active_session["id"],
+                              "email": "writer@example.com", "is_admin": False,
+                              "can_write": active_session["write"]}
+            return middleware.get_response(request)
+        with patch.object(ClerkSessionMiddleware, "__call__", authenticate), \
+             patch("purple.views.crowdstrike.credentials", return_value={"configured": True}), \
+             patch("purple.views.crowdstrike.start_sync") as start:
+            client = Client(enforce_csrf_checks=True)
+            response = client.get("/data-sources", secure=True)
+            token = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', response.content.decode())[1]
+            self.assertIn("no-store", response["Cache-Control"])
+            # Simulate browser suppression of all auxiliary Django cookies.
+            client.cookies.clear()
+            def submit(value=token, origin="https://testserver"):
+                return client.post("/data-sources/sync", {"csrfmiddlewaretoken": value},
+                                   secure=True, HTTP_ORIGIN=origin)
+            self.assertEqual(submit("").status_code, 403)
+            self.assertEqual(submit("x" * 64).status_code, 403)
+            self.assertEqual(submit(origin="https://attacker.example").status_code, 403)
+            active_session["id"] = "verified-session-b"
+            self.assertEqual(submit().status_code, 403)
+            active_session["id"] = "verified-session-a"
+            active_session["write"] = False
+            self.assertEqual(submit().status_code, 403)
+            start.assert_not_called()
+            active_session["write"] = True
+            self.assertRedirects(submit(), "/data-sources", fetch_redirect_response=False)
+            start.assert_called_once()
+
     def test_authenticated_templates(self):
         factory = RequestFactory()
         for slug in views.TABLES:

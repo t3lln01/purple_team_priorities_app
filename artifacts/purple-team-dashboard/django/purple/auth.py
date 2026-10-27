@@ -112,7 +112,7 @@ class ClerkSessionMiddleware:
                 primary = next((e for e in emails if e["id"] == user.get("primary_email_address_id")), {})
                 admin = any(e.get("email_address", "").lower() == ADMIN_EMAIL
                             and e.get("verification", {}).get("status") == "verified" for e in emails)
-                request.access = {"user_id": user["id"], "email": primary.get("email_address"),
+                request.access = {"user_id": user["id"], "session_id": sid, "email": primary.get("email_address"),
                                   "is_admin": admin,
                                   "can_write": admin or user.get("public_metadata", {}).get("role") == "writer"}
             except jwt.InvalidTokenError:

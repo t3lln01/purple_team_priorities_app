@@ -18,8 +18,8 @@ MIDDLEWARE = [
     "purple.auth.ClerkProxyMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
     "purple.auth.ClerkSessionMiddleware",
+    "purple.csrf.ClerkCsrfMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
