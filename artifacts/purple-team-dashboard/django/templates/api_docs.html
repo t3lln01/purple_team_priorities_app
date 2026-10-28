@@ -1,8 +1,0 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="card"><h2>Authentication</h2><p class="sub">Read endpoints follow the same access rules as the dashboard. Writes require a signed-in account with write access and are not offered through these endpoints.</p>
-<h3 style="margin-top:1rem">Export formats</h3><p class="sub">Add <code>?format=json</code> or <code>?format=csv</code> to an export endpoint.</p></div>
-<div class="table-wrap"><table><thead><tr><th scope="col">Endpoint</th><th scope="col">Description</th></tr></thead><tbody>
-{% for e in endpoints %}<tr class="endpoint"><td><code>{{ e.path }}</code></td><td>{{ e.description }}</td></tr>{% empty %}<tr><td colspan="2"><div class="empty"><strong>No endpoints published</strong></div></td></tr>{% endfor %}
-</tbody></table></div>
-{% endblock %}

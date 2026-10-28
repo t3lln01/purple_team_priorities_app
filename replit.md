@@ -2,22 +2,7 @@
 
 ## Overview
 
-This workspace's Python/Django version of Purple Team is a fork of the original React/Express project, not a replacement for the original. Treat future work here as changes to the Python fork; do not propagate changes to the original project unless explicitly requested. This designation does not itself create a separate Replit project or isolate the database and authentication services.
-
-The fork runs on Python 3.13 / Django 5.2, with server-rendered Django templates and PostgreSQL. Its web and API artifact services share `artifacts/purple-team-dashboard/django/`. Run checks from the workspace root with `uv run python artifacts/purple-team-dashboard/django/manage.py test purple --noinput`.
-
-The original React/Express sources and JSON datasets are retained as upstream references; they are not this fork's runtime. The separate mockup sandbox still uses Node. The TypeScript notes below describe the original workspace and sandbox, not the active Python fork.
-
-### Django operations
-
-- Install with `uv sync`. The portable `django/serve.py` launcher runs Gunicorn.
-- Development artifact commands start in their artifact directory and must first `cd ../..`.
-- Run `manage.py migrate` in development only. Production schema changes are applied through the Publish database schema review; never run migrations or DDL in a production startup/build command.
-- Existing `threat_model_snapshots` records are reused. New settings/imports/drafts use PostgreSQL documents. Do not replace these with filesystem persistence.
-- Existing users and roles stay in Clerk. Only administrator accounts can add writers; passwords require at least 15 characters. Browser authentication uses Clerk cookies, not manually injected bearer tokens.
-- Existing browser-local preferences can be explicitly imported from Data Sources → Import browser settings. Originals remain intact; existing server values are not overwritten.
-- Actor edits/assessments are drafts until **Save quarter**. Stale revisions must not overwrite newer saved snapshots.
-- The quarter filters monitored actor membership only. Priority uses current intent × capability × average distinct all-time observed TID risk. Risk Calculation has no quarter filter.
+pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
 
 ## Stack
 

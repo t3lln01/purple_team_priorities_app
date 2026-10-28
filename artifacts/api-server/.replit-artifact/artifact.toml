@@ -1,6 +1,6 @@
 kind = "api"
-previewPath = "/api"
-title = "Python API Server"
+previewPath = "/api" # TODO - should be excluded from preview in the first place
+title = "API Server"
 version = "1.0.0"
 id = "3B4_FFSkEVBkAeYMFRJ2e"
 
@@ -10,20 +10,16 @@ name = "API Server"
 paths = ["/api"]
 
 [services.development]
-run = "cd ../.. && uv run python artifacts/purple-team-dashboard/django/serve.py"
-
-[services.env]
-PORT = "8080"
+run = "pnpm --filter @workspace/api-server run dev"
 
 [services.production]
-build = "uv sync --no-dev && uv run python artifacts/purple-team-dashboard/django/manage.py collectstatic --noinput"
+build = "pnpm --filter @workspace/api-server run build"
 
 [services.production.run]
-args = ["uv", "run", "--no-sync", "python", "artifacts/purple-team-dashboard/django/serve.py"]
+args = ["node", "artifacts/api-server/dist/index.cjs"]
 
 [services.production.run.env]
 PORT = "8080"
-DJANGO_ENV = "production"
 
 [services.production.health.startup]
 path = "/api/healthz"

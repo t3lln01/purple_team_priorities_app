@@ -10,11 +10,3 @@ The primary administrator can manage users. Accounts created by the administrato
 **Why:** The application needs simple managed credentials and delegated editing without giving every authenticated user write access. Licensed intelligence and internal prioritization data must not be exposed through public read endpoints.
 
 **How to apply:** Any new editing feature must use the shared write-access state in the UI and remain protected by server-side role verification. New read endpoints must be classified explicitly: only static/reference exports may be public; sensitive intelligence and internal state require a Clerk subject. User-management operations remain administrator-only.
-
-## Production password policy
-
-Production Clerk requires passwords of at least 15 characters (confirmed from production validation errors on 2026-10-22). Do not assume development's password policy matches production or weaken the identity provider's checks.
-
-**Why:** The add-user form previously accepted shorter passwords, while the production provider rejected them behind a generic “Unprocessable Entity” message.
-
-**How to apply:** Keep account-creation guidance aligned with the production policy and surface Clerk's detailed validation errors, not just the top-level exception message. Recheck production evidence if the policy changes.

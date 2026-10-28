@@ -43,13 +43,9 @@ export default function UserManagement() {
 
   async function addUser(event: FormEvent) {
     event.preventDefault();
+    setSaving(true);
     setError("");
     setSuccess("");
-    if (password.length < 15) {
-      setError("Password must contain at least 15 characters.");
-      return;
-    }
-    setSaving(true);
     try {
       const response = await fetch("/api/access/users", {
         method: "POST",
@@ -131,18 +127,17 @@ export default function UserManagement() {
               autoComplete="new-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              minLength={15}
-              placeholder="At least 15 characters"
-              aria-describedby="new-user-password-help"
+              minLength={8}
+              placeholder="At least 8 characters"
               required
               className="w-full rounded-lg border border-border bg-input py-2.5 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
-          <p id="new-user-password-help" className="mt-2 text-xs leading-5 text-muted-foreground">
-            Use at least 15 characters and avoid common or compromised passwords. Share the temporary password securely. The password is sent directly to the identity service and is never stored by this app.
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            Share the temporary password securely. The password is sent directly to the identity service and is never stored by this app.
           </p>
 
-          {error && <div role="alert" className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">{error}</div>}
+          {error && <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">{error}</div>}
           {success && <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-300">{success}</div>}
 
           <button
