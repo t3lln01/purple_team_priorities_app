@@ -11,6 +11,7 @@ import {
   toTitleCase,
 } from "@/context/ViewContext";
 import { useAppData, buildMitreVersionData, type LiveActorData } from "@/context/AppDataContext";
+import { useTacticScope } from "@/context/TacticScopeContext";
 
 const MITRE_DEFAULT_URL =
   "https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json";
@@ -241,6 +242,7 @@ function SH({ children }: { children: React.ReactNode }) {
 }
 
 export default function DataSources() {
+  const { isTechniqueEnabled } = useTacticScope();
   const {
     liveActorData, setLiveActorData,
     mitreVersions, activeMitreVersionId, setActiveMitreVersionId,
@@ -723,7 +725,7 @@ export default function DataSources() {
                 <p className="text-[10px] text-muted-foreground">Loaded {new Date(mitreStats.loadedAt).toLocaleString()}</p>
                 <button onClick={() => setMitrePreview(v => !v)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   {mitrePreview ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                  {mitrePreview ? "Hide" : "Show"} preview ({mitreStats.sample.length} entries)
+                  {mitrePreview ? "Hide" : "Show"} preview ({mitreStats.sample.filter(t => isTechniqueEnabled(t.id, t.tactics)).length} enabled entries)
                 </button>
                 {mitrePreview && (
                   <div className="overflow-x-auto rounded-lg border border-border">
@@ -733,7 +735,7 @@ export default function DataSources() {
                         <th className="text-left px-3 py-2 text-muted-foreground font-medium">Name</th>
                         <th className="text-left px-3 py-2 text-muted-foreground font-medium">Tactics</th>
                       </tr></thead>
-                      <tbody>{mitreStats.sample.map((t, i) => (
+                      <tbody>{mitreStats.sample.filter(t => isTechniqueEnabled(t.id, t.tactics)).map((t, i) => (
                         <tr key={i} className="border-b border-border/40 hover:bg-accent/20">
                           <td className="px-3 py-1.5 font-mono text-primary whitespace-nowrap">{t.id}</td>
                           <td className="px-3 py-1.5 text-foreground max-w-[180px]"><div className="truncate" title={t.name}>{t.name}</div></td>

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef, Fragment } from "react";
 import { Link } from "wouter";
 import data from "@/data.json";
+import { useTacticScope } from "@/context/TacticScopeContext";
 import { useAppData } from "@/context/AppDataContext";
 import { Plus, Pencil, Trash2, Check, X, RotateCcw, Info } from "lucide-react";
 import { useSortTable } from "@/hooks/useSortTable";
@@ -101,6 +102,7 @@ function blankForm(): HVRow {
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function HighValueAssets() {
+  const { isTechniqueEnabled } = useTacticScope();
   const { setHVAScores } = useHVAScores();
   const { activeMitreVersionId } = useAppData();
   const versionKey    = activeMitreVersionId ?? "base";
@@ -133,7 +135,7 @@ export default function HighValueAssets() {
 
   // ── Merged rows ──────────────────────────────────────────────────────────────
 
-  const merged: Array<HVRow & { _key: string; _isCustom: boolean; _isEdited: boolean }> = useMemo(() => {
+  const allMerged: Array<HVRow & { _key: string; _isCustom: boolean; _isEdited: boolean }> = useMemo(() => {
     const baseline = baselineWithTID.map((r, i) => {
       const ov = overrides[`b-${i}`] ?? {};
       return {
@@ -152,11 +154,14 @@ export default function HighValueAssets() {
     }));
     return [...baseline, ...cust];
   }, [custom, overrides]);
+  const merged = useMemo(() => allMerged.filter(row => isTechniqueEnabled(row.tid)), [allMerged, isTechniqueEnabled]);
 
   // Keep HVScores in sync — recompute locally and push to shared context so
   // Risk Calculation and Likelihood Table react immediately.
-  const hvscores: HVScore[] = useMemo(() => recomputeHVScores(merged), [merged]);
-  useEffect(() => { setHVAScores(hvscores); }, [hvscores, setHVAScores]);
+  const allHvscores: HVScore[] = useMemo(() => recomputeHVScores(allMerged), [allMerged]);
+  const hvscores = useMemo(() => allHvscores.filter(row => isTechniqueEnabled(row.tid)), [allHvscores, isTechniqueEnabled]);
+  // Persist the full matrix so enabling a tactic restores its original scores.
+  useEffect(() => { setHVAScores(allHvscores); }, [allHvscores, setHVAScores]);
 
   // ── Filters ──────────────────────────────────────────────────────────────────
 

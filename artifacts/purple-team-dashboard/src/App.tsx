@@ -18,6 +18,7 @@ import DataSources from "@/pages/DataSources";
 import { TacticScoresProvider }    from "@/context/TacticScoresContext";
 import { LikelihoodProvider }       from "@/context/LikelihoodContext";
 import { AppDataProvider, useAppData } from "@/context/AppDataContext";
+import { TacticScopeProvider } from "@/context/TacticScopeContext";
 import { ImpactOverridesProvider }  from "@/context/ImpactOverridesContext";
 import { HVAScoresProvider }        from "@/context/HVAScoresContext";
 import { DateWindowProvider, useDateWindow, DATE_RANGE_LABELS, type DateRange } from "@/context/DateWindowContext";
@@ -429,6 +430,7 @@ function AppProvidersAndRoutes() {
           <TooltipProvider>
             <ThreatModelQuarterProvider>
               <AppDataProvider>
+                <TacticScopeProvider>
                 <DateWindowProvider>
                   <TacticScoresProvider>
                     <LikelihoodProvider>
@@ -457,6 +459,7 @@ function AppProvidersAndRoutes() {
                     </LikelihoodProvider>
                   </TacticScoresProvider>
                 </DateWindowProvider>
+                </TacticScopeProvider>
               </AppDataProvider>
             </ThreatModelQuarterProvider>
             <Toaster />

@@ -5,6 +5,7 @@ import { useSortTable } from "@/hooks/useSortTable";
 import SortableTh from "@/components/SortableTh";
 import AssessmentReviewPanel from "@/components/AssessmentReviewPanel";
 import { useAppData } from "@/context/AppDataContext";
+import { useTacticScope } from "@/context/TacticScopeContext";
 import { generateQuarterlyAssessments, sourceQuarterForAssessment, type AutoAssessment, type ScoringContext } from "@/utils/quarterlyAutoScoring";
 import { useThreatModelQuarter } from "@/context/ThreatModelQuarterContext";
 import {
@@ -1408,12 +1409,16 @@ function AddActorModal({
 type TabId = "actors" | "pptap" | "sirt";
 
 export default function ThreatModel() {
+  const { isTechniqueEnabled } = useTacticScope();
   const { liveActorData } = useAppData();
   const procedureSource = useMemo(() => {
-    if (liveActorData?.procedures?.length) return liveActorData;
+    if (liveActorData?.procedures?.length) return {
+      ...liveActorData,
+      procedures: liveActorData.procedures.filter(procedure => isTechniqueEnabled(procedure.mitreId, procedure.tacticName)),
+    };
     const source = dashboardData as any;
     return {
-      procedures: (source.allProcedures ?? []).map((procedure: any) => ({
+      procedures: (source.allProcedures ?? []).filter((procedure: any) => isTechniqueEnabled(procedure.mitreId)).map((procedure: any) => ({
         actor: String(procedure.actor ?? ""),
         mitreId: String(procedure.mitreId ?? ""),
         tacticName: (source.techTacticMap?.[procedure.mitreId] ?? []).join(", "),
@@ -1428,7 +1433,7 @@ export default function ThreatModel() {
       label: "Bundled procedure dataset",
       loadedAt: new Date(0).toISOString(),
     };
-  }, [liveActorData]);
+  }, [liveActorData, isTechniqueEnabled]);
   // Quarter versioning
   const { selectedQuarter, setSelectedQuarter } = useThreatModelQuarter();
   const [savedVersions, setSavedVersions]     = useState<Array<{
@@ -2218,7 +2223,10 @@ export default function ThreatModel() {
       {showAssessmentReview && activeTab === "actors" && (
         <AssessmentReviewPanel
           quarter={selectedQuarter}
-          assessments={Object.values(autoAssessments).sort((a, b) => a.actorName.localeCompare(b.actorName))}
+          assessments={Object.values(autoAssessments).map(assessment => ({
+            ...assessment,
+            evidence: assessment.evidence.filter(item => isTechniqueEnabled(item.mitreId)),
+          })).sort((a, b) => a.actorName.localeCompare(b.actorName))}
           onClose={() => setShowAssessmentReview(false)}
           onDecide={decideAssessments}
           scoringContext={scoringContext}

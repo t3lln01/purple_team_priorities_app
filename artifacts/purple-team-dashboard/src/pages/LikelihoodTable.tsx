@@ -1,8 +1,9 @@
-import { useState, useMemo, useCallback, Fragment } from "react";
+import { useState, useMemo, useCallback, useEffect, Fragment } from "react";
 import { useDateWindow } from "@/context/DateWindowContext";
 import { Link } from "wouter";
 import { useLikelihood } from "@/context/LikelihoodContext";
 import { useAppData, baseFullRiskCalc } from "@/context/AppDataContext";
+import { useTacticScope } from "@/context/TacticScopeContext";
 import { useHVAScores } from "@/context/HVAScoresContext";
 import {
   LAST_OCC_OPTIONS,
@@ -67,6 +68,7 @@ type ComputedRow = RiskRow & {
 };
 
 export default function LikelihoodTable() {
+  const { isTechniqueEnabled } = useTacticScope();
   const { overrides, setOverride, resetOverride, resetAll } = useLikelihood();
   const { activeNewRiskRows, liveActorData } = useAppData();
   const { hvaScoreMap: hvaScores } = useHVAScores();
@@ -78,19 +80,20 @@ export default function LikelihoodTable() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
+  useEffect(() => { setPage(0); }, [isTechniqueEnabled]);
 
   // Max date per TID from live procedures (for auto last-occurrence detection)
   const liveDateByTid = useMemo(() => {
     const m: Record<string, number> = {};
     for (const p of liveActorData?.procedures ?? []) {
-      if (p.mitreId && p.date && p.date > (m[p.mitreId] ?? 0)) m[p.mitreId] = p.date;
+      if (p.mitreId && isTechniqueEnabled(p.mitreId) && p.date && p.date > (m[p.mitreId] ?? 0)) m[p.mitreId] = p.date;
     }
     return m;
-  }, [liveActorData]);
+  }, [liveActorData, isTechniqueEnabled]);
 
   const allSourceRows = useMemo(
-    () => [...rawRiskCalc, ...(activeNewRiskRows as RiskRow[])],
-    [activeNewRiskRows]
+    () => [...rawRiskCalc, ...(activeNewRiskRows as RiskRow[])].filter(row => isTechniqueEnabled(row.TID, row.Tactic)),
+    [activeNewRiskRows, isTechniqueEnabled]
   );
 
   const allTactics = useMemo(
@@ -181,8 +184,8 @@ export default function LikelihoodTable() {
 
   const overrideCount = Object.keys(overrides).length;
   const vhCount = computed.filter(r => r._likRate === "Very High").length;
-  const avgLik  = computed.reduce((s, r) => s + r._likScore, 0) / computed.length;
-  const maxLik  = Math.max(...computed.map(r => r._likScore));
+  const avgLik  = computed.reduce((s, r) => s + r._likScore, 0) / (computed.length || 1);
+  const maxLik  = Math.max(0, ...computed.map(r => r._likScore));
   const liveDateCount = Object.keys(liveDateByTid).length;
 
   return (

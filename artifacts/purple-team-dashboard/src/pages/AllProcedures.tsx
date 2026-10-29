@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useSearch } from "wouter";
 import data from "@/data.json";
+import { useTacticScope } from "@/context/TacticScopeContext";
 import { useSortTable } from "@/hooks/useSortTable";
 import SortableTh from "@/components/SortableTh";
 import { Plus, Upload, Trash2, X, Check, FileJson, FileText, AlertCircle, ChevronDown, ChevronUp, Activity, XCircle, Download } from "lucide-react";
@@ -291,6 +292,7 @@ function ActorMultiSelect({ selected, onChange, allActors }: {
 function MitreMultiSelect({ selected, onChange }: {
   selected: Set<string>; onChange: (next: Set<string>) => void;
 }) {
+  const { isTechniqueEnabled, isTacticEnabled } = useTacticScope();
   const [open, setOpen] = useState(false);
   const [tacticFilter, setTacticFilter] = useState("");
   const [idSearch, setIdSearch] = useState("");
@@ -306,10 +308,10 @@ function MitreMultiSelect({ selected, onChange }: {
 
   const tacticIds = useMemo(() => mitreIdsForTactic(tacticFilter), [tacticFilter]);
   const visible = useMemo(() => {
-    let ids = [...tacticIds];
+    let ids = [...tacticIds].filter(id => isTechniqueEnabled(id));
     if (idSearch) ids = ids.filter(id => id.toLowerCase().includes(idSearch.toLowerCase()));
     return ids;
-  }, [tacticIds, idSearch]);
+  }, [tacticIds, idSearch, isTechniqueEnabled]);
 
   function toggle(id: string) { const next = new Set(selected); next.has(id) ? next.delete(id) : next.add(id); onChange(next); }
   function selectAllVisible() { const next = new Set(selected); visible.forEach(id => next.add(id)); onChange(next); }
@@ -341,8 +343,8 @@ function MitreMultiSelect({ selected, onChange }: {
           <div className="p-2 border-b border-border space-y-2">
             <select value={tacticFilter} onChange={e => setTacticFilter(e.target.value)}
               className="w-full bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-              <option value="">All tactics ({allMitreIds.length} IDs)</option>
-              {allTactics.map(t => <option key={t} value={t}>{t} ({[...mitreIdsForTactic(t)].length} IDs)</option>)}
+              <option value="">All tactics ({allMitreIds.filter(id => isTechniqueEnabled(id)).length} IDs)</option>
+              {allTactics.filter(isTacticEnabled).map(t => <option key={t} value={t}>{t} ({[...mitreIdsForTactic(t)].filter(id => isTechniqueEnabled(id)).length} IDs)</option>)}
             </select>
             <input type="search" autoFocus placeholder="Search technique ID…" value={idSearch} onChange={e => setIdSearch(e.target.value)}
               className="w-full bg-input border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
@@ -546,6 +548,7 @@ function AddForm({ allActors, onSave, onCancel }: {
   onSave: (p: Procedure) => void;
   onCancel: () => void;
 }) {
+  const { isTechniqueEnabled } = useTacticScope();
   const [form, setForm] = useState(BLANK_FORM);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -595,7 +598,7 @@ function AddForm({ allActors, onSave, onCancel }: {
       <td className="px-2 py-3">
         <div>
           <input list="mitre-list" placeholder="T1190" {...f("mitreId")} className={inputCls(errors.mitreId)} />
-          <datalist id="mitre-list">{allMitreIds.map(id => <option key={id} value={id} />)}</datalist>
+          <datalist id="mitre-list">{allMitreIds.filter(id => isTechniqueEnabled(id)).map(id => <option key={id} value={id} />)}</datalist>
           {errors.mitreId && <p className="text-[10px] text-red-400 mt-0.5">{errors.mitreId}</p>}
         </div>
       </td>
@@ -624,6 +627,7 @@ function AddForm({ allActors, onSave, onCancel }: {
 
 // ──────────────────────────── main component ─────────────────────────────────
 export default function AllProcedures() {
+  const { isTechniqueEnabled } = useTacticScope();
   const search = useSearch();
   const { liveActorData, clearLiveActorData } = useAppData();
   const { overrides: tacticOverrides }     = useTacticScores();
@@ -665,8 +669,8 @@ export default function AllProcedures() {
 
   // All procedures: base data.json + manually added custom + live CrowdStrike procedures
   const allProcedures = useMemo(
-    () => [...baseProcedures, ...customProcs, ...liveProcs],
-    [customProcs, liveProcs]
+    () => [...baseProcedures, ...customProcs, ...liveProcs].filter(procedure => isTechniqueEnabled(procedure.mitreId)),
+    [customProcs, liveProcs, isTechniqueEnabled]
   );
 
   const allActors = useMemo(() => Array.from(
@@ -814,12 +818,12 @@ export default function AllProcedures() {
           <h1 className="text-2xl font-bold text-foreground">All Procedures</h1>
           <p className="text-muted-foreground text-sm mt-1">
             Full procedure list from MITRE ATT&amp;CK —{" "}
-            <span className="text-foreground font-medium">{baseProcedures.length.toLocaleString()}</span> base
+            <span className="text-foreground font-medium">{baseProcedures.filter(p => isTechniqueEnabled(p.mitreId)).length.toLocaleString()}</span> enabled base
             {customProcs.length > 0 && (
-              <span className="text-chart-2"> + {customProcs.length.toLocaleString()} custom</span>
+              <span className="text-chart-2"> + {customProcs.filter(p => isTechniqueEnabled(p.mitreId)).length.toLocaleString()} enabled custom</span>
             )}
             {liveProcs.length > 0 && (
-              <span className="text-chart-4"> + {liveProcs.length.toLocaleString()} live</span>
+              <span className="text-chart-4"> + {liveProcs.filter(p => isTechniqueEnabled(p.mitreId)).length.toLocaleString()} enabled live</span>
             )}
             {" "}= <span className="text-foreground font-medium">{allProcedures.length.toLocaleString()}</span> entries
           </p>

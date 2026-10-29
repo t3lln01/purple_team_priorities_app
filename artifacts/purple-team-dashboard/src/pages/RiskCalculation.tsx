@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useTacticScope } from "@/context/TacticScopeContext";
 import { Link } from "wouter";
 import { applyOverrides, type RiskRow } from "@/utils/riskOverrides";
 import { useTacticScores } from "@/context/TacticScoresContext";
@@ -65,6 +66,7 @@ function rateStyle(rate: string) {
 }
 
 export default function RiskCalculation() {
+  const { isTechniqueEnabled } = useTacticScope();
   const [search, setSearch]             = useState("");
   const [tacticFilter, setTacticFilter] = useState("All");
   const [sortKey, setSortKey]           = useState<SortKey>("Risk Scores");
@@ -77,8 +79,8 @@ export default function RiskCalculation() {
   const { activeNewRiskRows, liveActorData } = useAppData();
 
   const allRawRows = useMemo(
-    () => [...rawRiskCalc, ...(activeNewRiskRows as RiskRow[])],
-    [activeNewRiskRows]
+    () => [...rawRiskCalc, ...(activeNewRiskRows as RiskRow[])].filter(row => isTechniqueEnabled(row.TID, row.Tactic)),
+    [activeNewRiskRows, isTechniqueEnabled]
   );
 
   const riskCalc = useMemo(
@@ -96,7 +98,7 @@ export default function RiskCalculation() {
     ];
     for (const procedure of procedures) {
       const date = typeof procedure.date === "number" && Number.isFinite(procedure.date) ? procedure.date : null;
-      if (!procedure.mitreId) continue;
+      if (!procedure.mitreId || !isTechniqueEnabled(procedure.mitreId)) continue;
       const current = evidence.get(procedure.mitreId);
       evidence.set(procedure.mitreId, {
         latest: date === null ? current?.latest ?? null : Math.max(current?.latest ?? date, date),
@@ -104,7 +106,7 @@ export default function RiskCalculation() {
       });
     }
     return evidence;
-  }, [liveActorData]);
+  }, [liveActorData, isTechniqueEnabled]);
 
   const allRiskCalc = useMemo<ObservedRiskRow[]>(() => riskCalc.map(row => ({
     ...row,

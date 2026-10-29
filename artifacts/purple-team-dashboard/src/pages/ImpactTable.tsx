@@ -1,6 +1,7 @@
-import { useState, useMemo, useCallback, Fragment } from "react";
+import { useState, useMemo, useCallback, useEffect, Fragment } from "react";
 import { Link } from "wouter";
 import data from "@/data.json";
+import { useTacticScope } from "@/context/TacticScopeContext";
 import { useImpactOverrides, ImpactOverride } from "@/context/ImpactOverridesContext";
 import { useTacticScores } from "@/context/TacticScoresContext";
 import { useHVAScores } from "@/context/HVAScoresContext";
@@ -91,6 +92,7 @@ type ComputedRow = ImpactRow & {
 };
 
 export default function ImpactTable() {
+  const { isTechniqueEnabled } = useTacticScope();
   const { overrides, setOverride, resetOverride, resetAll } = useImpactOverrides();
   const { overrides: tacticOverrides } = useTacticScores();
   const { hvaScoreMap } = useHVAScores();
@@ -103,14 +105,15 @@ export default function ImpactTable() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
+  useEffect(() => { setPage(0); }, [isTechniqueEnabled]);
 
   const stixOverrides: Record<string, { name?: string; platforms?: string; tactics?: string }> = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("pt_stix_techniques") ?? "{}"); } catch { return {}; }
   }, []);
 
   const allSourceRows = useMemo(
-    () => [...(rawRows as ImpactRow[]), ...(activeNewImpactRows as ImpactRow[])],
-    [activeNewImpactRows]
+    () => [...(rawRows as ImpactRow[]), ...(activeNewImpactRows as ImpactRow[])].filter(row => isTechniqueEnabled(row.id, stixOverrides[row.id]?.tactics ?? row.tactics)),
+    [activeNewImpactRows, isTechniqueEnabled, stixOverrides]
   );
 
   const allTactics = useMemo(
@@ -220,8 +223,8 @@ export default function ImpactTable() {
 
   const overrideCount = Object.keys(overrides).length;
   const vhCount = computed.filter(r => r._impactRate === "Very High").length;
-  const avgImpact = computed.reduce((s, r) => s + r._impactScore, 0) / computed.length;
-  const maxImpact = Math.max(...computed.map(r => r._impactScore));
+  const avgImpact = computed.reduce((s, r) => s + r._impactScore, 0) / (computed.length || 1);
+  const maxImpact = Math.max(0, ...computed.map(r => r._impactScore));
 
   return (
     <div className="p-6 space-y-6">

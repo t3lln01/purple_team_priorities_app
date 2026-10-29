@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTacticScope } from "@/context/TacticScopeContext";
 import { Link } from "wouter";
 import { Crosshair, Search, ShieldCheck } from "lucide-react";
 import threatModelData from "@/threatModelData.json";
@@ -115,6 +116,7 @@ function ScoreDots({ score, color }: { score: number; color: string }) {
 }
 
 export default function ActorPrioritisation() {
+  const { isTechniqueEnabled } = useTacticScope();
   const { selectedQuarter } = useThreatModelQuarter();
   const [state, setState] = useState<ThreatModelState | null>(null);
   const [membership, setMembership] = useState<ThreatModelState | null>(null);
@@ -131,15 +133,15 @@ export default function ActorPrioritisation() {
   });
   const riskScores = useMemo(() => Object.fromEntries(
     applyOverrides(
-      [...baseFullRiskCalc, ...activeNewRiskRows] as RiskRow[],
+      ([...baseFullRiskCalc, ...activeNewRiskRows] as RiskRow[]).filter(row => isTechniqueEnabled(row.TID, row.Tactic)),
       tacticOverrides, likelihoodOverrides, impactOverrides, hvaScoreMap,
     ).map(row => [row.TID, row["Risk Scores"]]),
-  ), [activeNewRiskRows, tacticOverrides, likelihoodOverrides, impactOverrides, hvaScoreMap]);
+  ), [activeNewRiskRows, tacticOverrides, likelihoodOverrides, impactOverrides, hvaScoreMap, isTechniqueEnabled]);
   const tidRisks = useMemo(() => actorTidRisks([
     ...(data.allProcedures as ActorProcedure[]),
     ...customProcedures,
     ...(liveActorData?.procedures ?? []),
-  ], riskScores), [customProcedures, liveActorData, riskScores]);
+  ].filter(procedure => isTechniqueEnabled(procedure.mitreId)), riskScores), [customProcedures, liveActorData, riskScores, isTechniqueEnabled]);
   const priorityCeiling = useMemo(() => 49 * Math.max(
     0,
     ...Object.values(riskScores).filter(Number.isFinite),

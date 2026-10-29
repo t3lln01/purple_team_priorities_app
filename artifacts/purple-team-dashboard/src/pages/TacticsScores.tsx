@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { Pencil, Check, X, RotateCcw } from "lucide-react";
+import { useTacticScope } from "@/context/TacticScopeContext";
+import { useAuthorization } from "@/context/AuthContext";
 import { CONF_SCORES, INT_SCORES, AVAIL_SCORES } from "@/utils/impactFormulas";
 import {
   useTacticScores,
@@ -269,6 +271,8 @@ function TacticCard({
 // ── page ──────────────────────────────────────────────────────────────────────
 export default function TacticsScores() {
   const { liveTactics, overrides, setOverride, resetOverride, resetAll } = useTacticScores();
+  const { isTacticEnabled, setTacticEnabled, disabledTactics, storageError } = useTacticScope();
+  const { canWrite } = useAuthorization();
 
   const editedCount = Object.keys(overrides).length;
 
@@ -300,6 +304,31 @@ export default function TacticsScores() {
             Reset all ({editedCount})
           </button>
         )}
+      </div>
+
+      <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+        <h2 className="font-semibold">Included tactics</h2>
+        <p className="text-sm text-muted-foreground">
+          Disable a tactic to exclude its TIDs from every analysis, procedure list and calculation.
+          Multi-tactic TIDs are excluded if any assigned tactic is disabled. Re-enabling restores them without deleting data.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {disabledTactics.length} disabled · Saved automatically in this browser, independently of data imports and MITRE versions.
+        </p>
+        {storageError && <p role="alert" className="text-sm text-red-400">{storageError}</p>}
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {liveTactics.map(tactic => (
+            <label key={tactic.tactic} className="flex items-center gap-3 rounded-lg border border-border p-3 text-sm">
+              <input type="checkbox" checked={isTacticEnabled(tactic.tactic)}
+                disabled={!canWrite}
+                onChange={event => setTacticEnabled(tactic.tactic, event.target.checked)}
+                className="h-4 w-4 accent-primary"
+                aria-label={`Include ${tactic.tactic}`} />
+              <span className="flex-1">{tactic.tactic}</span>
+              <span className="text-xs text-muted-foreground">{isTacticEnabled(tactic.tactic) ? "Enabled" : "Disabled"}</span>
+            </label>
+          ))}
+        </div>
       </div>
 
       {/* weight reference legend */}
