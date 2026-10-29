@@ -14,3 +14,9 @@ The patched ESM release of js-yaml has no default export, while the current Orva
 **Why:** Keeping js-yaml fully patched broke OpenAPI code generation until Orval's import was changed to a namespace import.
 
 **How to apply:** Preserve the pnpm package patch when upgrading Orval or js-yaml, and remove it only after upstream Orval no longer imports js-yaml's default export.
+
+Check the current advisory status before replacing a dependency with no published fix. A withdrawn advisory does not justify an invasive package replacement.
+
+**Why:** The braces stack-exhaustion advisory was withdrawn as not practically exploitable, while the original remediation request still listed it as high severity.
+
+**How to apply:** Verify the authoritative advisory and document withdrawal explicitly; do not suppress unrelated active findings or claim the entire audit is clean.
